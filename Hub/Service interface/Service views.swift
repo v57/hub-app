@@ -149,7 +149,7 @@ extension Element: @retroactive View {
     let value: HStack
     var body: some View {
       SwiftUI.HStack(spacing: value.spacing?.cg) {
-        value.content
+        ForEach(value.content) { $0 }
       }
     }
   }
@@ -157,7 +157,7 @@ extension Element: @retroactive View {
     let value: VStack
     var body: some View {
       SwiftUI.VStack(spacing: value.spacing?.cg) {
-        value.content
+        ForEach(value.content) { $0 }
       }
     }
   }
@@ -165,7 +165,7 @@ extension Element: @retroactive View {
     let value: ZStack
     var body: some View {
       SwiftUI.ZStack {
-        value.content
+        ForEach(value.content) { $0 }
       }
     }
   }
@@ -394,17 +394,20 @@ struct ServiceView: View {
   @State private var app = ServiceApp()
   let header: AppHeader
   var body: some View {
-    ScrollView {
-      LazyVStack {
-        if let body = app.app.body {
-          ForEach(body) { element in
-            element
+    GeometryReader { view in
+      ScrollView {
+        VStack {
+          if let body = app.app.body {
+            ForEach(body) { element in
+              element
+            }
           }
-        }
+        }.frame(minHeight: view.size.height)
       }
-    }.navigationTitle(app.app.header?.name ?? header.name)
-      .environment(app)
-      .task(id: header.path) { await app.sync(hub: hub, path: header.path) }
+    }.safeAreaPadding()
+    .navigationTitle(app.app.header?.name ?? header.name)
+    .environment(app)
+    .task(id: header.path) { await app.sync(hub: hub, path: header.path) }
   }
 }
 
