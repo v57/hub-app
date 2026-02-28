@@ -62,7 +62,7 @@ extension Element: @retroactive View {
     @Environment(ServiceApp.self) var app
     @Environment(NestedList.self) var nested: NestedList?
     func translate(_ value: String) -> String? {
-      value.staticText ?? self.value(value)
+      value.staticText ?? self.value(String(value.dropFirst()))
     }
     func value(_ value: String) -> String? {
       nested?.data?[value]?.string ?? app.data[value]?.string
@@ -374,7 +374,7 @@ extension Element: @retroactive View {
 }
 extension String {
   var staticText: String? {
-    starts(with: "$") ? String(dropFirst()) : nil
+    starts(with: "$") ? nil : self
   }
 }
 extension Double {
