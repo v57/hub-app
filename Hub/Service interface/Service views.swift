@@ -224,9 +224,9 @@ extension Element: @retroactive View {
     var body: some View {
       let v = state.doubleBinding(value.value, defaultValue: value.max)
       if let step = value.step {
-        SwiftUI.Slider(value: v, in: range, step: step)
+        SwiftUI.Slider(value: v, in: range, step: step).frame(maxWidth: 150)
       } else {
-        SwiftUI.Slider(value: v, in: range)
+        SwiftUI.Slider(value: v, in: range).frame(maxWidth: 150)
       }
     }
   }
