@@ -129,13 +129,12 @@ extension Element: @retroactive View {
         let progress = progress(current: current)
         SwiftUI.ZStack {
           Circle().trim(from: 0, to: 1)
-            .rotation(.degrees(-90))
-            .stroke(.blue.opacity(0.2), lineWidth: 2)
+            .stroke(.blue.opacity(0.2), lineWidth: 3)
           Circle().trim(from: 0, to: progress)
             .rotation(.degrees(-90))
-            .stroke(.blue.gradient, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+            .stroke(.blue.gradient, style: StrokeStyle(lineWidth: 3, lineCap: .round))
             .animation(.smooth, value: progress)
-        }.frame(width: 24, height: 24)
+        }.frame(width: 18, height: 18)
       }
     }
   }
