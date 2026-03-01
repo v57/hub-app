@@ -56,7 +56,7 @@ struct HomeView: View {
           InstallationGuide()
         } label: {
           ZStack {
-            Text("Make your own").font(.callout.weight(.semibold))
+            Text("Make your own").cellTitle()
               .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             Text("Learn how to host your own Hub")
               .secondary()
@@ -192,7 +192,7 @@ struct HomeView: View {
             Text("Services")
             Spacer()
             Image(systemName: "circle.hexagongrid.fill")
-          }.font(.callout.weight(.semibold))
+          }.cellTitle()
           Spacer()
           ForEach(status.services.sorted(by: { $0.requests > $1.requests }).prefix(3), id: \.name) { service in
             VStack(alignment: .leading) {
@@ -262,7 +262,7 @@ struct HomeView: View {
               Text(app.id)
               Spacer()
               Image(systemName: "terminal")
-            }.font(.callout.weight(.semibold))
+            }.cellTitle()
             Spacer()
             HStack(alignment: .lastTextBaseline) {
               VStack(alignment: .leading) {
@@ -404,7 +404,7 @@ struct HomeView: View {
             Text("Share Services")
             Spacer()
             Image(systemName: "square.and.arrow.up")
-          }.font(.callout.weight(.semibold))
+          }.cellTitle()
           Spacer()
           LazyVGrid(columns: [.init(.adaptive(minimum: 48))]) {
             ForEach(Service.allCases, id: \.self) { service in
@@ -459,7 +459,7 @@ struct HomeView: View {
             Image(systemName: "wifi", variableValue: hub.isConnected ? 1 : 0)
               .symbolEffect(.variableColor.iterative.dimInactiveLayers.reversing, options: .repeat(3), isActive: !hub.isConnected)
           }
-        }.font(.callout.weight(.semibold))
+        }.cellTitle()
         Spacer()
         if hub.isConnected {
           VStack(alignment: .leading) {
@@ -511,7 +511,7 @@ struct HomeView: View {
     var body: some View {
       VStack(alignment: .leading) {
         HStack {
-          Text(url?.absoluteString ?? "Join Hub").font(.callout.weight(.semibold))
+          Text(url?.absoluteString ?? "Join Hub").cellTitle()
           Spacer()
           if let url, let providedName {
             Button {
@@ -682,9 +682,8 @@ struct BlockStyle: ViewModifier {
   @Environment(\.colorScheme) var scheme
   func body(content: Content) -> some View {
     RoundedRectangle(cornerRadius: cornerRadius)
-      .fill(scheme == .dark ? Color(hue: 0.98, saturation: 0.3, brightness: 0.18) : Color(hue: 0.98, saturation: 0.05, brightness: 0.98))
-      .strokeBorder(LinearGradient(colors: [.clear, .white.opacity(0.2), .clear], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1)
-      .shadow(color: .black.opacity(0.2), radius: 12)
+      .fill(.background)
+      .shadow(color: .black.opacity(scheme == .dark ? 0.2 : 0.1), radius: 10)
       .overlay { content.safeAreaPadding(8) }
       .modifier {
         #if os(macOS)
@@ -694,6 +693,12 @@ struct BlockStyle: ViewModifier {
         #endif
       }
       .transition(.home)
+  }
+}
+
+extension View {
+  func cellTitle() -> some View {
+    font(.callout.weight(.semibold))
   }
 }
 
@@ -708,5 +713,7 @@ extension Date {
 }
 
 #Preview {
-  HomeView().frame(height: 800)
+  NavigationStack {
+    HomeView()
+  }.frame(height: 800)
 }
