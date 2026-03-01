@@ -313,6 +313,7 @@ extension Element: @retroactive View {
     @State private var processed = 0
     @State private var isClearing = false
     @State private var failed = Set<String>()
+    let state = AppState()
     var path: String { (app.app.header?.name ?? "Services") + "/" }
     var body: some View {
       RoundedRectangle(cornerRadius: 16).fill(Color.gray.opacity(0.1))
@@ -343,7 +344,7 @@ extension Element: @retroactive View {
             for path in files {
               do {
                 let from: String = try await hub.client.send("s3/read", path)
-                let target = target(from: path, value: value.value)
+                let target = target(from: path)
                 let to: String = try await hub.client.send("s3/write", target)
                 try await value.action.perform(hub: hub, app: app, nested: nested) { data in
                   data["from"] = .string(from)
@@ -357,23 +358,29 @@ extension Element: @retroactive View {
           }
         }.buttonStyle(.plain)
     }
-    func target(from path: String, value: String) -> String {
-      let result = path.parentDirectory + "Output/" + path.components(separatedBy: "/").last!
-      let valueComponents = value.components(separatedBy: ".")
-      if valueComponents.count > 1 {
-        let ext = valueComponents.last!
-        var res = result.components(separatedBy: ".")
-        res[res.count - 1] = ext
-        return res.joined(separator: ".")
-      } else {
-        return result
-      }
+    func target(from path: String) -> String {
+      var result = path.parentDirectory + "Output/" + path.components(separatedBy: "/").last!
+      guard let v = value.format, let format = state.translate(v) else { return result }
+      result.fileExtension = format
+      return result
     }
   }
 }
 extension String {
   var staticText: String? {
     starts(with: "$") ? nil : self
+  }
+  fileprivate var fileExtension: String {
+    get { components(separatedBy: ".").last ?? "" }
+    set {
+      var c = components(separatedBy: ".")
+      if c.count > 1 {
+        c[c.count - 1] = newValue
+        self = c.joined(separator: ".")
+      } else {
+        self += ".\(newValue)"
+      }
+    }
   }
 }
 extension Double {
