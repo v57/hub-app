@@ -9,28 +9,30 @@ import SwiftUI
 
 struct Toolbar: View {
   var body: some View {
-    if #available(macOS 15.0, iOS 18.0, *) {
-      TabView {
-        Tab("Home", systemImage: "house.fill") {
-          HomeView()
+    NavigationStack {
+      if #available(macOS 15.0, iOS 18.0, *) {
+        TabView {
+          Tab("Home", systemImage: "house.fill") {
+            HomeView()
+          }
+          Tab("Detail", systemImage: "sidebar.leading") {
+            ContentView()
+          }
+          Tab("Farm", systemImage: "tree.fill") {
+            FarmView()
+          }
         }
-        Tab("Detail", systemImage: "sidebar.leading") {
-          ContentView()
-        }
-        Tab("Farm", systemImage: "tree.fill") {
-          FarmView()
-        }
-      }
-    } else {
-      TabView {
-        HomeView().tabItem {
-          Label("Home", systemImage: "house.fill")
-        }
-        ContentView().tabItem {
-          Label("Detail", systemImage: "sidebar.leading")
-        }
-        FarmView().tabItem {
-          Label("Farm", systemImage: "tree.fill")
+      } else {
+        TabView {
+          HomeView().tabItem {
+            Label("Home", systemImage: "house.fill")
+          }
+          ContentView().tabItem {
+            Label("Detail", systemImage: "sidebar.leading")
+          }
+          FarmView().tabItem {
+            Label("Farm", systemImage: "tree.fill")
+          }
         }
       }
     }

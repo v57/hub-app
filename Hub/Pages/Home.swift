@@ -18,32 +18,30 @@ struct HomeView: View {
   var isFocusing: Bool { focus == .joinHubAddress || focus == .joinHubName }
   @State var hubs = Hubs.main
   var body: some View {
-    NavigationStack {
-      GeometryReader { view in
-        ScrollView {
-          VStack(alignment: .leading) {
-            HeaderSection(focus: $focus)
-            ForEach(Hubs.main.list) { hub in
-              HubSection().environment(hub).transition(.home)
+    GeometryReader { view in
+      ScrollView {
+        VStack(alignment: .leading) {
+          HeaderSection(focus: $focus)
+          ForEach(Hubs.main.list) { hub in
+            HubSection().environment(hub).transition(.home)
+          }
+          Text("My Apps").sectionTitle()
+          HomeGrid {
+            ForEach(AppServicesView.Service.allCases, id: \.self) { item in
+              ServiceContent(item: item, isSharing: nil)
             }
-            Text("My Apps").sectionTitle()
-            HomeGrid {
-              ForEach(AppServicesView.Service.allCases, id: \.self) { item in
-                ServiceContent(item: item, isSharing: nil)
-              }
-            }
-            Text("Support this Project").sectionTitle()
-            SupportView()
-          }.padding(.top).animation(.home, value: isFocusing)
-            .animation(.home, value: hubs.list.count)
-            .animation(.smooth, value: view.size.width)
-        }.environment(\.homeGridSpacing, HomeGrid.spacing(width: view.size.width - 16))
-      }.navigationTitle("Home")
-        .scrollDismissesKeyboard(.immediately)
-        .toolbarTitleDisplayMode(.inline)
-        .contentTransition(.numericText())
-        .scrollIndicators(.hidden)
-    }
+          }
+          Text("Support this Project").sectionTitle()
+          SupportView()
+        }.padding(.top).animation(.home, value: isFocusing)
+          .animation(.home, value: hubs.list.count)
+          .animation(.smooth, value: view.size.width)
+      }.environment(\.homeGridSpacing, HomeGrid.spacing(width: view.size.width - 16))
+    }.navigationTitle("Home")
+      .scrollDismissesKeyboard(.immediately)
+      .toolbarTitleDisplayMode(.inline)
+      .contentTransition(.numericText())
+      .scrollIndicators(.hidden)
   }
   struct HeaderSection: View {
     @FocusState.Binding var focus: TextFieldFocus?
