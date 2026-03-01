@@ -13,7 +13,7 @@ import Combine
 extension HubService.Group {
   func videoService() -> Self {
     app(App(header: .init(type: .app, name: "Video Encoder", path: "video/encode/ui"), body: [
-      .fileOperation(.init(title: nil, value: "videos.mov", action: .init(path: "video/encode/hevc", body: .void)))
+      .fileOperation(.init(title: nil, format: "mov", action: .init(path: "video/encode/hevc", body: .void)))
     ], data: [:]))
     .post("video/encode/hevc") { (request: EncodeRequest) in
       try await Self.encodeVideo(from: request.from, to: request.to)
@@ -21,10 +21,23 @@ extension HubService.Group {
   }
   func imageService() -> Self {
     app(App(header: .init(type: .app, name: "Image Encoder", path: "image/encode/ui"), body: [
-      .fileOperation(.init(title: nil, value: "images.heic", action: .init(path: "image/encode/heic", body: .void)))
-    ], data: [:]))
-    .post("image/encode/heic") { (request: EncodeRequest) in
-      try await Self.encodeImage(from: request.from, to: request.to)
+      .fileOperation(.init(title: nil, format: "$type", action: .init(path: "image/encode", body: .multiple(["type": "type", "quality": "quality"])))),
+      .vstack(.init(content: [
+        .hstack(.init(content: [
+          .text(.init(value: "Quality", secondary: true)),
+          .spacer(.init()),
+          .slider(.init(value: "quality", min: 0.1, max: 1.0, step: 0.1)),
+          .progress(.init(value: "quality")),
+        ])),
+        .hstack(.init(content: [
+          .text(.init(value: "Result Format", secondary: true)),
+          .spacer(.init()),
+          .picker(.init(options: ["heic", "avif", "jpeg", "png"], selected: "type")),
+        ])),
+      ]))
+    ], data: ["quality": .double(0.8), "type": .string("heic")]))
+    .post("image/encode") { (request: EncodeImageRequest) in
+      try await Self.encodeImage(request: request)
     }
   }
 #if os(macOS) || os(iOS) || os(visionOS)
@@ -40,9 +53,15 @@ extension HubService.Group {
     let from: URL
     let to: URL
   }
-  static func encodeImage(from: URL, to: URL) async throws {
-    let heic = try await data(from: from).heic(quality: 0.8, metadata: false)
-    try await upload(data: heic, to: to)
+  struct EncodeImageRequest: Decodable, Sendable {
+    let from: URL
+    let to: URL
+    let type: ImageType
+    let quality: Double
+  }
+  static func encodeImage(request: EncodeImageRequest) async throws {
+    let data = try await data(from: request.from).image(format: request.type.rawValue, quality: request.quality, metadata: false)
+    try await upload(data: data, to: request.to)
   }
   static func encodeVideo(from: URL, to: URL) async throws {
     let url = try await download(from: from)
@@ -112,7 +131,7 @@ class AppServices {
     }
 #endif
     video = hub.service.group(enabled: enabled.contains("video/encode")).videoService()
-    image = hub.service.group(enabled: enabled.contains("image/encode")).imageService()
+    image = hub.service.group(enabled: true).imageService()
 #if os(macOS) || os(iOS) || os(visionOS)
     sensitiveContent = hub.service.group(enabled: enabled.contains("image/sensitive")).sensitiveContentService()
 #endif
