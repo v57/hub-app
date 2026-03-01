@@ -43,6 +43,35 @@ struct SensitiveContentView: View {
         }
       }.frame(maxWidth: .infinity, alignment: .leading)
         .safeAreaPadding()
+    }.overlay {
+      ZStack {
+        if items.isEmpty {
+          VStack(spacing: 16) {
+            VStack {
+              Image(systemName: "photo.badge.magnifyingglass").font(.system(size: 88))
+                .gradientBlur(radius: 4)
+              Text("Detect Sensitive Content").font(.title)
+              Text("Helps with moderation on your server").secondary()
+            }
+            VStack(alignment: .center, spacing: 4) {
+              HStack(spacing: 4) {
+                Image(systemName: "circle.hexagonpath.fill").frame(width: 16)
+                  .foregroundStyle(.red.gradient)
+                Text("Use in your Hub").font(.caption2)
+              }
+              HStack(spacing: 4) {
+                Image(systemName: "lock.badge.checkmark").frame(width: 16)
+                  .foregroundStyle(.green)
+                Text("No internet needed").font(.caption2)
+              }
+              HStack(spacing: 4) {
+                Image(systemName: "arrow.down.app").frame(width: 16)
+                Text("Drop files here to check them").secondary()
+              }
+            }.symbolVariant(.fill)
+          }.transition(.blurReplace)
+        }
+      }.animation(.smooth, value: items.isEmpty).allowsHitTesting(false)
     }.dropFiles { (urls: [URL], point: CGPoint) -> Bool in
       withAnimation {
         items.append(contentsOf: urls.map { Item(url: $0) })
