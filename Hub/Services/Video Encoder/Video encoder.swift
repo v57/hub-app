@@ -7,11 +7,12 @@
 
 import Foundation
 @preconcurrency import AVFoundation
+import AudioToolbox
 import VideoToolbox
 
 public actor VideoEncoder {
   public enum Error: Swift.Error {
-    case noVideo, writingError
+    case noVideo, writingError, unsupportedAudioChannelLayout(tag: AudioChannelLayoutTag), invalidVideoSettings(reason: String)
   }
   
   // Compression Encode Parameters
@@ -25,9 +26,18 @@ public actor VideoEncoder {
       config.bitrate = Float(bitrate)
       return config
     }
-    public static func hevc(quality: Float, size: CGSize?, frameReordering: Bool, profile: Hevc.ProfileLevel = .main) -> Self {
-      other(codec: .hevc, quality: quality, size: size, frameReordering: frameReordering)
+    public static func hevc(quality: Float, size: CGSize?, frameReordering: Bool = false, hdr: Bool = true, profile: Hevc.ProfileLevel = .main) -> Self {
+      var settings = VideoCompressorSettings()
+        .codec(.hevc)
+        .compression(quality: quality, frameReordering: frameReordering, profile: profile)
+      if !hdr {
+        settings = settings.color(.hd).wideColor(false)
+      }
+      var config = EncoderSettings(settings: settings, fileType: .mov, size: size)
+      config.quality = quality
+      return config
     }
+    
     public static func other(codec: AVVideoCodecType, quality: Float, size: CGSize?, frameReordering: Bool = true, profile: Hevc.ProfileLevel = .main) -> Self {
       let settings = VideoCompressorSettings()
         .codec(codec)
@@ -50,74 +60,265 @@ public actor VideoEncoder {
   }
   public init() { }
   
+  struct VideoTrack {
+    let track: AVAssetTrack
+    let settings: [String: Any]
+    let transform: CGAffineTransform
+  }
+  
   struct AudioTrack {
     let track: AVAssetTrack
     let dataRate: Float
-    var settings: [String: Any] {
-      var audioChannelLayout = AudioChannelLayout()
-      memset(&audioChannelLayout, 0, MemoryLayout<AudioChannelLayout>.size)
-      audioChannelLayout.mChannelLayoutTag = kAudioChannelLayoutTag_Stereo
-      return [
-        AVFormatIDKey: kAudioFormatMPEG4AAC,
-        AVSampleRateKey: 44100,
-        AVEncoderBitRateKey: min(dataRate, 128_000),
-        AVNumberOfChannelsKey: 2,
-        AVChannelLayoutKey: Data(bytes: &audioChannelLayout, count: MemoryLayout<AudioChannelLayout>.size)
+    let sampleRate: Double
+    let channels: Int
+    let channelLayout: Data?
+    var readerSettings: [String: Any] {
+      var settings: [String: Any] = [
+        AVFormatIDKey: kAudioFormatLinearPCM,
+        AVSampleRateKey: sampleRate,
+        AVNumberOfChannelsKey: max(channels, 1),
       ]
+      if let channelLayout {
+        settings[AVChannelLayoutKey] = channelLayout
+      }
+      return settings
     }
+    func writerSettings() throws -> [String: Any] {
+      let channelCount = max(channels, 1)
+      let minimumBitrate = Float(max(channels, 1) * 64_000)
+      var settings: [String: Any] = [
+        AVFormatIDKey: kAudioFormatMPEG4AAC,
+        AVSampleRateKey: sampleRate,
+        AVEncoderBitRateKey: max(dataRate, minimumBitrate),
+        AVNumberOfChannelsKey: channelCount,
+      ]
+      settings[AVChannelLayoutKey] = try resolvedChannelLayout()
+      return settings
+    }
+    
+    private func resolvedChannelLayout() throws -> Data {
+      let channelCount = max(channels, 1)
+      if let layout = channelLayout,
+         let parsedLayout = layout.audioChannelLayout(),
+         parsedLayout.mChannelLayoutTag == kAudioChannelLayoutTag_UseChannelDescriptions {
+        return layout
+      }
+      if let layout = channelLayout,
+         let parsedLayout = layout.audioChannelLayout(),
+         isSupported(aacChannelLayout: parsedLayout, sampleRate: sampleRate, channels: channelCount) {
+        return layout
+      }
+      if let fallback = availableFallbackChannelLayout(sampleRate: sampleRate, channels: channelCount) {
+        return fallback
+      }
+      for tag in [kAudioChannelLayoutTag_Mono, kAudioChannelLayoutTag_Stereo] {
+        var fallbackLayout = AudioChannelLayout()
+        memset(&fallbackLayout, 0, MemoryLayout<AudioChannelLayout>.size)
+        fallbackLayout.mChannelLayoutTag = tag
+        if isSupported(aacChannelLayout: fallbackLayout, sampleRate: sampleRate, channels: channelCount) {
+          return Data(bytes: &fallbackLayout, count: MemoryLayout<AudioChannelLayout>.size)
+        }
+      }
+      throw Error.unsupportedAudioChannelLayout(tag: 0)
+    }
+    
+    private func availableFallbackChannelLayout(sampleRate: Double, channels: Int) -> Data? {
+      for tag in supportedAACChannelLayoutTags(sampleRate: sampleRate, channels: channels) where tag != 0 {
+        var candidate = AudioChannelLayout()
+        memset(&candidate, 0, MemoryLayout<AudioChannelLayout>.size)
+        candidate.mChannelLayoutTag = tag
+        if isSupported(aacChannelLayout: candidate, sampleRate: sampleRate, channels: channels) {
+          return Data(bytes: &candidate, count: MemoryLayout<AudioChannelLayout>.size)
+        }
+      }
+      return nil
+    }
+    
+    private func supportedAACChannelLayoutTags(sampleRate: Double, channels: Int) -> [AudioChannelLayoutTag] {
+      var asbd = AudioStreamBasicDescription(
+        mSampleRate: sampleRate,
+        mFormatID: kAudioFormatMPEG4AAC,
+        mFormatFlags: 0,
+        mBytesPerPacket: 0,
+        mFramesPerPacket: 1024,
+        mBytesPerFrame: 0,
+        mChannelsPerFrame: UInt32(max(channels, 1)),
+        mBitsPerChannel: 0,
+        mReserved: 0
+      )
+      var propertySize: UInt32 = 0
+      var status = AudioFormatGetPropertyInfo(
+        kAudioFormatProperty_AvailableEncodeChannelLayoutTags,
+        UInt32(MemoryLayout<AudioStreamBasicDescription>.size),
+        &asbd,
+        &propertySize
+      )
+      guard status == noErr, propertySize > 0 else { return [] }
+      let count = Int(propertySize / UInt32(MemoryLayout<AudioChannelLayoutTag>.size))
+      guard count > 0 else { return [] }
+      var availableTags = Array(repeating: AudioChannelLayoutTag(), count: count)
+      status = AudioFormatGetProperty(
+        kAudioFormatProperty_AvailableEncodeChannelLayoutTags,
+        UInt32(MemoryLayout<AudioStreamBasicDescription>.size),
+        &asbd,
+        &propertySize,
+        &availableTags
+      )
+      guard status == noErr else { return [] }
+      return availableTags
+    }
+    
+    private func isSupported(aacChannelLayout: AudioChannelLayout, sampleRate: Double, channels: Int) -> Bool {
+      var asbd = AudioStreamBasicDescription(
+        mSampleRate: sampleRate,
+        mFormatID: kAudioFormatMPEG4AAC,
+        mFormatFlags: 0,
+        mBytesPerPacket: 0,
+        mFramesPerPacket: 1024,
+        mBytesPerFrame: 0,
+        mChannelsPerFrame: UInt32(max(channels, 1)),
+        mBitsPerChannel: 0,
+        mReserved: 0
+      )
+      var propertySize: UInt32 = 0
+      var status = AudioFormatGetPropertyInfo(
+        kAudioFormatProperty_AvailableEncodeChannelLayoutTags,
+        UInt32(MemoryLayout<AudioStreamBasicDescription>.size),
+        &asbd,
+        &propertySize
+      )
+      guard status == noErr, propertySize > 0 else { return false }
+      let count = Int(propertySize / UInt32(MemoryLayout<AudioChannelLayoutTag>.size))
+      guard count > 0 else { return false }
+      var availableTags = Array(repeating: AudioChannelLayoutTag(), count: count)
+      status = AudioFormatGetProperty(
+        kAudioFormatProperty_AvailableEncodeChannelLayoutTags,
+        UInt32(MemoryLayout<AudioStreamBasicDescription>.size),
+        &asbd,
+        &propertySize,
+        &availableTags
+      )
+      guard status == noErr else { return false }
+      return availableTags.contains(aacChannelLayout.mChannelLayoutTag)
+    }
+  }
+  
+  private struct ProcessPipeline: @unchecked Sendable {
+    let input: AVAssetWriterInput
+    let output: AVAssetReaderTrackOutput
+    let progress: CompressionProgress?
   }
   
   
   public func encode(from asset: AVAsset, to: URL, settings: EncoderSettings, progress: @escaping @Sendable @MainActor (CMTime, CMTime) -> Void) async throws {
-    guard let videoTrack = try await asset.loadTracks(withMediaType: .video).first else { throw Error.noVideo }
+    let videoTracks = try await asset.loadTracks(withMediaType: .video)
+    guard !videoTracks.isEmpty else { throw Error.noVideo }
+    var videos: [VideoTrack] = []
+    videos.reserveCapacity(videoTracks.count)
+    for track in videoTracks {
+      let (videoSize, transform) = try await track.load(.naturalSize, .preferredTransform)
+      let targetSize = mapSize(settings.size, size: videoSize)
+      let videoSettings = settings.settings.width(targetSize.width).height(targetSize.height).settings
+      videos.append(VideoTrack(track: track, settings: videoSettings, transform: transform))
+    }
     
-    let (videoSize, transform) = try await videoTrack.load(.naturalSize, .preferredTransform)
-    let targetSize = mapSize(settings.size, size: videoSize)
-    let videoSettings = settings.settings.width(targetSize.width).height(targetSize.height).settings
-    let audio: AudioTrack?
-    if let track = try await asset.loadTracks(withMediaType: .audio).first {
+    let sourceAudioTracks = try await asset.loadTracks(withMediaType: .audio)
+    var audios: [AudioTrack] = []
+    audios.reserveCapacity(sourceAudioTracks.count)
+    for track in sourceAudioTracks {
       let dataRate = try await track.load(.estimatedDataRate)
-      audio = AudioTrack(track: track, dataRate: dataRate)
-    } else {
-      audio = nil
+      let formatDescriptions = try await track.load(.formatDescriptions)
+      var sampleRate = 44_100.0
+      var channels = 2
+      var channelLayout: Data?
+      if let formatDescription = formatDescriptions.first {
+        if let streamDescription = CMAudioFormatDescriptionGetStreamBasicDescription(formatDescription) {
+          sampleRate = streamDescription.pointee.mSampleRate
+          channels = Int(streamDescription.pointee.mChannelsPerFrame)
+        }
+        var layoutSize = 0
+        if
+          let layout = CMAudioFormatDescriptionGetChannelLayout(formatDescription, sizeOut: &layoutSize),
+          layoutSize > 0
+        {
+          channelLayout = Data(bytes: layout, count: layoutSize)
+        }
+      }
+      audios.append(
+        AudioTrack(
+          track: track,
+          dataRate: dataRate,
+          sampleRate: sampleRate,
+          channels: channels,
+          channelLayout: channelLayout
+        )
+      )
     }
     
     let duration: CMTime = try await asset.load(.duration)
-    let progress = CompressionProgress(duration: duration, callback: progress)
+    let progressTracker = CompressionProgress(duration: duration, callback: progress)
     
-    nonisolated(unsafe) let videoOutput = AVAssetReaderTrackOutput(track: videoTrack, outputSettings: [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA])
-    nonisolated(unsafe) let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings)
-    videoInput.transform = transform
     let reader = try AVAssetReader(asset: asset)
     let writer = try AVAssetWriter(url: to, fileType: settings.fileType)
-    if reader.canAdd(videoOutput) {
+    
+    var pipelines: [ProcessPipeline] = []
+    pipelines.reserveCapacity(videos.count + audios.count)
+    var hasProgressPipeline = false
+    for video in videos {
+      let videoOutput = AVAssetReaderTrackOutput(
+        track: video.track,
+        outputSettings: [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
+      )
+      guard reader.canAdd(videoOutput) else { throw Error.writingError }
       reader.add(videoOutput)
       videoOutput.alwaysCopiesSampleData = false
-    }
-    if writer.canAdd(videoInput) {
+      let outputSettings = validatedVideoSettings(video.settings, writer: writer)
+      let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: outputSettings)
+      guard writer.canAdd(videoInput) else {
+        throw Error.invalidVideoSettings(reason: "The provided video settings are not supported by AVAssetWriter.")
+      }
+      videoInput.transform = video.transform
+      guard writer.canAdd(videoInput) else { throw Error.writingError }
       writer.add(videoInput)
+      
+      let pipelineProgress: CompressionProgress?
+      if hasProgressPipeline {
+        pipelineProgress = nil
+      } else {
+        pipelineProgress = progressTracker
+        hasProgressPipeline = true
+      }
+      pipelines.append(ProcessPipeline(input: videoInput, output: videoOutput, progress: pipelineProgress))
     }
     
-    nonisolated(unsafe) var audioInput: AVAssetWriterInput?
-    nonisolated(unsafe) var audioOutput: AVAssetReaderTrackOutput?
-    if let audio {
-      audioOutput = AVAssetReaderTrackOutput(track: audio.track, outputSettings: [AVFormatIDKey: kAudioFormatLinearPCM, AVNumberOfChannelsKey: 2])
-      audioInput = AVAssetWriterInput(mediaType: .audio, outputSettings: audio.settings)
-    }
-    if let audioOutput, reader.canAdd(audioOutput) {
+    for audio in audios {
+      let audioOutput = AVAssetReaderTrackOutput(track: audio.track, outputSettings: audio.readerSettings)
+      guard reader.canAdd(audioOutput) else { throw Error.writingError }
       reader.add(audioOutput)
-    }
-    if let audioInput, writer.canAdd(audioInput) {
+      let audioWriterSettings = try audio.writerSettings()
+      let audioInput = AVAssetWriterInput(mediaType: .audio, outputSettings: audioWriterSettings)
+      guard writer.canAdd(audioInput) else { throw Error.writingError }
       writer.add(audioInput)
+      
+      pipelines.append(ProcessPipeline(input: audioInput, output: audioOutput, progress: nil))
     }
     
-    reader.startReading()
-    writer.startWriting()
+    guard reader.startReading() else {
+      throw reader.error ?? Error.writingError
+    }
+    guard writer.startWriting() else {
+      throw writer.error ?? Error.writingError
+    }
     writer.startSession(atSourceTime: CMTime.zero)
-    async let videoTask: Void = process(input: videoInput, output: videoOutput, progress: progress)
-    async let audioTask: Void = process(input: audioInput, output: audioOutput, progress: nil)
-    await videoTask
-    await audioTask
+    
+    await withTaskGroup(of: Void.self) { group in
+      for pipeline in pipelines {
+        group.addTask { [self] in
+          await self.process(input: pipeline.input, output: pipeline.output, progress: pipeline.progress)
+        }
+      }
+      await group.waitForAll()
+    }
     switch writer.status {
     case .writing, .completed:
       await withCheckedContinuation { continuation in
@@ -136,7 +337,8 @@ public actor VideoEncoder {
     nonisolated(unsafe) let input = i
     nonisolated(unsafe) let output = o
     await withCheckedContinuation { continuation in
-      input.requestMediaDataWhenReady(on: .global()) {
+      let queue = DispatchQueue(label: "Video encoder")
+      input.requestMediaDataWhenReady(on: queue) {
         while input.isReadyForMoreMediaData {
           if let buffer = output.copyNextSampleBuffer() {
             if let progress {
@@ -167,6 +369,31 @@ public actor VideoEncoder {
     } else {
       let height = target.width * size.height / size.width
       return CGSize(width: target.width, height: height.rounded(.down))
+    }
+  }
+  
+  private func validatedVideoSettings(_ settings: [String: Any], writer: AVAssetWriter) -> [String: Any] {
+    if writer.canApply(outputSettings: settings, forMediaType: .video) {
+      return settings
+    }
+    var fallbackSettings = settings
+    fallbackSettings.removeValue(forKey: AVVideoAllowWideColorKey)
+    fallbackSettings.removeValue(forKey: AVVideoColorPropertiesKey)
+    if writer.canApply(outputSettings: fallbackSettings, forMediaType: .video) {
+      return fallbackSettings
+    }
+    return settings
+  }
+}
+
+private extension Data {
+  func audioChannelLayout() -> AudioChannelLayout? {
+    guard count >= MemoryLayout<AudioChannelLayout>.size else { return nil }
+    return withUnsafeBytes { bytes in
+      bytes
+        .bindMemory(to: AudioChannelLayout.self)
+        .baseAddress?
+        .pointee
     }
   }
 }
