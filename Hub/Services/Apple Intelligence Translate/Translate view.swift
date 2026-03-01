@@ -27,6 +27,35 @@ struct TranslateView: View {
         languages = await LanguageAvailability().supportedLanguages
           .map(\.minimalIdentifier).sorted(by: { $0.languageName < $1.languageName })
       }.frame(maxWidth: .infinity, alignment: .leading).padding()
+    }.overlay {
+      ZStack {
+        if text.isEmpty {
+          VStack {
+            Image(systemName: "translate").font(.system(size: 88))
+              .gradientBlur(radius: 1)
+            Text("Translate").font(.title)
+            VStack(alignment: .center, spacing: 4) {
+              HStack(spacing: 4) {
+                Image(systemName: "circle.hexagonpath.fill").frame(width: 16)
+                  .foregroundStyle(.red.gradient)
+                Text("Use in your Hub").font(.caption2)
+              }
+              HStack(spacing: 4) {
+                Image(systemName: "lock").frame(width: 16)
+                Text("No internet needed").font(.caption2)
+              }.foregroundStyle(.green)
+              HStack(spacing: 4) {
+                Image(systemName: "lock").frame(width: 16)
+                Text("No translation history").font(.caption2)
+              }.foregroundStyle(.green)
+              HStack(spacing: 4) {
+                Image(systemName: "arrow.down.circle").frame(width: 16)
+                Text("Select language and start typing to download it").secondary()
+              }
+            }.symbolVariant(.fill)
+          }.transition(.blurReplace)
+        }
+      }.animation(.smooth, value: text.isEmpty)
     }.toolbar {
       Button("Refresh", systemImage: "arrow.clockwise") {
         Task {
@@ -153,6 +182,6 @@ extension String {
 #Preview {
   NavigationStack {
     TranslateView()
-  }
+  }.environment(Hub.test)
 }
 #endif
