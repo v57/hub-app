@@ -528,7 +528,7 @@ struct LargeProgressView: View {
 
 #Preview {
   NavigationStack {
-    ServiceView(header: AppHeader(name: "Image Encoder", path: "image/encode/ui")).environment(Hub.test)
+    ServiceView(header: AppHeader(name: "Video Encoder", path: "video/encode/ui")).environment(Hub.test)
   }
 }
 

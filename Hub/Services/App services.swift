@@ -13,10 +13,21 @@ import Combine
 extension HubService.Group {
   func videoService() -> Self {
     app(App(header: .init(type: .app, name: "Video Encoder", path: "video/encode/ui"), body: [
-      .fileOperation(.init(title: nil, format: "mov", action: .init(path: "video/encode/hevc", body: .void)))
-    ], data: [:]))
-    .post("video/encode/hevc") { (request: EncodeRequest) in
-      try await Self.encodeVideo(from: request.from, to: request.to)
+      .text(.init(value: "This service will convert your videos to h265 (hevc) format", secondary: true)),
+      .text(.init(value: "60% quality is a good for transfering over the internet", secondary: true)),
+      .text(.init(value: "Select desired quality and drop some files. Processing will start automatically", secondary: true)),
+      .vstack(.init(content: [
+        .hstack(.init(content: [
+          .text(.init(value: "Quality", secondary: true)),
+          .spacer(.init()),
+          .slider(.init(value: "quality", min: 0.1, max: 1.0, step: 0.1)),
+          .progress(.init(value: "quality")),
+        ])),
+      ])),
+      .fileOperation(.init(title: nil, format: "mov", action: .init(path: "video/encode/hevc", body: .void))),
+    ], data: ["quality": .double(0.6)]))
+    .post("video/encode/hevc") { (request: EncodeVideoRequest) in
+      try await Self.encodeVideo(request: request)
     }
   }
   func imageService() -> Self {
@@ -49,10 +60,6 @@ extension HubService.Group {
     }
   }
 #endif
-  struct EncodeRequest: Decodable, Sendable {
-    let from: URL
-    let to: URL
-  }
   struct EncodeImageRequest: Decodable, Sendable {
     let from: URL
     let to: URL
@@ -63,14 +70,19 @@ extension HubService.Group {
     let data = try await data(from: request.from).image(format: request.type.rawValue, quality: request.quality, metadata: false)
     try await upload(data: data, to: request.to)
   }
-  static func encodeVideo(from: URL, to: URL) async throws {
-    let url = try await download(from: from)
+  struct EncodeVideoRequest: Decodable, Sendable {
+    let from: URL
+    let to: URL
+    let quality: Float
+  }
+  static func encodeVideo(request: EncodeVideoRequest) async throws {
+    let url = try await download(from: request.from)
     defer { url.delete() }
     let asset = AVURLAsset(url: url)
     let target = URL.temporaryDirectory.appending(path: UUID().uuidString + ".mov", directoryHint: .notDirectory)
     defer { target.delete() }
-    try await VideoEncoder().encode(from: asset, to: target, settings: .hevc(quality: 0.6, size: nil, frameReordering: true)) { _, _ in }
-    try await upload(file: target, to: to)
+    try await VideoEncoder().encode(from: asset, to: target, settings: .hevc(quality: request.quality, size: nil, frameReordering: true)) { _, _ in }
+    try await upload(file: target, to: request.to)
   }
   static func download(from: URL) async throws -> URL {
     let (tempDownload, _) = try await URLSession.shared.download(from: from)
@@ -131,7 +143,7 @@ class AppServices {
     }
 #endif
     video = hub.service.group(enabled: enabled.contains("video/encode")).videoService()
-    image = hub.service.group(enabled: true).imageService()
+    image = hub.service.group(enabled: enabled.contains("image/encode")).imageService()
 #if os(macOS) || os(iOS) || os(visionOS)
     sensitiveContent = hub.service.group(enabled: enabled.contains("image/sensitive")).sensitiveContentService()
 #endif
