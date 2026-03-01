@@ -19,7 +19,7 @@ extension Data {
     case cannotCreateDestination
     case finalizeFailed
   }
-  func heic(quality: CGFloat, metadata: Bool) throws -> Data {
+  func image(format: String, quality: CGFloat, metadata: Bool) throws -> Data {
     guard let source = CGImageSourceCreateWithData(self as CFData, nil), CGImageSourceGetCount(source) > 0 else {
       throw ImageError.cannotCreateImageSource
     }
@@ -27,7 +27,7 @@ extension Data {
       kCGImageSourceShouldCache: true as CFBoolean
     ] as CFDictionary) else { throw ImageError.cannotCreateCGImage }
     let result = NSMutableData()
-    guard let destination = CGImageDestinationCreateWithData(result, "public.heic" as CFString, 1, nil) else {
+    guard let destination = CGImageDestinationCreateWithData(result, "public.\(format)" as CFString, 1, nil) else {
       throw ImageError.cannotCreateDestination
     }
     var imageProperties: [CFString: Any] = [:]

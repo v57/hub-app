@@ -6,15 +6,23 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
+import Combine
+
+enum ImageType: String, Codable, CaseIterable {
+  case heic, avif, jpeg, png
+}
+
 #if os(macOS) || os(iOS) || os(visionOS)
 
 struct ImageEncoderView: View {
   struct Operation: Identifiable {
-    var id: URL { file }
+    let id = UUID()
     var file: URL
-    var name: String { file.lastPathComponent }
+    var name: String { targetName }
+    var format: ImageType
     var targetName: String {
-      file.deletingPathExtension().lastPathComponent
+      file.deletingPathExtension().lastPathComponent + ".\(format.rawValue)"
     }
     var size: Int
     var result: Data?
@@ -27,6 +35,8 @@ struct ImageEncoderView: View {
   @State private var isRunning = false
   @State private var quality: CGFloat = 0.6
   @State private var metadata: Bool = false
+  @State private var format: ImageType = .heic
+  @State private var currentTask: AnyCancellable?
   var body: some View {
     Table(of: Operation.self, selection: $selected, sortOrder: $sortOrder) {
       TableColumn("Name", value: \Operation.name) { (file: Operation) in
@@ -43,21 +53,15 @@ struct ImageEncoderView: View {
         TableRow(file).draggable(ImageTransfer(file: file))
       }
     }.dropFiles { (files: [URL], point: CGPoint) -> Bool in
-      var content = [URL]()
-      for file in files {
-        file.contents(array: &content)
-      }
-      for file in content {
-        if file.lastPathComponent.fileType == .image {
-          operations.append(Operation(file: file, size: Int(file.fileSize), result: nil))
-        }
-      }
-      if !isRunning {
-        Task { try await run() }
-      }
+      add(files: files)
       return true
     }.safeAreaInset(edge: .top) {
       HStack {
+        Picker("Output Format", selection: $format) {
+          ForEach(ImageType.allCases, id: \.self) {
+            Text($0.rawValue).id($0)
+          }
+        }
         Toggle("Keep metadata", isOn: $metadata)
         HStack {
           Text("Quality \(Int(quality * 100))%")
@@ -70,7 +74,7 @@ struct ImageEncoderView: View {
   struct ImageTransfer: Transferable {
     let file: Operation
     static var transferRepresentation: some TransferRepresentation {
-      DataRepresentation(exportedContentType: .heic) { item in
+      DataRepresentation(exportedContentType: .image) { item in
         item.file.result!
       }.suggestedFileName { $0.file.targetName }
     }
@@ -103,23 +107,45 @@ struct ImageEncoderView: View {
       }
     }
   }
-  func run() async throws {
-    isRunning = true
-    var completed = 0
-    for i in 0..<operations.count {
-      let operation = operations[i]
-      guard operation.result == nil else { return }
-      try Task.checkCancellation()
-      do {
-        operations[i].result = try await operation.file.heic(quality: quality, metadata: metadata)
-        completed += 1
-      } catch {
-        operations[i].error = true
+  func add(files: [URL]) {
+    var content = [URL]()
+    for file in files {
+      file.contents(array: &content)
+    }
+    for file in content {
+      if file.lastPathComponent.fileType == .image {
+        operations.append(Operation(file: file, format: format, size: Int(file.fileSize), result: nil))
       }
     }
+    if !isRunning {
+      currentTask = Task {
+        await run()
+      }.cancellable()
+    }
+  }
+  func run() async {
+    guard !isRunning else { return }
+    isRunning = true
+    var completed = 0
+    
+    do {
+      for i in 0..<operations.count {
+        let operation = operations[i]
+        guard operation.result == nil else { continue }
+        try Task.checkCancellation()
+        do {
+          operations[i].result = try await operation.file
+            .image(format: operation.format.rawValue, quality: quality, metadata: metadata)
+          completed += 1
+        } catch {
+          operations[i].error = true
+        }
+      }
+    } catch { }
     isRunning = false
+    print(completed, isRunning)
     if completed > 0 {
-      try await run()
+      await run()
     }
   }
 }
@@ -130,9 +156,9 @@ struct ImageEncoderView: View {
 #endif
 
 extension URL {
-  func heic(quality: CGFloat, metadata: Bool) async throws -> Data {
+  func image(format: String, quality: CGFloat, metadata: Bool) async throws -> Data {
     try await Task.detached {
-      try Data(contentsOf: self).heic(quality: quality, metadata: metadata)
+      try Data(contentsOf: self).image(format: format, quality: quality, metadata: metadata)
     }.value
   }
 }
