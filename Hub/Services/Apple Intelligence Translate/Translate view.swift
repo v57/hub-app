@@ -30,10 +30,13 @@ struct TranslateView: View {
     }.overlay {
       ZStack {
         if text.isEmpty {
-          VStack {
-            Image(systemName: "translate").font(.system(size: 88))
-              .gradientBlur(radius: 1)
-            Text("Translate").font(.title)
+          VStack(spacing: 16) {
+            VStack {
+              Image(systemName: "translate").font(.system(size: 88))
+                .gradientBlur(radius: 1)
+              Text("Translate").font(.title)
+              Text("by Apple Intelligence").secondary()
+            }
             VStack(alignment: .center, spacing: 4) {
               HStack(spacing: 4) {
                 Image(systemName: "circle.hexagonpath.fill").frame(width: 16)

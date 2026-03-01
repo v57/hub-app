@@ -17,6 +17,40 @@ struct ChatView: View {
   var body: some View {
     List(messages) { message in
       Text(message.text).contentTransition(.numericText())
+    }.overlay {
+      ZStack {
+        if messages.isEmpty && text.isEmpty {
+          VStack(spacing: 16) {
+            VStack {
+              Image(systemName: "apple.intelligence").font(.system(size: 88))
+                .gradientBlur(radius: 4)
+              Text("Chat").font(.title)
+              Text("by Apple Ingelligence").secondary()
+            }
+            VStack(alignment: .center, spacing: 4) {
+              HStack(spacing: 4) {
+                Image(systemName: "circle.hexagonpath.fill").frame(width: 16)
+                  .foregroundStyle(.red.gradient)
+                Text("Use in your Hub").font(.caption2)
+              }
+              HStack(spacing: 4) {
+                Image(systemName: "lock.badge.checkmark").frame(width: 16)
+                  .foregroundStyle(.green)
+                Text("No internet needed").font(.caption2)
+              }
+              HStack(spacing: 4) {
+                Image(systemName: "lock.badge.checkmark").frame(width: 16)
+                  .foregroundStyle(.green)
+                Text("No chat history").font(.caption2)
+              }
+              HStack(spacing: 4) {
+                Image(systemName: "brain").frame(width: 16)
+                Text("Not smart, but fine").secondary()
+              }
+            }.symbolVariant(.fill)
+          }.transition(.blurReplace)
+        }
+      }.animation(.smooth, value: messages.isEmpty && text.isEmpty)
     }.safeAreaInset(edge: .bottom) {
       HStack {
         #if os(visionOS)
@@ -25,6 +59,7 @@ struct ChatView: View {
         #else
         TextField("Type your message...", text: $text)
           .padding(.horizontal).padding(.vertical, 6)
+          .textFieldStyle(.plain)
           .glassEffect(.regular, in: .capsule)
         #endif
         Button("Send") {
