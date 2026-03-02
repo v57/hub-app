@@ -13,13 +13,27 @@ struct UserConnections: View {
   @HubState(\.users) private var users
   @HubState(\.groups) private var groups
   var body: some View {
-    List(users) { user in
-      UserView(user: user, isMe: user.key == hub.key).contextMenu {
-        if let key = user.key {
-          Menu("Group") {
-            ForEach(groups.groups) { group in
-              AsyncButton(group.name) {
-                try await hub.add(key: key, group: group.name)
+    List {
+      Section {
+        VStack {
+          Image(systemName: "wifi").font(.system(size: 88))
+            .gradientBlur(radius: 4)
+          Text("Connections").font(.title.bold())
+          Text("""
+          See all services and other devices connected to this Hub
+          Assign them to permission groups
+          """).secondary()
+            .multilineTextAlignment(.center)
+        }.frame(maxWidth: .infinity)
+      }
+      ForEach(users) { user in
+        UserView(user: user, isMe: user.key == hub.key).contextMenu {
+          if let key = user.key {
+            Menu("Group") {
+              ForEach(groups.groups) { group in
+                AsyncButton(group.name) {
+                  try await hub.add(key: key, group: group.name)
+                }
               }
             }
           }
