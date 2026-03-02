@@ -15,7 +15,9 @@ struct HubApp: App {
   var body: some Scene {
     WindowGroup {
       if !ProcessInfo.isPreviews {
-        Toolbar()
+        NavigationStack {
+          HomeView()
+        }
       }
     }
   }

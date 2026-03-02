@@ -81,6 +81,11 @@ struct HomeView: View {
         } label: {
           AppIcon(title: copied ? "Copied" : "My Key", systemImage: copied ? "checkmark.circle.fill" : "key")
         }.buttonStyle(.plain)
+        NavigationLink {
+          FarmView()
+        } label: {
+          AppIcon(title: "Farm", systemImage: "tree")
+        }.buttonStyle(.plain)
       }
     }
   }
