@@ -616,7 +616,7 @@ struct HomeView: View {
           }
         }.overlay {
           GeometryReader { view in
-            title.font(.system(size: 10)).offset(y: view.size.height + 4)
+            title.font(.system(size: 10)).offset(y: view.size.height - 4)
               .multilineTextAlignment(.center)
               .frame(maxWidth: .infinity)
           }
@@ -705,6 +705,7 @@ struct BlockStyle: ViewModifier {
       .fill(.background)
       .shadow(color: .black.opacity(scheme == .dark ? 0.2 : 0.1), radius: 10)
       .overlay { content.safeAreaPadding(8) }
+      .padding(8)
       .modifier {
         #if os(macOS)
         $0
