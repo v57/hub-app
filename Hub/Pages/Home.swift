@@ -78,6 +78,7 @@ struct HomeView: View {
             .transitionTarget(id: "farm", namespace: namespace)
         } label: {
           AppIcon(title: "Farm", systemImage: "tree")
+            .iconBadge(Farm.main.isRunning ? "Farming" : nil)
             .transitionSource(id: "farm", namespace: namespace)
         }
       }

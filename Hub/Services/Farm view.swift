@@ -26,8 +26,16 @@ struct FarmView: View {
     return battery.charging || battery.level >= farm.minimumBattery
   }
   var body: some View {
-    List {
-      VStack(alignment: .leading) {
+    VStack(spacing: 16) {
+      if !farm.isRunning {
+        VStack {
+          Image(systemName: "tree").font(.system(size: 88))
+            .gradientBlur(radius: 4)
+          Text("Farm").font(.title)
+          Text("Prevents your device from sleeping while enabled").secondary()
+        }.transition(.blurReplace)
+      }
+      VStack {
         HStack {
           Slider(value: $farm.minimumBattery, in: 0...1, step: 0.05)
             .frame(maxWidth: 200)
@@ -36,30 +44,42 @@ struct FarmView: View {
         Text(text).secondary()
       }
 #if os(iOS)
-      VStack(alignment: .leading) {
+      HStack {
+        VStack(alignment: .leading) {
+          Text("Lower brightness")
+          Text("Lowers brightness to minimum level until stops. Helps to save battery").secondary()
+        }
+        Spacer()
         Toggle("Lower brightness", isOn: $farm.lowerBrightness)
-        Text("Lowers brightness to minimum level until stops. Helps to save battery").secondary()
+          .labelsHidden()
       }
-      VStack(alignment: .leading) {
+      HStack {
+        VStack(alignment: .leading) {
+          Text("Black overlay")
+          Text("Adds black screen, increasing battery life on OLED and XDR displays").secondary()
+        }
+        Spacer()
         Toggle("Black overlay", isOn: $blackOverlay)
-        Text("Adds black screen, increasing battery life on OLED and XDR displays").secondary()
+          .labelsHidden()
       }
 #endif
       if !canStart {
-        VStack(alignment: .leading) {
+        VStack {
           Text("Start charging your device\nor change minimum battery level")
           if let battery = farm.battery {
             Text("Battery level is \(Int(battery.level * 100))%")
           }
-        }.foregroundStyle(.red).error().transition(.blurReplace)
+        }.multilineTextAlignment(.center).foregroundStyle(.red).error().transition(.blurReplace)
       }
-    }.safeAreaInset(edge: .bottom) {
-      Button(farm.isRunning ? "Stop" : "Start") {
-        withAnimation {
-          farm.isRunning = true
-        }
-      }.disabled(!canStart).glassProminentButton().padding()
-    }.frame(maxWidth: .infinity, maxHeight: .infinity)
+    }.safeAreaPadding(.horizontal)
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+      .safeAreaInset(edge: .bottom) {
+        Button(farm.isRunning ? "Stop" : "Start Farming") {
+          withAnimation {
+            farm.isRunning.toggle()
+          }
+        }.disabled(!canStart).buttonStyle(ActionButtonStyle()).padding()
+      }.frame(maxWidth: .infinity, maxHeight: .infinity)
       .toggleStyle(.switch)
       .overlay {
         if farm.isRunning {
@@ -67,7 +87,9 @@ struct FarmView: View {
           Color.clear.toolbar(.hidden, for: .tabBar)
 #endif
           Color.black.opacity(blackOverlay ? 1 : 0.001).onTapGesture {
-            farm.isRunning = false
+            withAnimation {
+              farm.isRunning = false
+            }
           }.ignoresSafeArea()
         }
       }.disableSystemOverlay(farm.isRunning)
@@ -82,6 +104,12 @@ struct FarmView: View {
     }
   }
 }
+
+//struct ActionButtonStyle: ButtonStyle {
+//  func makeBody(configuration: Configuration) -> some View {
+//    configuration.label
+//  }
+//}
 
 extension View {
   func disableSystemOverlay(_ hidden: Bool) -> some View {
