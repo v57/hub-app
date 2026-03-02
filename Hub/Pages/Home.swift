@@ -97,7 +97,7 @@ struct HomeView: View {
     @State private var sheet: Sheet?
     enum Sheet: Identifiable {
       var id: Sheet { self }
-      case pending, connections, permissions, lockdown
+      case pending, connections, permissions, launcher, lockdown
     }
     var body: some View {
       Text(hub.settings.name).sectionTitle()
@@ -139,12 +139,12 @@ struct HomeView: View {
             AppIcon(title: "Lockdown", systemImage: "key.shield")
           }.buttonStyle(.plain)
         }
-        if hub.require(permissions: "launcher/app/create") {
-          NavigationLink {
-            StoreView().environment(hub)
+        if hub.require(permissions: "launcher/status") {
+          Button {
+            sheet = .launcher
           } label: {
-            AppIcon(title: "Get Apps", systemImage: "arrow.down.circle.fill")
-          }.buttonStyle(.plain).transition(.home)
+            AppIcon(title: "Launcher", systemImage: "apple.terminal")
+          }.buttonStyle(.plain)
         }
         Files()
         ForEach(launcherInfo.apps) { app in
@@ -179,6 +179,10 @@ struct HomeView: View {
             .environment(hub)
         case .lockdown:
           LockdownView()
+            .safeAreaPadding(.top).frame(minHeight: 400)
+            .environment(hub)
+        case .launcher:
+          LauncherView()
             .safeAreaPadding(.top).frame(minHeight: 400)
             .environment(hub)
         }
