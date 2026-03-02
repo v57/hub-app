@@ -76,7 +76,7 @@ struct TranslateView: View {
                 .symbolVariant(.circle.fill)
                 .tag(language)
             }
-          }
+          }.frame(maxWidth: .infinity)
           Button("Switch", systemImage: "arrow.left.arrow.right") {
             let source = source
             withAnimation {
@@ -84,14 +84,14 @@ struct TranslateView: View {
               target = source
               text = result
             }
-          }.labelStyle(.iconOnly)
+          }.labelStyle(.iconOnly).buttonStyle(ActionButtonStyle())
           Picker("Target", selection: $target) {
             ForEach(languages, id: \.self) { language in
               Label(language.languageName, systemImage: icon(status: installed?.contains(language)))
                 .symbolVariant(.circle.fill).tag(language)
             }
-          }
-        }
+          }.frame(maxWidth: .infinity)
+        }.frame(maxWidth: 400)
         TextField("Text to translate", text: $text, axis: .vertical)
           .textFieldStyle(.roundedBorder)
       }.padding().task(id: text) {
