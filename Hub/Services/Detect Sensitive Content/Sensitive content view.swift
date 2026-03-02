@@ -72,6 +72,7 @@ struct SensitiveContentView: View {
           }.transition(.blurReplace)
         }
       }.animation(.smooth, value: items.isEmpty).allowsHitTesting(false)
+        .frame(minHeight: 500, alignment: .top)
     }.dropFiles { (urls: [URL], point: CGPoint) -> Bool in
       withAnimation {
         items.append(contentsOf: urls.map { Item(url: $0) })

@@ -51,6 +51,7 @@ struct ChatView: View {
           }.transition(.blurReplace)
         }
       }.animation(.smooth, value: messages.isEmpty && text.isEmpty)
+        .frame(minHeight: 500, alignment: .top)
     }.safeAreaInset(edge: .bottom) {
       HStack {
         #if os(visionOS)

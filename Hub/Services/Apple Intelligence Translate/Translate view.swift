@@ -33,7 +33,7 @@ struct TranslateView: View {
           VStack(spacing: 16) {
             VStack {
               Image(systemName: "translate").font(.system(size: 88))
-                .gradientBlur(radius: 1)
+                .gradientBlur(radius: 4)
               Text("Translate").font(.title)
               Text("by Apple Intelligence").secondary()
             }
@@ -58,7 +58,7 @@ struct TranslateView: View {
             }.symbolVariant(.fill)
           }.transition(.blurReplace)
         }
-      }.animation(.smooth, value: text.isEmpty)
+      }.animation(.smooth, value: text.isEmpty).frame(minHeight: 500, alignment: .top)
     }.toolbar {
       Button("Refresh", systemImage: "arrow.clockwise") {
         Task {
