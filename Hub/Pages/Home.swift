@@ -17,6 +17,7 @@ struct HomeView: View {
   @FocusState var focus: TextFieldFocus?
   var isFocusing: Bool { focus == .joinHubAddress || focus == .joinHubName }
   @State var hubs = Hubs.main
+  @Environment(\.colorScheme) var colorScheme
   var body: some View {
     GeometryReader { view in
       ScrollView {
@@ -42,6 +43,7 @@ struct HomeView: View {
       .toolbarTitleDisplayMode(.inline)
       .contentTransition(.numericText())
       .scrollIndicators(.hidden)
+      .background(Color.main(dark: colorScheme == .dark).ignoresSafeArea())
   }
   struct HeaderSection: View {
     @FocusState.Binding var focus: TextFieldFocus?
@@ -549,12 +551,12 @@ struct HomeView: View {
           .textFieldStyle(.plain)
           .keyboard(style: .url)
           .padding(.horizontal, 8).padding(.vertical, 4)
-          .background(.black.opacity(0.2), in: RoundedRectangle(cornerRadius: 8))
+          .background(.black.opacity(0.05), in: RoundedRectangle(cornerRadius: 8))
         if !address.isEmpty {
           TextField(url?.name ?? "Name", text: $name).focused(focus, equals: .joinHubAddress)
             .textFieldStyle(.plain)
             .padding(.horizontal, 8).padding(.vertical, 4)
-            .background(.black.opacity(0.2), in: RoundedRectangle(cornerRadius: 8))
+            .background(.black.opacity(0.05), in: RoundedRectangle(cornerRadius: 8))
             .transition(.home)
         }
       }.animation(.home, value: address.isEmpty).blockBackground()
@@ -703,7 +705,7 @@ struct BlockStyle: ViewModifier {
   @Environment(\.colorScheme) var scheme
   func body(content: Content) -> some View {
     RoundedRectangle(cornerRadius: cornerRadius)
-      .fill(.background)
+      .fill(Color.main(dark: scheme == .dark))
       .shadow(color: .black.opacity(scheme == .dark ? 0.2 : 0.1), radius: 10)
       .overlay { content.safeAreaPadding(8) }
       .padding(8)
@@ -812,6 +814,16 @@ private extension String {
     let components = components(separatedBy: ".")
     guard components.count > 1 else { return self }
     return components[components.count - 2]
+  }
+}
+
+extension Color {
+  static func main(dark: Bool) -> Color {
+    if dark {
+      Color(hue: 0.091, saturation: 0.186, brightness: 0.156)
+    } else {
+      Color.white
+    }
   }
 }
 
