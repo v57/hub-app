@@ -28,7 +28,7 @@ struct HomeView: View {
           Text("My Apps").sectionTitle()
           HomeGrid {
             ForEach(AppServices.Service.allCases, id: \.self) { item in
-              ServiceContent(item: item, isSharing: nil)
+              ServiceContent(item: item)
             }
           }
           Text("Support this Project").sectionTitle()
@@ -48,12 +48,13 @@ struct HomeView: View {
     @State private var copied = false
     @State var address: String = ""
     @State var merging: Hub?
+    @Namespace var namespace
     var body: some View {
       HomeGrid {
         JoinHubView(address: $address.animation(), focus: $focus)
           .gridSize(address.isEmpty ? .x21 : .x42)
         NavigationLink {
-          InstallationGuide()
+          InstallationGuide().transitionTarget(id: "guide", namespace: namespace)
         } label: {
           ZStack {
             Text("Make your own").cellTitle()
@@ -61,7 +62,7 @@ struct HomeView: View {
             Text("Learn how to host your own Hub")
               .secondary()
               .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-          }.blockBackground()
+          }.blockBackground().transitionSource(id: "guide", namespace: namespace)
         }.buttonStyle(.plain).gridSize(.x21)
         ForEach(Hubs.main.list) { hub in
           HubView(merging: $merging).environment(hub)
@@ -74,8 +75,10 @@ struct HomeView: View {
         }.buttonStyle(.plain)
         NavigationLink {
           FarmView()
+            .transitionTarget(id: "farm", namespace: namespace)
         } label: {
           AppIcon(title: "Farm", systemImage: "tree")
+            .transitionSource(id: "farm", namespace: namespace)
         }.buttonStyle(.plain)
       }
     }
@@ -103,18 +106,20 @@ struct HomeView: View {
     @HubState(\.launcherInfo) var launcherInfo
     @Bindable var hub: Hub
     @State private var sheet: Sheet?
+    @Namespace var namespace
     enum Sheet: Identifiable {
       var id: Sheet { self }
-      case pending, connections, permissions, launcher, lockdown
+      case services, pending, connections, permissions, launcher, lockdown, installS3, files
     }
     var body: some View {
       Text(hub.settings.name).sectionTitle()
       HomeGrid {
         if statusBadges.services == 0 {
-          NavigationLink {
-            Services().environment(hub)
+          Button {
+            sheet = .services
           } label: {
             ServicesView()
+              .transitionSource(id: Sheet.services, namespace: namespace)
           }.buttonStyle(.plain).transition(.home).gridSize(.x22)
         }
         if hub.require(permissions: "hub/connections") {
@@ -123,6 +128,7 @@ struct HomeView: View {
           } label: {
             AppIcon(title: "Connections", systemImage: "wifi")
               .iconBadge(statusBadges.connections)
+              .transitionSource(id: Sheet.connections, namespace: namespace)
           }.buttonStyle(.plain)
         }
         if hub.require(permissions: "hub/host/pending") {
@@ -131,6 +137,7 @@ struct HomeView: View {
           } label: {
             AppIcon(title: "Requests", systemImage: "clock")
               .iconBadge(statusBadges.security)
+              .transitionSource(id: Sheet.pending, namespace: namespace)
           }.buttonStyle(.plain)
         }
         if hub.require(permissions: "hub/group/list", "hub/group/names") {
@@ -138,6 +145,7 @@ struct HomeView: View {
             sheet = .permissions
           } label: {
             AppIcon(title: "Permissions", systemImage: "lock")
+              .transitionSource(id: Sheet.permissions, namespace: namespace)
           }.buttonStyle(.plain)
         }
         if hub.canLockdown {
@@ -145,6 +153,7 @@ struct HomeView: View {
             sheet = .lockdown
           } label: {
             AppIcon(title: "Lockdown", systemImage: "key.shield")
+              .transitionSource(id: Sheet.lockdown, namespace: namespace)
           }.buttonStyle(.plain)
         }
         if hub.require(permissions: "launcher/status") {
@@ -152,9 +161,22 @@ struct HomeView: View {
             sheet = .launcher
           } label: {
             AppIcon(title: "Launcher", systemImage: "apple.terminal")
+              .transitionSource(id: Sheet.launcher, namespace: namespace)
           }.buttonStyle(.plain)
         }
-        Files()
+        if hub.hasStorage {
+          Button {
+            sheet = .files
+          } label: {
+            AppIcon(title: "Files", systemImage: "folder")
+          }.buttonStyle(.plain).transition(.home)
+        } else if hub.canInstall {
+          Button {
+            sheet = .installS3
+          } label: {
+            AppIcon(title: "Files", systemImage: "folder")
+          }.buttonStyle(.plain).transition(.home)
+        }
         ForEach(launcherInfo.apps) { app in
           AppView(app: app)
         }
@@ -164,36 +186,38 @@ struct HomeView: View {
             NavigationLink(value: app) {
               AppIcon(title: app.name, textIcon: String(app.name.first ?? "A"))
                 .iconBadge(app.isOnline ? nil : "Offline", color: .red)
+                .transitionSource(id: app.id, namespace: namespace)
             }.buttonStyle(.plain).transition(.home)
           }
         }
       }
       .navigationDestination(for: Hub.AppHeader.self) { app in
         ServiceView(header: app).environment(hub)
+          .transitionTarget(id: app.id, namespace: namespace)
       }
       .navigationDestination(item: $sheet) { sheet in
-        switch sheet {
-        case .connections:
-          UserConnections()
-            .safeAreaPadding(.top).frame(minHeight: 400)
-            .environment(hub)
-        case .pending:
-          PendingListView()
-            .safeAreaPadding(.top).frame(minHeight: 400)
-            .environment(hub)
-        case .permissions:
-          PermissionGroups()
-            .safeAreaPadding(.top).frame(minHeight: 400)
-            .environment(hub)
-        case .lockdown:
-          LockdownView()
-            .safeAreaPadding(.top).frame(minHeight: 400)
-            .environment(hub)
-        case .launcher:
-          LauncherView()
-            .safeAreaPadding(.top).frame(minHeight: 400)
-            .environment(hub)
-        }
+        ZStack {
+          switch sheet {
+          case .services:
+            Services()
+          case .connections:
+            UserConnections()
+          case .pending:
+            PendingListView()
+          case .permissions:
+            PermissionGroups()
+          case .lockdown:
+            LockdownView()
+          case .launcher:
+            LauncherView()
+          case .files:
+            StorageView()
+          case .installS3:
+            InstallS3()
+          }
+        }.safeAreaPadding(.top).frame(minHeight: 400)
+          .environment(hub)
+          .transitionTarget(id: sheet, namespace: namespace)
       }
     }
     struct ServicesView: View {
@@ -389,24 +413,6 @@ struct HomeView: View {
         try await hub.client.send("launcher/app/cluster", LauncherView.AppView.SetInstances(name: app.name, count: targetInstances))
       }
     }
-    struct Files: View {
-      @Environment(Hub.self) var hub
-      var body: some View {
-        if hub.hasStorage {
-          NavigationLink {
-            StorageView().environment(hub)
-          } label: {
-            AppIcon(title: "Files", systemImage: "folder")
-          }.buttonStyle(.plain).transition(.home)
-        } else if hub.canInstall {
-          NavigationLink {
-            InstallS3().environment(hub)
-          } label: {
-            AppIcon(title: "Files", systemImage: "folder")
-          }.buttonStyle(.plain).transition(.home)
-        }
-      }
-    }
     struct ShareServicesView: View {
       @Environment(Hub.self) var hub
       typealias Service = AppServices.Service
@@ -555,12 +561,14 @@ struct HomeView: View {
   }
   struct ServiceContent: View {
     let item: AppServices.Service
-    let isSharing: Bool?
+    @Namespace var namespace
     var body: some View {
       NavigationLink {
         AppServices.Page(service: item)
+          .transitionTarget(id: item, namespace: namespace)
       } label: {
         AppIcon(title: item.title, systemImage: item.image)
+          .transitionSource(id: item, namespace: namespace)
       }.buttonStyle(.plain)
     }
   }
