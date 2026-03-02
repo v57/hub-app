@@ -20,6 +20,20 @@ struct LauncherView: View {
   var body: some View {
     let task = TaskId(hub: hub.id, isConnected: hub.isConnected && hasLauncher)
     List {
+      Section {
+        VStack {
+          Image(systemName: "apple.terminal").font(.system(size: 88))
+            .gradientBlur(radius: 4)
+          Text("Launcher").font(.title.bold())
+          Text("""
+          Installs apps
+          Displays usage
+          Updates apps
+          Restarts on crash
+          """).secondary()
+            .multilineTextAlignment(.center)
+        }.frame(maxWidth: .infinity)
+      }
       LauncherCell()
       if task.isConnected {
         ListView(editing: $editing)
