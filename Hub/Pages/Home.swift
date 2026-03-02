@@ -37,7 +37,7 @@ struct HomeView: View {
           .animation(.home, value: hubs.list.count)
           .animation(.smooth, value: view.size.width)
       }.environment(\.homeGridSpacing, HomeGrid.spacing(width: view.size.width - 16))
-    }.navigationTitle("Home")
+    }.buttonStyle(.plain).navigationTitle("Home")
       .scrollDismissesKeyboard(.immediately)
       .toolbarTitleDisplayMode(.inline)
       .contentTransition(.numericText())
@@ -63,7 +63,7 @@ struct HomeView: View {
               .secondary()
               .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
           }.blockBackground().transitionSource(id: "guide", namespace: namespace)
-        }.buttonStyle(.plain).gridSize(.x21)
+        }.gridSize(.x21)
         ForEach(Hubs.main.list) { hub in
           HubView(merging: $merging).environment(hub)
             .gridSize(.x21)
@@ -72,14 +72,14 @@ struct HomeView: View {
           copy()
         } label: {
           AppIcon(title: copied ? "Copied" : "My Key", systemImage: copied ? "checkmark.circle.fill" : "key")
-        }.buttonStyle(.plain)
+        }
         NavigationLink {
           FarmView()
             .transitionTarget(id: "farm", namespace: namespace)
         } label: {
           AppIcon(title: "Farm", systemImage: "tree")
             .transitionSource(id: "farm", namespace: namespace)
-        }.buttonStyle(.plain)
+        }
       }
     }
     func copy() {
@@ -120,7 +120,7 @@ struct HomeView: View {
           } label: {
             ServicesView()
               .transitionSource(id: Sheet.services, namespace: namespace)
-          }.buttonStyle(.plain).transition(.home).gridSize(.x22)
+          }.transition(.home).gridSize(.x22)
         }
         if hub.require(permissions: "hub/connections") {
           Button {
@@ -129,7 +129,7 @@ struct HomeView: View {
             AppIcon(title: "Connections", systemImage: "wifi")
               .iconBadge(statusBadges.connections)
               .transitionSource(id: Sheet.connections, namespace: namespace)
-          }.buttonStyle(.plain)
+          }
         }
         if hub.require(permissions: "hub/host/pending") {
           Button {
@@ -138,7 +138,7 @@ struct HomeView: View {
             AppIcon(title: "Requests", systemImage: "clock")
               .iconBadge(statusBadges.security)
               .transitionSource(id: Sheet.pending, namespace: namespace)
-          }.buttonStyle(.plain)
+          }
         }
         if hub.require(permissions: "hub/group/list", "hub/group/names") {
           Button {
@@ -146,7 +146,7 @@ struct HomeView: View {
           } label: {
             AppIcon(title: "Permissions", systemImage: "lock")
               .transitionSource(id: Sheet.permissions, namespace: namespace)
-          }.buttonStyle(.plain)
+          }
         }
         if hub.canLockdown {
           Button {
@@ -154,7 +154,7 @@ struct HomeView: View {
           } label: {
             AppIcon(title: "Lockdown", systemImage: "key.shield")
               .transitionSource(id: Sheet.lockdown, namespace: namespace)
-          }.buttonStyle(.plain)
+          }
         }
         if hub.require(permissions: "launcher/status") {
           Button {
@@ -162,20 +162,20 @@ struct HomeView: View {
           } label: {
             AppIcon(title: "Launcher", systemImage: "apple.terminal")
               .transitionSource(id: Sheet.launcher, namespace: namespace)
-          }.buttonStyle(.plain)
+          }
         }
         if hub.hasStorage {
           Button {
             sheet = .files
           } label: {
             AppIcon(title: "Files", systemImage: "folder")
-          }.buttonStyle(.plain).transition(.home)
+          }.transition(.home)
         } else if hub.canInstall {
           Button {
             sheet = .installS3
           } label: {
             AppIcon(title: "Files", systemImage: "folder")
-          }.buttonStyle(.plain).transition(.home)
+          }.transition(.home)
         }
         ForEach(launcherInfo.apps) { app in
           AppView(app: app)
@@ -187,7 +187,7 @@ struct HomeView: View {
               AppIcon(title: app.name, textIcon: String(app.name.first ?? "A"))
                 .iconBadge(app.isOnline ? nil : "Offline", color: .red)
                 .transitionSource(id: app.id, namespace: namespace)
-            }.buttonStyle(.plain).transition(.home)
+            }.transition(.home)
           }
         }
       }
@@ -342,7 +342,7 @@ struct HomeView: View {
                   .padding(.vertical, 6)
                   .background(.background, in: .capsule)
                   
-              }.buttonStyle(.plain)
+              }
             }
           }
         }.frame(maxWidth: .infinity, alignment: .leading).overlay(alignment: .topTrailing) {
@@ -454,7 +454,7 @@ struct HomeView: View {
               }
               .font(.body).fontWeight(.medium)
           }.onReceive(publisher) { isEnabled = $0 }
-            .buttonStyle(.plain)
+            
         }
       }
     }
@@ -540,7 +540,7 @@ struct HomeView: View {
               Text("Connect").font(.callout.weight(.medium))
                 .padding(.horizontal, 12).padding(.vertical, 4)
                 .background(.black.opacity(0.2), in: RoundedRectangle(cornerRadius: 8))
-            }.buttonStyle(.plain)
+            }
           }
         }
         Spacer()
@@ -569,7 +569,7 @@ struct HomeView: View {
       } label: {
         AppIcon(title: item.title, systemImage: item.image)
           .transitionSource(id: item, namespace: namespace)
-      }.buttonStyle(.plain)
+      }
     }
   }
   struct SupportView: View {
