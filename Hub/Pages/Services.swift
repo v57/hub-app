@@ -25,6 +25,17 @@ struct Services: View {
   @HubState(\.status) var status
   var body: some View {
     List {
+      VStack {
+        Image(systemName: "hexagon").font(.system(size: 88))
+          .gradientBlur(radius: 4)
+        Text("Hub Api").font(.title.bold())
+        Text("""
+          Api produced by Services of this Hub located here
+          You can change load balancer settings for each api here
+          See number of total, pending and currently processing requests
+          """).secondary()
+          .multilineTextAlignment(.center)
+      }.frame(maxWidth: .infinity)
       ForEach(status.services, id: \.name) { service in
         Service(service: service)
       }
