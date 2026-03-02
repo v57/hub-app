@@ -68,16 +68,7 @@ struct HomeView: View {
             .gridSize(.x21)
         }
         Button {
-          Task {
-            withAnimation {
-              copied = true
-            }
-            KeyChain.main.publicKey().copyToClipboard()
-            try await Task.sleep(for: .seconds(3))
-            withAnimation {
-              copied = false
-            }
-          }
+          copy()
         } label: {
           AppIcon(title: copied ? "Copied" : "My Key", systemImage: copied ? "checkmark.circle.fill" : "key")
         }.buttonStyle(.plain)
@@ -86,6 +77,18 @@ struct HomeView: View {
         } label: {
           AppIcon(title: "Farm", systemImage: "tree")
         }.buttonStyle(.plain)
+      }
+    }
+    func copy() {
+      Task {
+        withAnimation {
+          copied = true
+        }
+        KeyChain.main.publicKey().copyToClipboard()
+        try await Task.sleep(for: .seconds(3))
+        withAnimation {
+          copied = false
+        }
       }
     }
   }

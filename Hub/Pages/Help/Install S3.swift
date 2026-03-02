@@ -65,11 +65,11 @@ struct InstallS3: View {
             .padding(.vertical, 4)
             .background(Color(.secondarySystemFill).opacity(0.4), in: .capsule)
         }.fontWeight(.medium)
-        VStack(alignment: .leading) {
-          Text("Hub is not associated with Wasabi")
-          Text("I think Wasabi is the cheapest S3 service on the market")
-          Text("If you know any better, please leave a message in Discord and i will replace it in the next update!")
-        }.secondary()
+        Text("""
+          Hub is not associated with Wasabi
+          I think Wasabi is the cheapest S3 service on the market
+          If you know any better, please leave a message in Discord and i will replace it in the next update!
+          """).secondary()
       }
       Section(number: 1, title: "Create account") {
         Text("""

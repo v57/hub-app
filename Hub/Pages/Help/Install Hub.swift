@@ -75,14 +75,7 @@ struct InstallationGuide: View {
           .fontDesign(.monospaced)
         Spacer()
         AsyncButton(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark.circle.fill" : "document.on.document.fill") {
-          code.copyToClipboard()
-          withAnimation {
-            copied = true
-          }
-          try await Task.sleep(for: .seconds(1))
-          withAnimation {
-            copied = false
-          }
+          try await copy()
         }.labelStyle(.iconOnly)
           .contentTransition(.symbolEffect)
       }
@@ -94,6 +87,16 @@ struct InstallationGuide: View {
         .background(.black, in: RoundedRectangle(cornerRadius: 6))
         .padding(.horizontal, -14)
         .transition(.blurReplace)
+    }
+    func copy() async throws {
+      code.copyToClipboard()
+      withAnimation {
+        copied = true
+      }
+      try await Task.sleep(for: .seconds(1))
+      withAnimation {
+        copied = false
+      }
     }
   }
 }
