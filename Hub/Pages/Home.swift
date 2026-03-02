@@ -9,7 +9,7 @@ import SwiftUI
 import HubService
 
 struct HomeView: View {
-  typealias StatusBadges = ContentView.StatusBadges
+  typealias StatusBadges = Hub.StatusBadges
   enum TextFieldFocus: Hashable {
     case joinHubAddress
     case joinHubName
@@ -27,7 +27,7 @@ struct HomeView: View {
           }
           Text("My Apps").sectionTitle()
           HomeGrid {
-            ForEach(AppServicesView.Service.allCases, id: \.self) { item in
+            ForEach(AppServices.Service.allCases, id: \.self) { item in
               ServiceContent(item: item, isSharing: nil)
             }
           }
@@ -160,7 +160,7 @@ struct HomeView: View {
           }
         }
       }
-      .navigationDestination(for: AppHeader.self) { app in
+      .navigationDestination(for: Hub.AppHeader.self) { app in
         ServiceView(header: app).environment(hub)
       }
       .navigationDestination(item: $sheet) { sheet in
@@ -401,7 +401,7 @@ struct HomeView: View {
     }
     struct ShareServicesView: View {
       @Environment(Hub.self) var hub
-      typealias Service = AppServicesView.Service
+      typealias Service = AppServices.Service
       var body: some View {
         VStack(alignment: .leading) {
           HStack {
@@ -546,11 +546,11 @@ struct HomeView: View {
     }
   }
   struct ServiceContent: View {
-    let item: AppServicesView.Service
+    let item: AppServices.Service
     let isSharing: Bool?
     var body: some View {
       NavigationLink {
-        AppServicesView.ServicePage(service: item)
+        AppServices.Page(service: item)
       } label: {
         AppIcon(title: item.title, systemImage: item.image)
       }.buttonStyle(.plain)
@@ -713,6 +713,87 @@ extension Date {
     guard offset > 1 else { return "now" }
     guard offset > 60 else { return "\(offset)m" }
     return "\(offset / 60)h"
+  }
+}
+
+extension URLComponents {
+  mutating func hub() {
+    if host == nil, !path.isEmpty || scheme != nil {
+      var components = path.components(separatedBy: "/")
+      if scheme != nil {
+        host = scheme
+        scheme = nil
+        if let port = Int(components[0]) {
+          self.port = port
+          components.removeFirst()
+        }
+      } else {
+        let host = components.removeFirst()
+        if let port = Int(host) {
+          self.port = port
+          self.host = "localhost"
+        } else {
+          self.host = host
+        }
+      }
+      if components.filter({ !$0.isEmpty }).count > 0 {
+        path = "/" + components.joined(separator: "/")
+      } else {
+        path = ""
+      }
+    }
+    // Getting scheme if needed {
+    if let host, !host.isEmpty {
+      if scheme == nil {
+        scheme = host.isIp || host.isLocal ? "ws" : "wss"
+      }
+      if port == nil && scheme == "ws" {
+        port = 1997
+      }
+    }
+  }
+}
+extension URL {
+  var pathName: String {
+    return path().components(separatedBy: "/")
+      .last!.components(separatedBy: "?")[0]
+  }
+  var name: String? {
+    guard let host = host() else { return nil }
+    let dots = host.components(separatedBy: ".")
+    if host.isIp {
+      if let port, port != 1997 {
+        return "\(host):\(port)"
+      } else {
+        return "\(host)"
+      }
+    } else if let port, dots.count == 1, port != 1997 {
+      return port.description // localhost:1998 -> 1998
+    } else {
+      var name = host.secondDomain.capitalized
+      let pathName = path().components(separatedBy: "/")
+        .last!.components(separatedBy: "?")[0].capitalized
+      if !pathName.isEmpty {
+        name += " \(pathName)"
+      }
+      return name // apple.com -> Apple
+    }
+  }
+}
+private extension String {
+  var isIp: Bool {
+    let ipv4Regex = /^((25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)\.){3}(25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)$/
+    let ipv6Regex = /^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/
+    return wholeMatch(of: ipv4Regex) != nil || self.wholeMatch(of: ipv6Regex) != nil
+  }
+  var isLocal: Bool {
+    let components = components(separatedBy: ".")
+    return components.count < 2 || components.last == "local" || components.last?.isEmpty ?? true
+  }
+  var secondDomain: String {
+    let components = components(separatedBy: ".")
+    guard components.count > 1 else { return self }
+    return components[components.count - 2]
   }
 }
 

@@ -7,36 +7,8 @@
 
 import SwiftUI
 
-struct AppServicesView: View {
-  @State var open: Service?
-  var body: some View {
-    NavigationStack {
-      List {
-        ForEach(Service.allCases, id: \.self) { item in
-          HStack {
-            if let hub = Hubs.main.selectedHub, let publisher = item.servicePublisher(hub: hub) {
-              HubButton(hub: hub, publisher: publisher, service: item)
-            } else {
-              ServiceContent(item: item, isSharing: nil)
-            }
-            Spacer()
-            Button("Open") {
-              open = item
-            }.buttonStyle(DownloadButtonStyle())
-          }
-        }
-      }.safeAreaInset(edge: .bottom) {
-#if os(macOS) || os(iOS)
-        NavigationLink("Farm") {
-          FarmView()
-        }.glassProminentButton().padding()
-#endif
-      }.navigationDestination(item: $open) { service in
-        ServicePage(service: service)
-      }
-    }
-  }
-  struct ServicePage: View {
+extension AppServices {
+  struct Page: View {
     let service: Service
     var body: some View {
       switch service {
@@ -204,8 +176,4 @@ extension Color {
     Color.gray.opacity(0.4)
 #endif
   }
-}
-
-#Preview {
-  AppServicesView()
 }

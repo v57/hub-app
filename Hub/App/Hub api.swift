@@ -15,7 +15,7 @@ struct HubStateStorage {
   let users = Sync("hub/connections", [Hub.User]())
   let groups = Sync("hub/group/list", GroupList())
   let permissions = Sync("hub/group/names", PermissionList())
-  let statusBadges = Sync("hub/status/badges", ContentView.StatusBadges())
+  let statusBadges = Sync("hub/status/badges", Hub.StatusBadges())
   let status = Sync("hub/status", Status(requests: 0, services: []))
   let merge = Sync("hub/merge/status", [Hub.MergeStatus]())
   let hostPending = Sync("hub/host/pending", PendingList())
@@ -158,5 +158,65 @@ extension Hub {
       name = container.decodeIfPresent(.name, "")
       icon = container.decodeIfPresent(.icon) ?? Icon(symbol: .init(name: "hexagon"))
     }
+  }
+  
+  func isMerged(to hub: Hub) -> Bool {
+    var addresses = Set<String>()
+    return isMerged(address: settings.address.absoluteString, addresses: &addresses)
+  }
+  private func isMerged(address: String, addresses: inout Set<String>) -> Bool {
+    for status in state.merge.value {
+      guard addresses.insert(status.address).inserted else { continue }
+      guard let hub = Hubs.main.list.first(where: { $0.settings.address.absoluteString == status.address })
+      else { continue }
+      guard hub.isMerged(address: address, addresses: &addresses) else { continue }
+      return true
+    }
+    return false
+  }
+  func addOwner(_ key: String) async throws {
+    try await client.send("auth/keys/add", KeyAdd(key: key, type: .key, permissions: ["owner"]))
+  }
+  func add(key: String, group: String) async throws {
+    try await client.send("hub/group/update/users", EditGroupUsers(group: group, add: [key], remove: nil))
+  }
+  func merge(other: Hub) async throws {
+    let key: String = try await client.send("hub/key")
+    try await other.client.send("auth/keys/add", KeyAdd(key: key, type: .key, permissions: ["merge"]))
+    try await client.send("hub/merge/add", other.settings.address.absoluteString)
+  }
+  func unmerge(other: Hub) async throws {
+    let key: String = try await client.send("hub/key")
+    try await other.client.send("auth/keys/remove", key)
+    try await client.send("hub/merge/remove", other.settings.address.absoluteString)
+  }
+  struct KeyAdd: Encodable {
+    enum KeyType: String, Encodable {
+      case key, hmac
+    }
+    let key: String
+    let type: KeyType
+    let permissions: [String]
+  }
+  struct EditGroupUsers: Encodable {
+    let group: String, add: [String]?, remove: [String]?
+  }
+  struct MergeStatus: Decodable, Equatable {
+    let address: String
+    let error: String?
+    let isConnected: Bool
+  }
+  struct StatusBadges: Decodable {
+    var services: Int = 0
+    var connections: Int?
+    var security: Int?
+    var apps: [AppHeader]?
+  }
+  struct AppHeader: Identifiable, Hashable, Decodable {
+    var id: String { path }
+    var name: String
+    var path: String
+    var services: Int?
+    var isOnline: Bool { (services ?? 1) != 0 }
   }
 }

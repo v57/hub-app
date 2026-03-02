@@ -396,9 +396,9 @@ class NestedList: Identifiable {
 }
 
 struct ServiceView: View {
-  @Environment(Hub.self) var hub
+  @Environment(Hub.self) private var hub
   @State private var app = ServiceApp()
-  let header: AppHeader
+  let header: Hub.AppHeader
   var body: some View {
     GeometryReader { view in
       ScrollView {
@@ -528,7 +528,7 @@ struct LargeProgressView: View {
 
 #Preview {
   NavigationStack {
-    ServiceView(header: AppHeader(name: "Video Encoder", path: "video/encode/ui")).environment(Hub.test)
+    ServiceView(header: Hub.AppHeader(name: "Video Encoder", path: "video/encode/ui")).environment(Hub.test)
   }
 }
 

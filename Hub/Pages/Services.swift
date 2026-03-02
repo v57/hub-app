@@ -131,6 +131,20 @@ extension Status.BalancerType {
   }
 }
 
+enum OnlineStatus: Comparable {
+  case online, unauthorized, offline
+  var view: some View {
+    Circle().fill(background.opacity(1)).frame(width: 6)
+  }
+  var background: Color {
+    switch self {
+    case .online: .blue
+    case .offline: .red
+    case .unauthorized: .orange
+    }
+  }
+}
+
 #Preview {
   Services()
     .environment(Hub.test)
