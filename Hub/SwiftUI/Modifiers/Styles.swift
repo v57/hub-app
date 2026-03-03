@@ -8,12 +8,6 @@
 import SwiftUI
 
 extension View {
-  func secondary() -> some View {
-    font(.caption2).foregroundStyle(.secondary)
-  }
-  func error() -> some View {
-    font(.caption2).fontWeight(.medium).foregroundStyle(.red)
-  }
   func badgeStyle() -> some View {
     font(.caption2).foregroundStyle(.white)
       .padding(.horizontal, 6).padding(.vertical, 2)
@@ -57,12 +51,66 @@ struct DownloadButtonStyle: ButtonStyle {
   }
 }
 struct TabButtonStyle: ButtonStyle {
+  let selected: Bool
   func makeBody(configuration: Configuration) -> some View {
-    configuration.label.foregroundStyle(.white)
-      .fontWeight(.medium)
-      .padding(.horizontal, 4)
-      .padding(.vertical, 4)
-      .frame(minWidth: 60)
-      .background(.blue, in: .capsule)
+    configuration.label.font(.system(size: 12, weight: .medium, design: .rounded))
+      .foregroundStyle(.red)
+      .padding(.horizontal, 8).padding(.vertical, 4)
+      .background(.red.opacity(selected ? 0.1 : 0), in: .capsule)
   }
+}
+
+extension Text {
+  func title() -> Text {
+    font(.system(size: 16, weight: .medium, design: .rounded))
+  }
+  func code() -> Text {
+    font(.system(size: 12, weight: .medium, design: .monospaced))
+      .foregroundStyle(.secondary)
+  }
+  func body() -> Text {
+    font(.system(size: 14, weight: .medium, design: .rounded))
+  }
+  func note() -> Text {
+    font(.system(size: 12, weight: .medium, design: .rounded))
+      .foregroundStyle(.secondary)
+  }
+  func secondary() -> Text {
+    note()
+  }
+  func error() -> Text {
+    font(.system(size: 12, weight: .medium, design: .rounded))
+      .foregroundStyle(.red)
+  }
+}
+extension View {
+  func page() -> some View {
+    body()
+  }
+  func title() -> some View {
+    font(.system(size: 16, weight: .medium, design: .rounded))
+  }
+  func body() -> some View {
+    font(.system(size: 14, weight: .medium, design: .rounded))
+  }
+  func note() -> some View {
+    font(.system(size: 12, weight: .medium, design: .rounded))
+      .foregroundStyle(.secondary)
+  }
+  func secondary() -> some View {
+    note()
+  }
+  func error() -> some View {
+    font(.system(size: 12, weight: .medium, design: .rounded))
+      .foregroundStyle(.red)
+  }
+}
+
+#Preview {
+  VStack {
+    Text("Title").title()
+    Text("Body").body()
+    Text("Note").note()
+    Text("Error Message").error()
+  }.frame(maxWidth: .infinity, maxHeight: .infinity)
 }
