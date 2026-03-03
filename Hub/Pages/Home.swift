@@ -24,7 +24,7 @@ struct HomeView: View {
         VStack(alignment: .leading) {
           HeaderSection(focus: $focus)
           ForEach(Hubs.main.list) { hub in
-            HubSection().environment(hub).transition(.home)
+            HubSection().environment(hub)
           }
           Text("My Apps").sectionTitle()
           HomeGrid {
@@ -37,7 +37,7 @@ struct HomeView: View {
         }.padding(.top).animation(.home, value: isFocusing)
           .animation(.home, value: hubs.list.count)
           .animation(.smooth, value: view.size.width)
-      }.environment(\.homeGridSpacing, HomeGrid.spacing(width: view.size.width - 16))
+      }.environment(\.homeGridSpacing, HomeGridLayout.spacing(width: view.size.width - 16))
     }.buttonStyle(.plain).navigationTitle("Home")
       .scrollDismissesKeyboard(.immediately)
       .toolbarTitleDisplayMode(.inline)
@@ -59,7 +59,7 @@ struct HomeView: View {
           InstallationGuide().transitionTarget(id: "guide", namespace: namespace)
         } label: {
           ZStack {
-            Text("Make your own").cellTitle()
+            Text("Make your own").note()
               .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             Text("Learn how to host your own Hub")
               .secondary()
@@ -123,7 +123,7 @@ struct HomeView: View {
           } label: {
             ServicesView()
               .transitionSource(id: Sheet.services, namespace: namespace)
-          }.transition(.home).gridSize(.x22)
+          }.gridSize(.x22)
         }
         if hub.require(permissions: "hub/connections") {
           Button {
@@ -172,13 +172,13 @@ struct HomeView: View {
             sheet = .files
           } label: {
             AppIcon(title: "Files", systemImage: "folder")
-          }.transition(.home)
+          }
         } else if hub.canInstall {
           Button {
             sheet = .installS3
           } label: {
             AppIcon(title: "Files", systemImage: "folder")
-          }.transition(.home)
+          }
         }
         ForEach(launcherInfo.apps) { app in
           AppView(app: app)
@@ -190,7 +190,7 @@ struct HomeView: View {
               AppIcon(title: app.name, textIcon: String(app.name.first ?? "A"))
                 .iconBadge(app.isOnline ? nil : "Offline", color: .red)
                 .transitionSource(id: app.id, namespace: namespace)
-            }.transition(.home)
+            }
           }
         }
       }
@@ -339,7 +339,7 @@ struct HomeView: View {
               AsyncButton {
                 try await hub.launcher.pro(KeyChain.main.publicKey())
               } label: {
-                Text("Upgrade to Pro").font(.body.weight(.medium))
+                Text("Upgrade to Pro")
                   .frame(maxWidth: .infinity)
                   .padding(.horizontal, 12)
                   .padding(.vertical, 6)
@@ -443,19 +443,21 @@ struct HomeView: View {
         @State var isEnabled: Bool = false
         var body: some View {
           Button {
-            withAnimation(.home) {
+            withAnimation(.smooth) {
               isEnabled.toggle()
             }
             service.setService(enabled: isEnabled, hub: hub)
           } label: {
             ZStack {
-              Image(systemName: service.image)
+              Image(systemName: service.image).fontWeight(.bold)
+                .frame(height: 14)
             }.frame(maxWidth: .infinity)
               .padding(.vertical, 6)
               .background {
-                RoundedRectangle(cornerRadius: 10).fill(Color(.tertiarySystemFill)).strokeBorder(.blue, lineWidth: isEnabled ? 1 : 0)
+                RoundedRectangle(cornerRadius: 10)
+                  .fill(.green.opacity(0.1))
+                  .strokeBorder(.green, lineWidth: isEnabled ? 1 : 0)
               }
-              .font(.body).fontWeight(.medium)
           }.onReceive(publisher) { isEnabled = $0 }
             
         }
@@ -488,7 +490,7 @@ struct HomeView: View {
             if let security = statusBadges.security, security > 0 {
               Text("\(security) service requests").foregroundStyle(.green)
             }
-          }.fontWeight(.medium).secondary().transition(.blurReplace)
+          }.secondary().transition(.blurReplace)
         } else {
           Text("Connecting...").secondary().transition(.blurReplace)
         }
@@ -540,10 +542,10 @@ struct HomeView: View {
               self.name = ""
               self.address = ""
             } label: {
-              Text("Connect").font(.callout.weight(.medium))
+              Text("Connect")
                 .padding(.horizontal, 12).padding(.vertical, 4)
                 .background(.black.opacity(0.2), in: RoundedRectangle(cornerRadius: 8))
-            }
+            }.transition(.blurReplace)
           }
         }
         Spacer()
@@ -557,7 +559,7 @@ struct HomeView: View {
             .textFieldStyle(.plain)
             .padding(.horizontal, 8).padding(.vertical, 4)
             .background(.black.opacity(0.05), in: RoundedRectangle(cornerRadius: 8))
-            .transition(.home)
+            .transition(.blurReplace)
         }
       }.animation(.home, value: address.isEmpty).blockBackground()
     }
@@ -592,8 +594,7 @@ struct HomeView: View {
   struct LinkButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
       configuration.label.multilineTextAlignment(.center)
-        .font(.callout).fontWeight(.semibold)
-        .fontDesign(.rounded)
+        .body()
         .minimumScaleFactor(0.6)
         .blockBackground()
     }
@@ -606,7 +607,7 @@ struct HomeView: View {
     var hasBadge: Bool { badge != nil }
     var body: some View {
       icon.gradientBlur(radius: hasBadge ? 4 : 1)
-        .contentTransition(.symbolEffect).font(.system(size: 32, weight: .semibold, design: .rounded))
+        .contentTransition(.symbolEffect).icon()
         .blockBackground().overlay(alignment: .top) {
           if let badge {
             badge.foregroundStyle(.white).font(.caption.bold()).padding(.horizontal, 6)
@@ -619,7 +620,7 @@ struct HomeView: View {
           }
         }.overlay {
           GeometryReader { view in
-            title.font(.system(size: 10)).offset(y: view.size.height - 4)
+            title.app().offset(y: view.size.height - 4)
               .multilineTextAlignment(.center)
               .frame(maxWidth: .infinity)
           }
@@ -674,7 +675,7 @@ struct SectionTitleModifier: ViewModifier {
   @Environment(\.homeGridSpacing) var spacing
   let padding: Bool
   func body(content: Content) -> some View {
-    content.font(.body).fontWeight(.medium)
+    content.title()
       .padding(.leading, spacing + 8)
       .padding(.top, padding ? 32 : 0)
   }
@@ -699,6 +700,16 @@ extension AnyTransition {
 extension Animation {
   static var home: Animation { .spring(response: 0.5, dampingFraction: 0.7) }
 }
+struct HomeGrid<Content: View>: View {
+  @ViewBuilder var content: Content
+  var body: some View {
+    HomeGridLayout {
+      Group {
+        content
+      }.transition(.home)
+    }
+  }
+}
 
 struct BlockStyle: ViewModifier {
   let cornerRadius: CGFloat
@@ -716,13 +727,12 @@ struct BlockStyle: ViewModifier {
         $0.contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: cornerRadius))
         #endif
       }
-      .transition(.home)
   }
 }
 
 extension View {
   func cellTitle() -> some View {
-    font(.callout.weight(.semibold))
+    note()
   }
 }
 

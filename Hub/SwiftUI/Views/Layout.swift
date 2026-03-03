@@ -17,7 +17,7 @@ extension EnvironmentValues {
   }
 }
 
-struct HomeGrid: Layout {
+struct HomeGridLayout: Layout {
   static var minSpacing: Int { 0 }
   static var size: Int {
     80
@@ -33,7 +33,7 @@ struct HomeGrid: Layout {
     return (intWidth, spacing)
   }
   func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout Cache) -> CGSize {
-    (cache.width, cache.spacing) = HomeGrid.widthAndSpacing(proposal: proposal)
+    (cache.width, cache.spacing) = HomeGridLayout.widthAndSpacing(proposal: proposal)
     cache.reset()
     for i in 0..<subviews.count {
       let p = subviews[i][GridSize.self]
@@ -50,8 +50,8 @@ struct HomeGrid: Layout {
   func makeCache(subviews: Subviews) -> Cache {
     Cache()
   }
-  var minSpacing: Int { HomeGrid.minSpacing }
-  var size: Int { HomeGrid.size }
+  var minSpacing: Int { HomeGridLayout.minSpacing }
+  var size: Int { HomeGridLayout.size }
   func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout Cache) {
     let spacing = cache.spacing
     let size = CGFloat(size)
@@ -214,8 +214,8 @@ struct HomeGrid: Layout {
 }
 
 extension View {
-  func gridSize(_ preset: HomeGrid.PositionPreset) -> some View {
-    layoutValue(key: HomeGrid.GridSize.self, value: preset.value)
+  func gridSize(_ preset: HomeGridLayout.PositionPreset) -> some View {
+    layoutValue(key: HomeGridLayout.GridSize.self, value: preset.value)
   }
 }
 

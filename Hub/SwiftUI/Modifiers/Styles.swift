@@ -73,14 +73,15 @@ extension Text {
   }
   func note() -> Text {
     font(.system(size: 12, weight: .medium, design: .rounded))
-      .foregroundStyle(.secondary)
   }
   func secondary() -> Text {
-    note()
+    note().foregroundStyle(.secondary)
   }
   func error() -> Text {
-    font(.system(size: 12, weight: .medium, design: .rounded))
-      .foregroundStyle(.red)
+    note().foregroundStyle(.red)
+  }
+  func app() -> Text {
+    font(.system(size: 10, design: .rounded))
   }
 }
 extension View {
@@ -95,22 +96,25 @@ extension View {
   }
   func note() -> some View {
     font(.system(size: 12, weight: .medium, design: .rounded))
-      .foregroundStyle(.secondary)
   }
   func secondary() -> some View {
-    note()
+    note().foregroundStyle(.secondary)
   }
   func error() -> some View {
-    font(.system(size: 12, weight: .medium, design: .rounded))
-      .foregroundStyle(.red)
+    note().foregroundStyle(.red)
+  }
+  func icon() -> some View {
+    font(.system(size: 32, weight: .semibold, design: .rounded))
   }
 }
 
 #Preview {
   VStack {
+    Image(systemName: "tree").icon()
     Text("Title").title()
     Text("Body").body()
     Text("Note").note()
+    Text("Secondary").secondary()
     Text("Error Message").error()
   }.frame(maxWidth: .infinity, maxHeight: .infinity)
 }
