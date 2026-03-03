@@ -16,80 +16,41 @@ struct PermissionGroups: View {
   @State var selected = Set<String>()
   @State var editing: String?
   var body: some View {
+    let showsPlaceholder = !adding && groups.groups.isEmpty
     ScrollView {
-      if adding {
-        LazyVStack(alignment: .leading, pinnedViews: .sectionHeaders) {
-          ForEach(permissions.sections) { section in
-            Section {
-              ForEach(section.permissions, id: \.self) { (name: String) in
-                Toggle(name, isOn: $selected.toggle("\(section.name)/\(name)"))
-                  .padding(.leading)
-              }
-            } header: {
-              Toggle(section.name, isOn: $selected.toggle(section.permissions.map { "\(section.name)/\($0)" }))
-                .fontWeight(.semibold)
+      VStack {
+        if adding {
+          addGroupsView
+        } else {
+          groupsView
+        }
+      }.frame(maxWidth: .infinity).safeAreaPadding(.horizontal)
+    }.lineLimit(2).overlay {
+      ZStack {
+        if showsPlaceholder {
+          VStack(spacing: 16) {
+            VStack {
+              Image(systemName: "shield").font(.system(size: 88))
+                .gradientBlur(radius: 4)
+              Text("Permission Groups").font(.title)
+              Text("Secure your Hub").secondary()
             }
-          }
-        }.padding(.horizontal)
-      } else {
-        ForEach($groups.groups) { $group in
-          let isEditing = group.name == editing
-          LazyVStack(alignment: .leading, pinnedViews: .sectionHeaders) {
-            Section {
-              ForEach(permissions.sections) { section in
-                let isSelected = $group.permissions.toggle(section.permissions.map { "\(section.name)/\($0)" })
-                if isEditing || !section.permissions.contains(where: { $0.starts(with: "\(section.name)/") }) {
-                  HStack {
-                    if isEditing {
-                      Toggle(section.name, isOn: isSelected)
-                    }
-                    Text(section.name).fontWeight(.semibold)
-                  }
-                  ForEach(section.permissions, id: \.self) { (name: String) in
-                    let isSelected = $group.permissions.toggle("\(section.name)/\(name)")
-                    if isEditing || isSelected.wrappedValue {
-                      HStack {
-                        if isEditing {
-                          Toggle(name, isOn: isSelected)
-                        }
-                        Text(name).font(isEditing ? .body : .caption)
-                      }.padding(.leading, isEditing ? nil : 0)
-                    }
-                  }
-                }
+            VStack(alignment: .center, spacing: 4) {
+              HStack(spacing: 4) {
+                Image(systemName: "key").frame(width: 16)
+                  .foregroundStyle(.red.gradient)
+                Text("Add Owners").font(.caption2)
               }
-            } header: {
-              HStack {
-                Text(group.name).font(.title)
-                if isEditing {
-                  AsyncButton("Delete Group", role: .destructive) {
-                    try await hub.client.send("hub/group/remove", group.name)
-                    withAnimation {
-                      editing = nil
-                    }
-                  }
-                }
-                Spacer()
-                if isEditing {
-                  AsyncButton("Save") {
-                    try await hub.client.send("hub/group/update", UpdateGroup(group: group.name, set: Array(group.permissions)))
-                    withAnimation {
-                      editing = nil
-                    }
-                  }
-                } else {
-                  Button("Edit") {
-                    withAnimation {
-                      editing = group.name
-                    }
-                  }
-                }
+              HStack(spacing: 4) {
+                Image(systemName: "plus").frame(width: 16)
+                  .foregroundStyle(.blue)
+                Text("Create Groups").font(.caption2)
               }
-            }.labelsHidden()
-          }
-        }.padding(.horizontal)
-      }
-    }.lineLimit(2).frame(maxWidth: .infinity).safeAreaInset(edge: .bottom) {
+            }.symbolVariant(.fill)
+          }.transition(.blurReplace).allowsHitTesting(false)
+        }
+      }.animation(.smooth, value: showsPlaceholder)
+    }.safeAreaInset(edge: .bottom) {
       if hub.require(permissions: "hub/group/update") {
         HStack {
           if adding {
@@ -104,8 +65,82 @@ struct PermissionGroups: View {
             withAnimation {
               adding.toggle()
             }
-          }.buttonStyle(.borderedProminent).contentTransition(.numericText())
+          }.buttonStyle(TabButtonStyle(selected: false))
+            .contentTransition(.numericText())
         }.padding()
+      }
+    }
+  }
+  var groupsView: some View {
+    ForEach($groups.groups) { $group in
+      let isEditing = group.name == editing
+      LazyVStack(alignment: .leading, pinnedViews: .sectionHeaders) {
+        Section {
+          ForEach(permissions.sections) { section in
+            let isSelected = $group.permissions.toggle(section.permissions.map { "\(section.name)/\($0)" })
+            if isEditing || !section.permissions.contains(where: { $0.starts(with: "\(section.name)/") }) {
+              HStack {
+                if isEditing {
+                  Toggle(section.name, isOn: isSelected)
+                }
+                Text(section.name).fontWeight(.semibold)
+              }
+              ForEach(section.permissions, id: \.self) { (name: String) in
+                let isSelected = $group.permissions.toggle("\(section.name)/\(name)")
+                if isEditing || isSelected.wrappedValue {
+                  HStack {
+                    if isEditing {
+                      Toggle(name, isOn: isSelected)
+                    }
+                    Text(name).font(isEditing ? .body : .caption)
+                  }.padding(.leading, isEditing ? nil : 0)
+                }
+              }
+            }
+          }
+        } header: {
+          HStack {
+            Text(group.name).font(.title)
+            if isEditing {
+              AsyncButton("Delete Group", role: .destructive) {
+                try await hub.client.send("hub/group/remove", group.name)
+                withAnimation {
+                  editing = nil
+                }
+              }
+            }
+            Spacer()
+            if isEditing {
+              AsyncButton("Save") {
+                try await hub.client.send("hub/group/update", UpdateGroup(group: group.name, set: Array(group.permissions)))
+                withAnimation {
+                  editing = nil
+                }
+              }
+            } else {
+              Button("Edit") {
+                withAnimation {
+                  editing = group.name
+                }
+              }
+            }
+          }
+        }.labelsHidden()
+      }
+    }
+  }
+  var addGroupsView: some View {
+    LazyVStack(alignment: .leading, pinnedViews: .sectionHeaders) {
+      ForEach(permissions.sections) { section in
+        Section {
+          ForEach(section.permissions, id: \.self) { (name: String) in
+            Toggle(name, isOn: $selected.toggle("\(section.name)/\(name)"))
+              .padding(.leading)
+          }
+        } header: {
+          Toggle(section.name, isOn: $selected.toggle(section.permissions.map { "\(section.name)/\($0)" }))
+            .fontWeight(.semibold)
+        }
       }
     }
   }
@@ -208,5 +243,5 @@ extension Binding where Value: SetAlgebra & Sendable {
 }
 
 #Preview {
-  PermissionGroups().environment(Hub.test)
+  PermissionGroups().test()
 }
