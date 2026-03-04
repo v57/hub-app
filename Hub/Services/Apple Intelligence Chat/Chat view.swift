@@ -15,9 +15,13 @@ struct ChatView: View {
   @State var messages: [Message] = []
   @State var text: String = ""
   var body: some View {
-    List(messages) { message in
-      Text(message.text).contentTransition(.numericText())
-    }.overlay {
+    ScrollView {
+      LazyVStack(spacing: 8) {
+        ForEach(messages) { message in
+          MessageView(message: message)
+        }
+      }.contentTransition(.numericText()).safeAreaPadding(.horizontal)
+    }.defaultScrollAnchor(.bottom).overlay {
       ZStack {
         if messages.isEmpty && text.isEmpty {
           Placeholder(image: "apple.intelligence", title: "Chat", description: "by Apple Intelligence") {
@@ -34,33 +38,51 @@ struct ChatView: View {
     }.safeAreaInset(edge: .bottom) {
       HStack {
         #if os(visionOS)
-        TextField("Type your message...", text: $text)
+        TextField("Type your message...", text: $text, axis: .vertical)
           .padding(.horizontal).padding(.vertical, 6)
         #else
-        TextField("Type your message...", text: $text)
+        TextField("Type your message...", text: $text, axis: .vertical)
           .padding(.horizontal).padding(.vertical, 6)
           .textFieldStyle(.plain)
           .glassEffect(.regular, in: .capsule)
         #endif
         Button("Send") {
           Task { try await send(text: text) }
-        }.disabled(session.isResponding || text.isEmpty).glassProminentButton()
+        }.disabled(session.isResponding || text.isEmpty).buttonStyle(ActionButtonStyle())
       }.padding()
     }
   }
   @Observable
   class Message: Identifiable {
+    let my: Bool
     var text: AttributedString
-    init(text: String) {
+    init(my: Bool, text: String) {
+      self.my = my
       self.text = text.markdown
+    }
+  }
+  struct MessageView: View {
+    let message: Message
+    var body: some View {
+      VStack(alignment: .leading) {
+        Text(message.my ? "You" : "Apple Intelligence").secondary()
+        Text(message.text).textSelection()
+      }.transition(.offset(y: 100)).frame(maxWidth: .infinity, alignment: .leading)
     }
   }
   func send(text: String) async throws {
     self.text = ""
-    messages.append(Message(text: text))
+    withAnimation {
+      messages.append(Message(my: true, text: text))
+    }
     Task {
-      let message = Message(text: "responding...")
-      messages.append(message)
+      let message = Message(my: false, text: "responding...")
+      Task {
+        try await Task.sleep(for: .seconds(1))
+        withAnimation {
+          messages.append(message)
+        }
+      }
       do {
         for try await response in session.streamResponse(to: text) {
           withAnimation {
@@ -68,7 +90,9 @@ struct ChatView: View {
           }
         }
       } catch {
-        message.text = error.localizedDescription.markdown
+        withAnimation {
+          message.text = error.localizedDescription.markdown
+        }
       }
     }
   }
