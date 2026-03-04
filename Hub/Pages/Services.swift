@@ -159,6 +159,5 @@ enum OnlineStatus: Comparable {
 }
 
 #Preview {
-  Services()
-    .environment(Hub.test)
+  Services().test()
 }

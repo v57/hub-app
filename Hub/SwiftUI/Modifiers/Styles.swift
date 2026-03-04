@@ -86,7 +86,12 @@ extension Text {
 }
 extension View {
   func page() -> some View {
-    body()
+    body().fontDesign(.rounded)
+  }
+  func test() -> some View {
+    NavigationStack {
+      environment(Hub.test).page()
+    }
   }
   func title() -> some View {
     font(.system(size: 16, weight: .medium, design: .rounded))

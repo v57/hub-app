@@ -445,6 +445,6 @@ extension Hub.Launcher {
 }
 
 #Preview {
-  InstallS3().environment(Hub.test)
+  InstallS3().test()
 }
 

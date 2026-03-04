@@ -838,7 +838,5 @@ extension Color {
 }
 
 #Preview {
-  NavigationStack {
-    HomeView()
-  }.frame(height: 800)
+  HomeView().test()
 }

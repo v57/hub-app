@@ -8,11 +8,12 @@
 import SwiftUI
 
 extension View {
-  func transitionSource<ID: Hashable>(id: ID, namespace: Namespace.ID) -> some View {
-    modifier(TransitionSourceModifier(id: id, namespace: namespace))
+  func transitionSource<ID: Hashable>(id: ID, namespace: Namespace.ID) -> Self {
+    self
+//    modifier(TransitionSourceModifier(id: id, namespace: namespace))
   }
   func transitionTarget<ID: Hashable>(id: ID, namespace: Namespace.ID) -> some View {
-    modifier(TransitionTargetModifier(id: id, namespace: namespace))
+    modifier(TransitionTargetModifier(id: id, namespace: namespace)).page()
   }
 }
 private struct TransitionSourceModifier<ID: Hashable>: ViewModifier {

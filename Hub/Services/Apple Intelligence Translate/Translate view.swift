@@ -183,8 +183,6 @@ extension String {
 
 @available(macOS 15.0, iOS 18.0, *)
 #Preview {
-  NavigationStack {
-    TranslateView()
-  }.environment(Hub.test)
+  TranslateView().test()
 }
 #endif

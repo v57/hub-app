@@ -717,5 +717,5 @@ extension View {
 
 // MARK: Preview
 #Preview {
-  StorageView().environment(Hub.test).frame(width: 400)
+  StorageView().test()
 }

@@ -115,7 +115,5 @@ struct InstallationGuide: View {
 }
 
 #Preview {
-  NavigationStack {
-    InstallationGuide()
-  }
+  InstallationGuide().test()
 }

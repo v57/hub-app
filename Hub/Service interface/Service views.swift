@@ -465,7 +465,7 @@ struct FileTaskStatus: View {
           LargeProgressView(progress: Double(processed) / Double(files.count), running: files.count - processed, completed: processed, icon: "photo", title: isProcessing ? "Processing" : "Processed")
           if !isProcessing {
             NavigationLink {
-              StorageView(path: target).environment(hub)
+              StorageView(path: target).environment(hub).page()
             } label: {
               HStack(spacing: 4) {
                 Image(systemName: "folder.fill")
@@ -527,8 +527,6 @@ struct LargeProgressView: View {
 }
 
 #Preview {
-  NavigationStack {
-    ServiceView(header: Hub.AppHeader(name: "Video Encoder", path: "video/encode/ui")).environment(Hub.test)
-  }
+  ServiceView(header: Hub.AppHeader(name: "Video Encoder", path: "video/encode/ui")).test()
 }
 

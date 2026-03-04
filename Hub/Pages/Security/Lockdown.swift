@@ -130,5 +130,5 @@ struct LockdownView: View {
 }
 
 #Preview {
-  LockdownView().environment(Hub.test)
+  LockdownView().test()
 }

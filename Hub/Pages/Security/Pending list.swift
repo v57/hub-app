@@ -31,9 +31,7 @@ struct PendingListView: View {
         HStack {
           VStack(alignment: .leading) {
             Text(item.name)
-            Text(item.id).secondary()
-              .textScale(.secondary)
-              .fontDesign(.monospaced)
+            Text(item.id).code()
           }.lineLimit(2)
           Spacer()
           if hub.host.canManage {
@@ -48,5 +46,5 @@ struct PendingListView: View {
 }
 
 #Preview {
-  PendingListView().environment(Hub.test)
+  PendingListView().test()
 }

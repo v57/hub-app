@@ -121,11 +121,10 @@ struct TestEditApp: View {
         Text("Loading")
       }
     }.hubStream("launcher/info", to: $apps)
-      .environment(Hub.test)
   }
 }
 
 #Preview {
-  TestEditApp().frame(width: 400, height: 300)
+  TestEditApp().test()
 }
 

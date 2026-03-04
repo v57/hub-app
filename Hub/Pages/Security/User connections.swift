@@ -75,5 +75,5 @@ struct UserConnections: View {
   }
 }
 #Preview {
-  UserConnections().environment(Hub.test)
+  UserConnections().test()
 }

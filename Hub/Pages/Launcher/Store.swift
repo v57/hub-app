@@ -239,7 +239,6 @@ struct StoreView: View {
     StoreItem(icon: Icon(symbol: .init(name: "network")),
               name: "NginX config",
               shortDescription: "Setup your NginX", type: .app),
-  ])
-    .environment(Hub.test)
+  ]).test()
 }
 #endif

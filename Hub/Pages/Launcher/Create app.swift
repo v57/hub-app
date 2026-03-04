@@ -97,5 +97,5 @@ extension String {
 }
 
 #Preview {
-  CreateApp().padding().environment(Hub.test)
+  CreateApp().padding().test()
 }

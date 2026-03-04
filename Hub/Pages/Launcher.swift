@@ -48,11 +48,11 @@ struct LauncherView: View {
         ToolbarView(creating: $creating)
       }
     }.sheet(isPresented: $creating) {
-      CreateApp().padding().frame(maxWidth: 300)
+      CreateApp().padding().frame(maxWidth: 300).page()
     }.sheet(item: $editing) {
-      EditApp(app: $0).environment(hub).frame(minHeight: 300)
+      EditApp(app: $0).environment(hub).frame(minHeight: 300).page()
     }.navigationDestination(isPresented: $openStore) {
-      StoreView().environment(hub)
+      StoreView().environment(hub).page()
     }.task(id: task) {
 #if PRO
       if task.isConnected {
@@ -315,6 +315,5 @@ extension Launcher.Status {
 #endif
 
 #Preview {
-  LauncherView()
-    .environment(Hub.test)
+  LauncherView().test()
 }
