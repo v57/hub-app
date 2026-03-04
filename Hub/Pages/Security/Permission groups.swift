@@ -26,28 +26,14 @@ struct PermissionGroups: View {
         }
       }.frame(maxWidth: .infinity).safeAreaPadding(.horizontal)
     }.lineLimit(2).overlay {
-      ZStack {
+      VStack {
         if showsPlaceholder {
-          VStack(spacing: 16) {
-            VStack {
-              Image(systemName: "shield").font(.system(size: 88))
-                .gradientBlur(radius: 4)
-              Text("Permission Groups").font(.title)
-              Text("Secure your Hub").secondary()
-            }
-            VStack(alignment: .center, spacing: 4) {
-              HStack(spacing: 4) {
-                Image(systemName: "key").frame(width: 16)
-                  .foregroundStyle(.red.gradient)
-                Text("Add Owners").font(.caption2)
-              }
-              HStack(spacing: 4) {
-                Image(systemName: "plus").frame(width: 16)
-                  .foregroundStyle(.blue)
-                Text("Create Groups").font(.caption2)
-              }
-            }.symbolVariant(.fill)
-          }.transition(.blurReplace).allowsHitTesting(false)
+          Placeholder(image: "shield", title: "Permission Groups", description: "Secure your Hub") {
+            Label("Add Owners", systemImage: "key")
+              .foregroundStyle(.red.gradient, .primary)
+            Label("Create Groups", systemImage: "plus")
+              .foregroundStyle(.blue, .primary)
+          }
         }
       }.animation(.smooth, value: showsPlaceholder)
     }.safeAreaInset(edge: .bottom) {

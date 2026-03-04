@@ -20,38 +20,17 @@ struct ChatView: View {
     }.overlay {
       ZStack {
         if messages.isEmpty && text.isEmpty {
-          VStack(spacing: 16) {
-            VStack {
-              Image(systemName: "apple.intelligence").font(.system(size: 88))
-                .gradientBlur(radius: 4)
-              Text("Chat").font(.title)
-              Text("by Apple Ingelligence").secondary()
-            }
-            VStack(alignment: .center, spacing: 4) {
-              HStack(spacing: 4) {
-                Image(systemName: "circle.hexagonpath.fill").frame(width: 16)
-                  .foregroundStyle(.red.gradient)
-                Text("Use in your Hub").font(.caption2)
-              }
-              HStack(spacing: 4) {
-                Image(systemName: "lock.badge.checkmark").frame(width: 16)
-                  .foregroundStyle(.green)
-                Text("No internet needed").font(.caption2)
-              }
-              HStack(spacing: 4) {
-                Image(systemName: "lock.badge.checkmark").frame(width: 16)
-                  .foregroundStyle(.green)
-                Text("No chat history").font(.caption2)
-              }
-              HStack(spacing: 4) {
-                Image(systemName: "brain").frame(width: 16)
-                Text("Not smart, but fine").secondary()
-              }
-            }.symbolVariant(.fill)
-          }.transition(.blurReplace)
+          Placeholder(image: "apple.intelligence", title: "Chat", description: "by Apple Intelligence") {
+            Label("Use in your Hub", systemImage: "circle.hexagonpath.fill")
+              .foregroundStyle(.red.gradient, .primary)
+            Label("No internet needed", systemImage: "lock.badge.checkmark")
+              .foregroundStyle(.green, .primary)
+            Label("No chat history", systemImage: "lock.badge.checkmark")
+              .foregroundStyle(.green, .primary)
+            Label("Not smart, but fine", systemImage: "brain")
+          }
         }
       }.animation(.smooth, value: messages.isEmpty && text.isEmpty)
-        .frame(minHeight: 500, alignment: .top)
     }.safeAreaInset(edge: .bottom) {
       HStack {
         #if os(visionOS)
@@ -103,7 +82,7 @@ extension String {
 
 @available(macOS 26.0, iOS 26.0, *)
 #Preview {
-  ChatView()
+  ChatView().test()
 }
 
 #endif

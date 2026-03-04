@@ -61,6 +61,9 @@ struct TabButtonStyle: ButtonStyle {
 }
 
 extension Text {
+  func largeTitle() -> Text {
+    font(.system(size: 20, weight: .semibold, design: .rounded))
+  }
   func title() -> Text {
     font(.system(size: 16, weight: .medium, design: .rounded))
   }
@@ -91,7 +94,7 @@ extension View {
   func test() -> some View {
     NavigationStack {
       environment(Hub.test).page()
-    }
+    }.frame(minHeight: 600)
   }
   func title() -> some View {
     font(.system(size: 16, weight: .medium, design: .rounded))
@@ -121,5 +124,5 @@ extension View {
     Text("Note").note()
     Text("Secondary").secondary()
     Text("Error Message").error()
-  }.frame(maxWidth: .infinity, maxHeight: .infinity)
+  }.frame(maxWidth: .infinity, maxHeight: .infinity).test()
 }

@@ -15,16 +15,10 @@ struct UserConnections: View {
   var body: some View {
     List {
       Section {
-        VStack {
-          Image(systemName: "wifi").font(.system(size: 88))
-            .gradientBlur(radius: 4)
-          Text("Connections").font(.title.bold())
-          Text("""
+        Placeholder(image: "wifi", title: "Connections", description: """
           See all services and other devices connected to this Hub
           Assign them to permission groups
-          """).secondary()
-            .multilineTextAlignment(.center)
-        }.frame(maxWidth: .infinity)
+          """) { }
       }
       ForEach(users) { user in
         UserView(user: user, isMe: user.key == hub.key).contextMenu {

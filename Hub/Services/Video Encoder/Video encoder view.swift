@@ -49,39 +49,19 @@ struct VideoEncoderView: View {
         TableRow(file).draggable(VideoTransfer(file: file))
       }
     }.opacity(operations.isEmpty ? 0 : 1).overlay {
-      ZStack {
+      VStack {
         if operations.isEmpty {
-          VStack(spacing: 16) {
-            VStack {
-              Image(systemName: "video").font(.system(size: 88))
-                .gradientBlur(radius: 4)
-              Text("Video Encoder").font(.title)
-              Text("Compress your videos to hevc format").secondary()
-            }
-            VStack(alignment: .center, spacing: 4) {
-              HStack(spacing: 4) {
-                Image(systemName: "circle.hexagonpath.fill").frame(width: 16)
-                  .foregroundStyle(.red.gradient)
-                Text("Use in your Hub").font(.caption2)
-              }
-              HStack(spacing: 4) {
-                Image(systemName: "hammer").frame(width: 16)
-                  .foregroundStyle(.blue)
-                Text("Test settings here").font(.caption2)
-              }
-              HStack(spacing: 4) {
-                Image(systemName: "lock.badge.checkmark").frame(width: 16)
-                  .foregroundStyle(.green)
-                Text("No internet needed").font(.caption2)
-              }
-              HStack(spacing: 4) {
-                Image(systemName: "arrow.down.app").frame(width: 16)
-                Text("Drop videos to start compressing").secondary()
-              }
-            }.symbolVariant(.fill)
-          }.allowsHitTesting(false).transition(.blurReplace)
+          Placeholder(image: "video", title: "Video Encoder", description: "Compress your videos to hevc format") {
+            Label("Use in your Hub", systemImage: "circle.hexagonpath.fill")
+              .foregroundStyle(.red.gradient, .primary)
+            Label("Test settings here", systemImage: "hammer")
+              .foregroundStyle(.blue, .primary)
+            Label("No internet needed", systemImage: "lock.badge.checkmark")
+              .foregroundStyle(.green, .primary)
+            Label("Drop images to start compressing", systemImage: "arrow.down.app")
+          }
         }
-      }.frame(minHeight: 500, alignment: .top)
+      }
     }.animation(.smooth, value: operations.isEmpty).dropFiles { (files: [URL], point: CGPoint) -> Bool in
       var content = [URL]()
       for file in files {

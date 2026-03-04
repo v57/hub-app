@@ -28,12 +28,7 @@ struct FarmView: View {
   var body: some View {
     VStack(spacing: 16) {
       if !farm.isRunning {
-        VStack {
-          Image(systemName: "tree").font(.system(size: 88))
-            .gradientBlur(radius: 4)
-          Text("Farm").font(.title)
-          Text("Prevents your device from sleeping while enabled").secondary()
-        }.transition(.blurReplace)
+        Placeholder(image: "tree", title: "Farm", description: "Prevents your device from sleeping while enabled") { }
       }
       VStack {
         HStack {

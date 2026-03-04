@@ -40,25 +40,17 @@ struct LockdownView: View {
     @State private var isEnabled = false
     @State private var toggleTask: AnyCancellable?
     var body: some View {
-      VStack {
-        Image(systemName: "key.shield.fill").font(.system(size: 88))
-          .gradientBlur(radius: isEnabled ? 8 : 1)
-          .scaleEffect(isEnabled ? 1 : 0.8)
-        HStack {
-          Text("Lockdown mode").font(.title)
-        }
-        Text("Enable maximum security by blocking any untrusted device or service from accessing your hub").frame(maxWidth: 320)
-        VStack {
-          Text("You will still be able to add keys in lockdown mode")
-          Text("Every untrusted service will not connect to your hub anymore")
-        }.secondary()
+      Placeholder(image: "key.shield.fill", title: "Lockdown Mode", description: "Maximum Security", isEnabled: isEnabled) {
+        Text("""
+          Block any untrusted device or service from accessing your hub
+          You will still be able to add keys in lockdown mode
+          Every untrusted service will not connect to your hub anymore
+          """).multilineTextAlignment(.center)
         Toggle("Lockdown", isOn: $isEnabled.animation(.spring(response: 1, dampingFraction: 0.5)))
           .toggleStyle(.switch).labelsHidden()
-      }.multilineTextAlignment(.center).frame(maxWidth: .infinity).padding(.vertical)
-        .contentTransition(.numericText())
-        .task(id: whitelist.enabled) {
-          isEnabled = whitelist.enabled
-        }.onChange(of: isEnabled) { toggle() }
+      }.task(id: whitelist.enabled) {
+        isEnabled = whitelist.enabled
+      }.onChange(of: isEnabled) { toggle() }
     }
     func toggle() {
       let task = Task {

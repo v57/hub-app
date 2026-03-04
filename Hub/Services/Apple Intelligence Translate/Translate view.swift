@@ -30,35 +30,17 @@ struct TranslateView: View {
     }.overlay {
       ZStack {
         if text.isEmpty {
-          VStack(spacing: 16) {
-            VStack {
-              Image(systemName: "translate").font(.system(size: 88))
-                .gradientBlur(radius: 4)
-              Text("Translate").font(.title)
-              Text("by Apple Intelligence").secondary()
-            }
-            VStack(alignment: .center, spacing: 4) {
-              HStack(spacing: 4) {
-                Image(systemName: "circle.hexagonpath.fill").frame(width: 16)
-                  .foregroundStyle(.red.gradient)
-                Text("Use in your Hub").font(.caption2)
-              }
-              HStack(spacing: 4) {
-                Image(systemName: "lock").frame(width: 16)
-                Text("No internet needed").font(.caption2)
-              }.foregroundStyle(.green)
-              HStack(spacing: 4) {
-                Image(systemName: "lock").frame(width: 16)
-                Text("No translation history").font(.caption2)
-              }.foregroundStyle(.green)
-              HStack(spacing: 4) {
-                Image(systemName: "arrow.down.circle").frame(width: 16)
-                Text("Select language and start typing to download it").secondary()
-              }
-            }.symbolVariant(.fill)
-          }.transition(.blurReplace)
+          Placeholder(image: "translate", title: "Translate", description: "by Apple Intelligence") {
+            Label("Use in your Hub", systemImage: "circle.hexagonpath.fill")
+              .foregroundStyle(.red.gradient, .primary)
+            Label("No internet needed", systemImage: "lock.badge.checkmark")
+              .foregroundStyle(.green, .primary)
+            Label("No translation history", systemImage: "lock.badge.checkmark")
+              .foregroundStyle(.green, .primary)
+            Label("Select language and start typing to download it", systemImage: "arrow.down.circle")
+          }
         }
-      }.animation(.smooth, value: text.isEmpty).frame(minHeight: 500, alignment: .top)
+      }.animation(.smooth, value: text.isEmpty)
     }.toolbar {
       Button("Refresh", systemImage: "arrow.clockwise") {
         Task {
