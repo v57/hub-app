@@ -11,36 +11,53 @@ struct InstallS3: View {
   typealias CodeView = InstallationGuide.CodeView
   @Environment(Hub.self) var hub
   enum Guide {
-    case host, local, manual
+    case local, host, manual
+    var title: LocalizedStringKey {
+      switch self {
+      case .local: "Local"
+      case .host: "Cloud"
+      case .manual: "Connect"
+      }
+    }
   }
   @State var installer = Installer()
-  @State var guide: Guide = .local
+  @State var guide: Guide = .manual
   @State var open = false
+  @State var step = 0
   var body: some View {
     if open {
       StorageView().transition(.blurReplace)
     } else {
-      ScrollView {
-        VStack(alignment: .leading) {
-          Picker("Storage Options", selection: $guide) {
-            Text("Local").tag(Guide.local)
-            Text("Cloud").tag(Guide.host)
-            Text("Connect").tag(Guide.manual)
-          }.pickerStyle(.segmented).labelsHidden()
+      VStack {
+        Group {
           switch guide {
-          case .local:
-            Share(open: $open)
-          case .manual:
-            Connect(open: $open)
-          case .host:
-            Host(open: $open)
+          case .local: Share(open: $open)
+          case .host: Host(open: $open, step: $step)
+          case .manual: Connect(open: $open)
           }
-        }.frame(maxWidth: .infinity, alignment: .leading).safeAreaPadding(.horizontal)
-      }.task {
-        installer.set(hub: hub)
-      }.navigationTitle("Connect Storage").environment(installer)
+        }.transition(.blurReplace)
+      }.frame(maxWidth: .infinity, maxHeight: .infinity)
+        .safeAreaInset(edge: .bottom) {
+          if step == 0 {
+            HStack(spacing: 4) {
+              button(guide: .local)
+              button(guide: .host)
+              button(guide: .manual)
+            }.lineLimit(1).padding(.bottom, 4)
+          }
+        }.task {
+          installer.set(hub: hub)
+        }.navigationTitle("Connect Storage").environment(installer)
+        .buttonStyle(ActionButtonStyle())
         .transition(.blurReplace)
     }
+  }
+  func button(guide: Guide) -> some View {
+    Button {
+      withAnimation { self.guide = guide }
+    } label: {
+      Text(guide.title)
+    }.buttonStyle(TabButtonStyle(selected: self.guide == guide))
   }
   struct Host: View {
     @Environment(Installer.self) private var installer
@@ -48,64 +65,103 @@ struct InstallS3: View {
     @State private var region: Region?
     @State private var accessKey: String = ""
     @State private var secretKey: String = ""
+    @Binding var open: Bool
+    @Binding var step: Int
+    
     private var isReady: Bool {
       !bucketName.isEmpty && region != nil && !accessKey.isEmpty && !secretKey.isEmpty
     }
     
-    @Binding var open: Bool
+    private var regionName: String {
+      if let region {
+        " \(region.flag) \(region.name)"
+      } else {
+        ""
+      }
+    }
+    private var canContinue: Bool {
+      switch step {
+      case 0, 1: true
+      case 2: region != nil && !bucketName.isEmpty
+      default: false
+      }
+    }
     var body: some View {
-      Section(number: 0, title: "Wasabi Cloud Storage") {
-        HStack {
-          Text("30 day trial")
-            .padding(.horizontal, 12)
-            .padding(.vertical, 4)
-            .background(Color(.secondarySystemFill).opacity(0.4), in: .capsule)
-          Text("$7 / TB / month")
-            .padding(.horizontal, 12)
-            .padding(.vertical, 4)
-            .background(Color(.secondarySystemFill).opacity(0.4), in: .capsule)
-        }.fontWeight(.medium)
-        Text("""
-          Hub is not associated with Wasabi
-          I think Wasabi is the cheapest S3 service on the market
-          If you know any better, please leave a message in Discord and i will replace it in the next update!
-          """).secondary()
+      if step > 0 {
+        Spacer()
       }
-      Section(number: 1, title: "Create account") {
-        Text("""
-1. Go to [Wasabi](https://wasabi.com) Website and create account
-2. Login
-""")
-      }
-      Section(number: 2, title: "Create bucket") {
-        Text("""
-1. Go to [Buckets](https://console.wasabisys.com/file_manager)
-2. Click **Create bucket**
-3. Name your bucket (you can put anything)
-4. Select server
-5. Fill data in the fields below
-""")
-        TextField("Bucket Name", text: $bucketName).keyboard(style: .code)
-          .frame(maxWidth: 400)
-        Picker("Server region", selection: $region) {
-          ForEach(Region.allCases, id: \.self) { region in
-            Text("\(region.flag) \(region.name)").tag(region)
+      switch step {
+      case 0:
+        Section(title: "Wasabi Cloud Storage") {
+          HStack {
+            Button("30 day trial") { }
+            Button("$7 / TB / month") { }
+          }.buttonStyle(TabButtonStyle(selected: true))
+          Text("""
+            Hub is not associated with Wasabi
+            I think Wasabi is the cheapest S3 service on the market
+            If you know any better, please leave a message in Discord and i will replace it in the next update!
+            """).secondary()
+        }
+      case 1:
+        Section(title: "Create account") {
+          Text("""
+  1. Go to [Wasabi](https://wasabi.com) Website and create account
+  2. Login
+  """)
+        }
+      case 2:
+        Section(title: "Create bucket") {
+          Text("""
+  1. Go to [Buckets](https://console.wasabisys.com/file_manager)
+  2. Click **Create bucket**
+  3. Name your bucket \(bucketName.isEmpty ? "(you can put anything)" : bucketName)
+  4. Select server\(regionName)
+  5. Fill data in the fields below
+  """)
+          VStack {
+            TextField("Bucket Name", text: $bucketName).keyboard(style: .code)
+              .frame(maxWidth: 240)
+            Picker("Server Region", selection: $region.animation()) {
+              ForEach(Region.allCases, id: \.self) { region in
+                Text("\(region.flag) \(region.name)").tag(region)
+              }
+              Text("Server Region").tag(Optional<Region>.none)
+            }.labelsHidden()
           }
         }
+      default:
+        Section(title: "Create access key for your service") {
+          Text("""
+  1. Go to [Access Keys](https://console.wasabisys.com/access_keys)
+  2. Click **Create Access Key**
+  3. Click **Create**
+  4. Enter **Access Key** and **Secret Key** in the fields below 
+  """)
+          TextField("Access Key", text: $accessKey).frame(maxWidth: 240)
+            .keyboard(style: .code)
+          SecureField("Secret Key", text: $secretKey).frame(maxWidth: 240)
+            .keyboard(style: .code)
+        }
       }
-      Section(number: 3, title: "Create access key for your service") {
-        Text("""
-1. Go to [Access Keys](https://console.wasabisys.com/access_keys)
-2. Click **Create Access Key**
-3. Click **Create**
-4. Enter **Access Key** and **Secret Key** in the fields below 
-""")
-        TextField("Access Key", text: $accessKey).frame(maxWidth: 400)
-          .keyboard(style: .code)
-        TextField("Secret Key", text: $secretKey).frame(maxWidth: 400)
-          .keyboard(style: .code)
-        CreationButtons(settings: settings)
+      if step > 0 {
+        Spacer()
       }
+      HStack {
+        if step > 0 {
+          Button("Back") {
+            withAnimation { step -= 1 }
+          }.transition(.blurReplace)
+        }
+        if canContinue {
+          Button(step == 0 ? "Start" : "Continue") {
+            withAnimation { step += 1 }
+          }.transition(.blurReplace)
+        }
+        if step == 3 {
+          CreationButtons(settings: settings)
+        }
+      }.padding()
     }
     var settings: Hub.Launcher.AppSettings? {
       guard isReady else { return nil }
@@ -184,18 +240,13 @@ struct InstallS3: View {
     }
   }
   struct Section<Content: View>: View {
-    let number: Int
     let title: LocalizedStringKey
     @ViewBuilder let content: Content
     var body: some View {
-      HStack(alignment: .firstTextBaseline) {
-        Text("\(number).").font(.title3).fontWeight(.bold)
-        VStack(alignment: .leading) {
-          Text(title).font(.title3).fontWeight(.bold)
-            .padding(.bottom, 2)
-          content
-        }
-      }.padding(.top)
+      VStack {
+        Text(title).title()
+        content
+      }.multilineTextAlignment(.center)
     }
   }
   struct Share: View {
@@ -208,20 +259,21 @@ struct InstallS3: View {
     
     @Binding var open: Bool
     var body: some View {
-      Text("Share your local directory").font(.title3).fontWeight(.bold)
+      Text("Share your local directory").title()
       Text("Install storage service from your **Hub Launcher**")
-      CodeView(title: "Shared Directory", "~/Hub/Files")
-      Text("Only this directory will be shared")
+      CodeView(title: "Shared Directory", systemImage: "folder.fill", "~/Hub/Files")
+      Text("Only this directory will be shared").secondary()
       let status = status
-      ZStack {
+      Group {
         if let error = status.error {
-          Text(error).foregroundStyle(.red).transition(.blurReplace)
-        } else if let title = status.action(running: running) {
-          AsyncButton(title) {
-            try await action(status: status)
-          }.transition(.blurReplace).buttonStyle(.borderedProminent)
+          Text(error).error()
         }
-      }.contentTransition(.numericText())
+        if let title = status.action(running: running), let icon = status.icon {
+          AsyncButton(title, systemImage: icon) {
+            try await action(status: status)
+          }
+        }
+      }.padding().transition(.blurReplace)
     }
     var canCreate: Bool { hub.require(permissions: "launcher/app/create") }
     var canReadFiles: Bool { hub.require(permissions: "s3/read") }
@@ -251,9 +303,13 @@ struct InstallS3: View {
     }
     func action(status: Status) async throws {
       guard !running else { return }
-      running = true
-      testFailed = false
-      defer { running = false }
+      withAnimation {
+        running = true
+        testFailed = false
+      }
+      defer {
+        withAnimation { running = false }
+      }
       switch status {
       case .create:
         try await hub.launcher.createLocal()
@@ -285,6 +341,15 @@ struct InstallS3: View {
         case .cantCreate, .cantAllow: nil
         }
       }
+      var icon: String? {
+        switch self {
+        case .create: "plus"
+        case .allow: "shield.lefthalf.filled.badge.checkmark"
+        case .test: "hammer"
+        case .tested: "folder"
+        case .cantCreate, .cantAllow: nil
+        }
+      }
       var error: LocalizedStringKey? {
         switch self {
         case .create, .allow, .test, .tested: nil
@@ -303,12 +368,18 @@ struct InstallS3: View {
     @State private var secretKey: String = ""
     @Binding var open: Bool
     var body: some View {
-      Text("Use this page if you use other S3 services like AWS, Azure, Google Cloud and so on")
-      TextField("Endpoint", text: $endpoint).keyboard(style: .url)
-      TextField("Region", text: $region).keyboard(style: .code)
-      TextField("Bucket name", text: $bucketName).keyboard(style: .code)
-      TextField("Access Key", text: $accessKey).keyboard(style: .code)
-      TextField("Secret Key", text: $secretKey).keyboard(style: .code)
+      Text("Connect Manually").title()
+      Text("""
+Connect to other S3 services
+like AWS, Azure, Google Cloud etc.
+""").multilineTextAlignment(.center)
+      Group {
+        TextField("Endpoint", text: $endpoint).keyboard(style: .url)
+        TextField("Region (optional)", text: $region).keyboard(style: .code)
+        TextField("Bucket name", text: $bucketName).keyboard(style: .code)
+        TextField("Access Key", text: $accessKey).keyboard(style: .code)
+        SecureField("Secret Key", text: $secretKey).keyboard(style: .code)
+      }.frame(maxWidth: 220)
       CreationButtons(settings: settings)
     }
     private var isReady: Bool {
@@ -343,7 +414,7 @@ struct InstallS3: View {
           Image(systemName: testSucccessful ? "checkmark.circle.fill" : "xmark.circle.fill")
             .foregroundStyle(testSucccessful ? .green : .red)
         }
-      }.buttonStyle(.borderedProminent).disabled(settings == nil)
+      }.opacity(settings == nil ? 0.5 : 1).disabled(settings == nil)
     }
   }
   @Observable class Installer {

@@ -32,31 +32,39 @@ extension View {
 
 struct ActionButtonStyle: ButtonStyle {
   func makeBody(configuration: Configuration) -> some View {
-    configuration.label.foregroundStyle(.blue)
-      .fontWeight(.medium)
-      .padding(.horizontal, 12)
-      .padding(.vertical, 4)
+    let up = configuration.isPressed
+    configuration.label.body()
+      .foregroundStyle(.red)
+      .padding(.horizontal, 12).padding(.vertical, 4)
       .frame(minWidth: 60)
-      .background(.blue.opacity(0.15), in: .capsule)
-  }
-}
-struct DownloadButtonStyle: ButtonStyle {
-  func makeBody(configuration: Configuration) -> some View {
-    configuration.label.foregroundStyle(.blue)
-      .fontWeight(.medium)
-      .padding(.horizontal, 12)
-      .padding(.vertical, 4)
-      .frame(minWidth: 60)
-      .background(.blue.opacity(0.15), in: .capsule)
+      .background(.black.opacity(0.001))
+      .background(.red.opacity(0.1), in: .capsule)
+      .scaleEffect(up ? 1.1 : 1.0)
+      .animation(.spring(response: up ? 0.1 : 0.5, dampingFraction: up ? 1.0 : 0.5), value: up)
+      .contentTransition(.numericText())
   }
 }
 struct TabButtonStyle: ButtonStyle {
   let selected: Bool
   func makeBody(configuration: Configuration) -> some View {
-    configuration.label.font(.system(size: 12, weight: .medium, design: .rounded))
+    let up = configuration.isPressed
+    configuration.label.note()
       .foregroundStyle(.red)
+      .labelStyle(LabelStyle())
       .padding(.horizontal, 8).padding(.vertical, 4)
+      .background(.black.opacity(0.001))
       .background(.red.opacity(selected ? 0.1 : 0), in: .capsule)
+      .scaleEffect(up ? 1.1 : 1.0)
+      .animation(.spring(response: up ? 0.1 : 0.5, dampingFraction: up ? 1.0 : 0.5), value: up)
+      .contentTransition(.numericText())
+  }
+  struct LabelStyle: SwiftUI.LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+      HStack(spacing: 4) {
+        configuration.icon.frame(height: 0)
+        configuration.title
+      }
+    }
   }
 }
 
@@ -68,7 +76,8 @@ extension Text {
     font(.system(size: 16, weight: .medium, design: .rounded))
   }
   func code() -> Text {
-    font(.system(size: 12, weight: .medium, design: .monospaced))
+    font(.system(size: 12, weight: .medium))
+      .fontDesign(.monospaced)
       .foregroundStyle(.secondary)
   }
   func body() -> Text {
@@ -124,5 +133,9 @@ extension View {
     Text("Note").note()
     Text("Secondary").secondary()
     Text("Error Message").error()
+    Button("Action", systemImage: "hammer") { }
+      .buttonStyle(TabButtonStyle(selected: false))
+    Button("Action", systemImage: "hammer") { }
+      .buttonStyle(TabButtonStyle(selected: true))
   }.frame(maxWidth: .infinity, maxHeight: .infinity).test()
 }

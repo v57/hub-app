@@ -172,7 +172,7 @@ struct StoreView: View {
         if let buttonTitle {
           AsyncButton(buttonTitle) {
             try await action()
-          }.buttonStyle(DownloadButtonStyle())
+          }.buttonStyle(ActionButtonStyle())
             .animation(.smooth, value: buttonTitle)
             .contentTransition(.numericText())
         }

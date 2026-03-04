@@ -73,10 +73,12 @@ struct InstallationGuide: View {
   }
   struct CodeView: View {
     let title: LocalizedStringKey
+    let systemImage: String
     let code: String
     @State var copied: Bool = false
-    init(title: LocalizedStringKey = "Terminal", _ code: String) {
+    init(title: LocalizedStringKey = "Terminal", systemImage: String = "apple.terminal.fill", _ code: String) {
       self.title = title
+      self.systemImage = systemImage
       self.code = code
     }
     var body: some View {
@@ -86,18 +88,15 @@ struct InstallationGuide: View {
         } label: {
           VStack(alignment: .leading, spacing: 4) {
             header
-            codeView
+            Text(code).code().textSelection()
           }.padding(8).background(.background, in: RoundedRectangle(cornerRadius: 10))
         }.buttonStyle(.plain)
       }.shadow(color: .black.opacity(0.2), radius: 10)
         .multilineTextAlignment(.leading)
     }
-    var codeView: some View {
-      Text(code).code().textSelection()
-    }
     var header: some View {
       HStack(spacing: 4) {
-        Image(systemName: copied ? "checkmark.circle.fill" : "apple.terminal.fill")
+        Image(systemName: copied ? "checkmark.circle.fill" : systemImage)
         Text(copied ? "Copied to clipboard" : title)
       }.font(.caption2).foregroundStyle(.red.opacity(0.7))
     }
