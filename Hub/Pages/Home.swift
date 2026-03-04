@@ -43,7 +43,6 @@ struct HomeView: View {
       .toolbarTitleDisplayMode(.inline)
       .contentTransition(.numericText())
       .scrollIndicators(.hidden)
-      .background(Color.main(dark: colorScheme == .dark).ignoresSafeArea())
   }
   struct HeaderSection: View {
     @FocusState.Binding var focus: TextFieldFocus?
@@ -715,8 +714,7 @@ struct BlockStyle: ViewModifier {
   let cornerRadius: CGFloat
   @Environment(\.colorScheme) var scheme
   func body(content: Content) -> some View {
-    RoundedRectangle(cornerRadius: cornerRadius)
-      .fill(Color.main(dark: scheme == .dark))
+    RoundedRectangle(cornerRadius: cornerRadius).fill(Background())
       .shadow(color: .black.opacity(scheme == .dark ? 0.2 : 0.1), radius: 10)
       .overlay { content.safeAreaPadding(8) }
       .padding(8)
@@ -824,16 +822,6 @@ private extension String {
     let components = components(separatedBy: ".")
     guard components.count > 1 else { return self }
     return components[components.count - 2]
-  }
-}
-
-extension Color {
-  static func main(dark: Bool) -> Color {
-    if dark {
-      Color(hue: 0.091, saturation: 0.186, brightness: 0.156)
-    } else {
-      Color.white
-    }
   }
 }
 

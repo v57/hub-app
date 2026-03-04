@@ -16,7 +16,7 @@ struct HubApp: App {
     WindowGroup {
       if !ProcessInfo.isPreviews {
         NavigationStack {
-          HomeView()
+          HomeView().page()
         }
       }
     }

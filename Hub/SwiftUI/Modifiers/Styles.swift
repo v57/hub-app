@@ -67,6 +67,27 @@ struct TabButtonStyle: ButtonStyle {
     }
   }
 }
+struct Background: ShapeStyle {
+  func resolve(in environment: EnvironmentValues) -> Color {
+    Color.main(dark: environment.colorScheme == .dark)
+  }
+  struct Screen: View {
+    @Environment(\.colorScheme) var colorScheme
+    var body: some View {
+      Color.main(dark: colorScheme == .dark).ignoresSafeArea()
+    }
+  }
+}
+
+extension Color {
+  static func main(dark: Bool) -> Color {
+    if dark {
+      Color(hue: 0.091, saturation: 0.186, brightness: 0.156)
+    } else {
+      Color.white
+    }
+  }
+}
 
 extension Text {
   func largeTitle() -> Text {
@@ -99,6 +120,7 @@ extension Text {
 extension View {
   func page() -> some View {
     body().fontDesign(.rounded)
+      .background(Background.Screen())
   }
   func test() -> some View {
     NavigationStack {
