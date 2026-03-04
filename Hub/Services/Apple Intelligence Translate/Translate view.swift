@@ -20,13 +20,14 @@ struct TranslateView: View {
   @State var result: String = ""
   @State private var isRefreshing = false
   var body: some View {
-    ScrollView {
-      VStack {
+    GeometryReader { view in
+      ScrollView {
         Text(result).textSelection().contentTransition(.numericText())
-      }.task {
-        languages = await LanguageAvailability().supportedLanguages
-          .map(\.minimalIdentifier).sorted(by: { $0.languageName < $1.languageName })
-      }.frame(maxWidth: .infinity, alignment: .leading).padding()
+          .task {
+            languages = await LanguageAvailability().supportedLanguages
+              .map(\.minimalIdentifier).sorted(by: { $0.languageName < $1.languageName })
+          }.frame(maxWidth: .infinity, minHeight: view.size.height, alignment: .bottomLeading).padding()
+      }
     }.overlay {
       ZStack {
         if text.isEmpty {
