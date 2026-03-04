@@ -21,7 +21,7 @@ struct InstallS3: View {
     }
   }
   @State var installer = Installer()
-  @State var guide: Guide = .manual
+  @State var guide: Guide = .local
   @State var open = false
   @State var step = 0
   var body: some View {
@@ -121,7 +121,9 @@ struct InstallS3: View {
   """)
           VStack {
             TextField("Bucket Name", text: $bucketName).keyboard(style: .code)
-              .frame(maxWidth: 240)
+              .frame(maxWidth: 220).padding(.horizontal, 12).padding(.vertical, 4)
+                .frame(minHeight: 30)
+                .background(.regularMaterial, in: .capsule)
             Picker("Server Region", selection: $region.animation()) {
               ForEach(Region.allCases, id: \.self) { region in
                 Text("\(region.flag) \(region.name)").tag(region)
@@ -138,10 +140,13 @@ struct InstallS3: View {
   3. Click **Create**
   4. Enter **Access Key** and **Secret Key** in the fields below 
   """)
-          TextField("Access Key", text: $accessKey).frame(maxWidth: 240)
-            .keyboard(style: .code)
-          SecureField("Secret Key", text: $secretKey).frame(maxWidth: 240)
-            .keyboard(style: .code)
+          Group {
+            TextField("Access Key", text: $accessKey)
+            SecureField("Secret Key", text: $secretKey)
+          }.keyboard(style: .code).frame(maxWidth: 220)
+            .padding(.horizontal, 12).padding(.vertical, 4)
+            .frame(minHeight: 30)
+            .background(.regularMaterial, in: .capsule)
         }
       }
       if step > 0 {
@@ -379,7 +384,9 @@ like AWS, Azure, Google Cloud etc.
         TextField("Bucket name", text: $bucketName).keyboard(style: .code)
         TextField("Access Key", text: $accessKey).keyboard(style: .code)
         SecureField("Secret Key", text: $secretKey).keyboard(style: .code)
-      }.frame(maxWidth: 220)
+      }.frame(maxWidth: 220).padding(.horizontal, 12).padding(.vertical, 4)
+        .frame(minHeight: 30)
+        .background(.regularMaterial, in: .capsule)
       CreationButtons(settings: settings)
     }
     private var isReady: Bool {
