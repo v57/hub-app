@@ -145,6 +145,9 @@ extension View {
   func icon() -> some View {
     font(.system(size: 32, weight: .semibold, design: .rounded))
   }
+  func app() -> some View {
+    font(.system(size: 10, design: .rounded))
+  }
 }
 
 #Preview {

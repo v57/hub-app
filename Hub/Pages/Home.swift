@@ -31,7 +31,7 @@ struct HomeView: View {
             ForEach(AppServices.Service.allCases, id: \.self) { item in
               ServiceContent(item: item)
             }
-          }
+          }.labelStyle(.appIcon)
           Text("Support this Project").sectionTitle()
           SupportView()
         }.padding(.top).animation(.home, value: isFocusing)
@@ -69,19 +69,15 @@ struct HomeView: View {
           HubView(merging: $merging).environment(hub)
             .gridSize(.x21)
         }
-        Button {
+        Button(copied ? "Copied" : "My Key", systemImage: copied ? "checkmark.circle.fill" : "key") {
           copy()
-        } label: {
-          AppIcon(title: copied ? "Copied" : "My Key", systemImage: copied ? "checkmark.circle.fill" : "key")
-        }
+        }.labelStyle(.appIcon)
         NavigationLink {
           FarmView()
             .transitionTarget(id: "farm", namespace: namespace)
         } label: {
-          AppIcon(title: "Farm", systemImage: "tree")
-            .iconBadge(Farm.main.isRunning ? "Farming" : nil)
-            .transitionSource(id: "farm", namespace: namespace)
-        }
+          Label("Farm", systemImage: "tree")
+        }.labelStyle(.appIcon).iconBadge(Farm.main.isRunning ? "Farming" : nil)
       }
     }
     func copy() {
@@ -124,73 +120,56 @@ struct HomeView: View {
               .transitionSource(id: Sheet.services, namespace: namespace)
           }.gridSize(.x22)
         }
-        if hub.require(permissions: "hub/connections") {
-          Button {
-            sheet = .connections
-          } label: {
-            AppIcon(title: "Connections", systemImage: "wifi")
-              .iconBadge(statusBadges.connections)
-              .transitionSource(id: Sheet.connections, namespace: namespace)
+        Group {
+          if hub.require(permissions: "hub/connections") {
+            Button("Connections", systemImage: "wifi") {
+              sheet = .connections
+            }
           }
-        }
-        if let security = statusBadges.security, security > 0 && hub.require(permissions: "hub/host/pending") {
-          Button {
-            sheet = .pending
-          } label: {
-            AppIcon(title: "Requests", systemImage: "clock")
-              .iconBadge(statusBadges.security)
-              .transitionSource(id: Sheet.pending, namespace: namespace)
+          if let security = statusBadges.security, security > 0 && hub.require(permissions: "hub/host/pending") {
+            Button("Requests", systemImage: "clock") {
+              sheet = .pending
+            }.iconBadge(statusBadges.security)
           }
-        }
-        if hub.require(permissions: "hub/group/list", "hub/group/names") {
-          Button {
-            sheet = .permissions
-          } label: {
-            AppIcon(title: "Permissions", systemImage: "lock")
-              .transitionSource(id: Sheet.permissions, namespace: namespace)
+          if hub.require(permissions: "hub/group/list", "hub/group/names") {
+            Button("Permissions", systemImage: "lock") {
+              sheet = .permissions
+            }
           }
-        }
-        if hub.canLockdown {
-          Button {
-            sheet = .lockdown
-          } label: {
-            AppIcon(title: "Lockdown", systemImage: "key.shield")
-              .transitionSource(id: Sheet.lockdown, namespace: namespace)
+          if hub.canLockdown {
+            Button("Lockdown", systemImage: "key.shield") {
+              sheet = .lockdown
+            }
           }
-        }
-        if hub.require(permissions: "launcher/status") {
-          Button {
-            sheet = .launcher
-          } label: {
-            AppIcon(title: "Launcher", systemImage: "apple.terminal")
-              .transitionSource(id: Sheet.launcher, namespace: namespace)
+          if hub.require(permissions: "launcher/status") {
+            Button("Launcher", systemImage: "apple.terminal") {
+              sheet = .launcher
+            }
           }
-        }
-        if hub.hasStorage {
-          Button {
-            sheet = .files
-          } label: {
-            AppIcon(title: "Files", systemImage: "folder")
+          if hub.hasStorage {
+            Button("Files", systemImage: "folder") {
+              sheet = .files
+            }
+          } else if hub.canInstall {
+            Button("Files", systemImage: "folder") {
+              sheet = .installS3
+            }
           }
-        } else if hub.canInstall {
-          Button {
-            sheet = .installS3
-          } label: {
-            AppIcon(title: "Files", systemImage: "folder")
+          ForEach(launcherInfo.apps) { app in
+            AppView(app: app)
           }
-        }
-        ForEach(launcherInfo.apps) { app in
-          AppView(app: app)
-        }
+        }.labelStyle(.appIcon)
         ShareServicesView().gridSize(.x22)
         if let apps = statusBadges.apps, !apps.isEmpty {
           ForEach(apps) { app in
             NavigationLink(value: app) {
-              AppIcon(title: app.name, textIcon: String(app.name.first ?? "A"))
-                .iconBadge(app.isOnline ? nil : "Offline", color: .red)
-                .transitionSource(id: app.id, namespace: namespace)
-            }
-          }
+              Label {
+                Text(app.name)
+              } icon: {
+                Text(String(app.name.first ?? "A"))
+              }
+            }.iconBadge(app.isOnline ? nil : "Offline")
+          }.labelStyle(.appIcon)
         }
       }
       .navigationDestination(for: Hub.AppHeader.self) { app in
@@ -250,7 +229,7 @@ struct HomeView: View {
                 }
               }.labelStyle(LabelStyle())
             }
-              .frame(maxWidth: .infinity, alignment: .leading).background {
+            .frame(maxWidth: .infinity, alignment: .leading).background {
               RoundedRectangle(cornerRadius: 4)
                 .fill(.background).padding(.horizontal, -4).padding(.vertical, -2)
             }.secondary()
@@ -571,8 +550,7 @@ struct HomeView: View {
         AppServices.Page(service: item)
           .transitionTarget(id: item, namespace: namespace)
       } label: {
-        AppIcon(title: item.title, systemImage: item.image)
-          .transitionSource(id: item, namespace: namespace)
+        Label(item.title, systemImage: item.image)
       }
     }
   }
@@ -598,62 +576,6 @@ struct HomeView: View {
         .blockBackground()
     }
   }
-  struct AppIcon<Icon: View>: View {
-    let title: Text
-    var badge: Text?
-    var badgeColor: Color = .blue
-    @ViewBuilder let icon: Icon
-    var hasBadge: Bool { badge != nil }
-    var body: some View {
-      icon.gradientBlur(radius: hasBadge ? 4 : 1)
-        .contentTransition(.symbolEffect).icon()
-        .blockBackground().overlay(alignment: .top) {
-          if let badge {
-            badge.foregroundStyle(.white).font(.caption.bold()).padding(.horizontal, 6)
-              .padding(.vertical, 2)
-              .background(badgeColor, in: .capsule)
-              .frame(maxWidth: .infinity, alignment: .trailing)
-              .padding(.horizontal, -4)
-              .offset(y: -4)
-              .transition(.blurReplace)
-          }
-        }.overlay {
-          GeometryReader { view in
-            title.app().offset(y: view.size.height - 4)
-              .multilineTextAlignment(.center)
-              .frame(maxWidth: .infinity)
-          }
-        }
-    }
-    func iconBadge(_ value: Int?, color: Color = .blue) -> Self {
-      var a = self
-      if let value, value > 0 {
-        a.badge = Text("\(value)")
-        a.badgeColor = color
-      }
-      return a
-    }
-    func iconBadge(_ value: LocalizedStringKey?, color: Color = .blue) -> Self {
-      var a = self
-      if let value {
-        a.badge = Text(value)
-        a.badgeColor = color
-      }
-      return a
-    }
-  }
-}
-extension HomeView.AppIcon where Icon == Image {
-  init(title: LocalizedStringKey, systemImage: String) {
-    self.title = Text(title)
-    self.icon = Image(systemName: systemImage)
-  }
-}
-extension HomeView.AppIcon where Icon == Text {
-  init(title: String, textIcon: String) {
-    self.title = Text(title)
-    self.icon = Text(textIcon)
-  }
 }
 extension View {
   func sectionTitle(padding: Bool = true) -> some View {
@@ -677,16 +599,6 @@ struct SectionTitleModifier: ViewModifier {
     content.title()
       .padding(.leading, spacing + 8)
       .padding(.top, padding ? 32 : 0)
-  }
-}
-
-struct BackgroundColor: ShapeStyle {
-  func resolve(in environment: EnvironmentValues) -> Color {
-    if environment.colorScheme == .dark {
-      Color(red: 0.2, green: 0.2, blue: 0.24)
-    } else {
-      Color(hue: 0, saturation: 0, brightness: 0.92)
-    }
   }
 }
 
