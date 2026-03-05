@@ -133,7 +133,7 @@ struct HomeView: View {
               .transitionSource(id: Sheet.connections, namespace: namespace)
           }
         }
-        if hub.require(permissions: "hub/host/pending") {
+        if let security = statusBadges.security, security > 0 && hub.require(permissions: "hub/host/pending") {
           Button {
             sheet = .pending
           } label: {
