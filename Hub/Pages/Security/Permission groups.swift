@@ -64,7 +64,7 @@ struct PermissionGroups: View {
         Section {
           ForEach(permissions.sections) { section in
             let isSelected = $group.permissions.toggle(section.permissions.map { "\(section.name)/\($0)" })
-            if isEditing || !section.permissions.contains(where: { $0.starts(with: "\(section.name)/") }) {
+            if isEditing || isSelected.wrappedValue {
               HStack {
                 if isEditing {
                   Toggle(section.name, isOn: isSelected)
