@@ -51,11 +51,10 @@ struct PermissionGroups: View {
             withAnimation {
               adding.toggle()
             }
-          }.buttonStyle(TabButtonStyle(selected: false))
-            .contentTransition(.numericText())
+          }
         }.padding()
       }
-    }
+    }.buttonStyle(TabButtonStyle(selected: true)).contentTransition(.numericText())
   }
   var groupsView: some View {
     ForEach($groups.groups) { $group in
@@ -96,15 +95,13 @@ struct PermissionGroups: View {
               }
             }
             Spacer()
-            if isEditing {
-              AsyncButton("Save") {
+            AsyncButton(isEditing ? "Save" : "Edit") {
+              if isEditing {
                 try await hub.client.send("hub/group/update", UpdateGroup(group: group.name, set: Array(group.permissions)))
                 withAnimation {
                   editing = nil
                 }
-              }
-            } else {
-              Button("Edit") {
+              } else {
                 withAnimation {
                   editing = group.name
                 }
