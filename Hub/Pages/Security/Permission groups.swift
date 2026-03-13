@@ -15,15 +15,18 @@ struct PermissionGroups: View {
   @HubState(\.groups) private var groups
   @State var selected = Set<String>()
   @State var editing: String?
+  @FocusState var focused: Bool
   var body: some View {
     let showsPlaceholder = !adding && groups.groups.isEmpty
     ScrollView {
       VStack {
-        if adding {
-          addGroupsView
-        } else {
-          groupsView
-        }
+        Group {
+          if adding {
+            addGroupsView
+          } else {
+            groupsView
+          }
+        }.transition(.blurReplace)
       }.frame(maxWidth: .infinity).safeAreaPadding(.horizontal)
     }.lineLimit(2).overlay {
       VStack {
@@ -39,22 +42,31 @@ struct PermissionGroups: View {
     }.safeAreaInset(edge: .bottom) {
       if hub.require(permissions: "hub/group/update") {
         HStack {
-          if adding {
-            TextField("Name", text: $name.animation()).frame(maxWidth: 150)
-              .transition(.blurReplace)
-          }
-          AsyncButton(createTitle) {
-            if adding && !name.isEmpty {
-              try await hub.client.send("hub/group/update", UpdateGroup(group: name, set: Array(selected)))
-            }
-            name = ""
-            withAnimation {
-              adding.toggle()
-            }
-          }
-        }.padding()
+          addGroup.transition(.blurReplace)
+        }.padding().frame(maxWidth: .infinity)
       }
     }.buttonStyle(TabButtonStyle(selected: true)).contentTransition(.numericText())
+  }
+  @ViewBuilder
+  var addGroup: some View {
+    if adding {
+      TextField("Name", text: $name.animation()).frame(maxWidth: 150)
+        .textFieldStyle(.plain)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(.regularMaterial, in: .capsule)
+        .focused($focused)
+    }
+    AsyncButton(addGroupTitle, systemImage: addGroupIcon) {
+      if adding && !name.isEmpty {
+        try await hub.client.send("hub/group/update", UpdateGroup(group: name, set: Array(selected)))
+      }
+      name = ""
+      withAnimation {
+        adding.toggle()
+        focused = adding
+      }
+    }
   }
   var groupsView: some View {
     ForEach($groups.groups) { $group in
@@ -127,8 +139,11 @@ struct PermissionGroups: View {
       }
     }
   }
-  var createTitle: LocalizedStringKey {
-    adding ? name.isEmpty ? "Cancel" : "Create" : "Create group"
+  var addGroupTitle: LocalizedStringKey {
+    adding ? name.isEmpty ? "Cancel" : "Create" : "Create Group"
+  }
+  var addGroupIcon: String {
+    adding ? name.isEmpty ? "xmark" : "plus" : "plus"
   }
   struct UpdateGroup: Encodable {
     let group: String
