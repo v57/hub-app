@@ -61,7 +61,7 @@ struct TabButtonStyle: ButtonStyle {
   struct LabelStyle: SwiftUI.LabelStyle {
     func makeBody(configuration: Configuration) -> some View {
       HStack(spacing: 4) {
-        configuration.icon.frame(height: 0)
+        configuration.icon.frame(height: 0).contentTransition(.symbolEffect)
         configuration.title
       }
     }
