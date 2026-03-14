@@ -9,33 +9,33 @@ import SwiftUI
 
 extension View {
   // MARK: Without body
-  func hubStream<T: Decodable>(_ path: String, initial: T? = nil, action: @MainActor @escaping (T) -> Void) -> some View {
-    modifier(HubStreamModifier(path: path, initial: initial, action: action))
+  func hubStream<T: Decodable>(_ path: String, initial: T? = nil, delayed: Bool = true, action: @MainActor @escaping (T) -> Void) -> some View {
+    modifier(HubStreamModifier(path: path, initial: initial, delayed: delayed, action: action))
   }
-  func hubStream<T: Decodable>(_ path: String, initial: T? = nil, to: Binding<T>, animation: Animation? = nil) -> some View {
-    hubStream(path, initial: initial) { (value: T) in
+  func hubStream<T: Decodable>(_ path: String, initial: T? = nil, to: Binding<T>, delayed: Bool = true) -> some View {
+    hubStream(path, initial: initial, delayed: delayed) { (value: T) in
       to.wrappedValue = value
     }
   }
-  func hubStream<T: Decodable>(_ path: String, initial: T?, to: Binding<T?>, animation: Animation? = nil) -> some View {
-    hubStream(path, initial: initial) { (value: T) in
+  func hubStream<T: Decodable>(_ path: String, initial: T?, to: Binding<T?>, delayed: Bool = true) -> some View {
+    hubStream(path, initial: initial, delayed: delayed) { (value: T) in
       to.wrappedValue = value
     }
   }
   // MARK: With body
-  func hubStream<T: Decodable, Body>(_ path: String, _ body: Body, initial: T? = nil, action: @MainActor @escaping (T) -> Void) -> some View
+  func hubStream<T: Decodable, Body>(_ path: String, _ body: Body, initial: T? = nil, delayed: Bool = true, action: @MainActor @escaping (T) -> Void) -> some View
   where Body: Encodable & Sendable & Hashable {
-    modifier(HubStreamBodyModifier(path: path, body: body, initial: initial, action: action))
+    modifier(HubStreamBodyModifier(path: path, body: body, initial: initial, delayed: delayed, action: action))
   }
-  func hubStream<T: Decodable, Body>(_ path: String, _ body: Body, initial: T? = nil, to: Binding<T>, animation: Animation? = nil) -> some View
+  func hubStream<T: Decodable, Body>(_ path: String, _ body: Body, initial: T? = nil, to: Binding<T>, delayed: Bool = true) -> some View
   where Body: Encodable & Sendable & Hashable {
-    hubStream(path, body, initial: initial) { (value: T) in
+    hubStream(path, body, initial: initial, delayed: delayed) { (value: T) in
       to.wrappedValue = value
     }
   }
-  func hubStream<T: Decodable, Body>(_ path: String, _ body: Body, initial: T?, to: Binding<T?>, animation: Animation? = nil) -> some View
+  func hubStream<T: Decodable, Body>(_ path: String, _ body: Body, initial: T?, to: Binding<T?>, delayed: Bool = true) -> some View
   where Body: Encodable & Sendable & Hashable {
-    hubStream(path, body, initial: initial) { (value: T) in
+    hubStream(path, body, initial: initial, delayed: delayed) { (value: T) in
       to.wrappedValue = value
     }
   }
@@ -44,6 +44,7 @@ extension View {
 private struct HubStreamModifier<T: Decodable>: ViewModifier {
   let path: String
   let initial: T?
+  let delayed: Bool
   let action: @MainActor (T) -> Void
   @Environment(Hub.self) private var hub
   func body(content: Content) -> some View {
@@ -54,7 +55,11 @@ private struct HubStreamModifier<T: Decodable>: ViewModifier {
       guard hub.isConnected && hub.api.contains(path) else { return }
       do {
         for try await value: T in hub.client.values(path) {
-          EventDelayManager.main.execute {
+          if delayed {
+            EventDelayManager.main.execute {
+              action(value)
+            }
+          } else {
             action(value)
           }
         }
@@ -70,6 +75,7 @@ private struct HubStreamBodyModifier<T: Decodable, Body: Encodable & Hashable & 
   let path: String
   let body: Body
   let initial: T?
+  let delayed: Bool
   let action: @MainActor (T) -> Void
   @Environment(Hub.self) private var hub
   func body(content: Content) -> some View {
@@ -80,7 +86,11 @@ private struct HubStreamBodyModifier<T: Decodable, Body: Encodable & Hashable & 
       guard hub.isConnected && hub.api.contains(path) else { return }
       do {
         for try await value: T in hub.client.values(path, body) {
-          EventDelayManager.main.execute {
+          if delayed {
+            EventDelayManager.main.execute {
+              action(value)
+            }
+          } else {
             action(value)
           }
         }
