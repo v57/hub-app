@@ -86,7 +86,7 @@ struct StorageView: View {
     }.dropDestination { (files: [URL], point: CGPoint) -> Bool in
       add(files: files)
       return true
-    }.navigationTitle("Storage").hubStream("s3/list", path, to: $list)
+    }.navigationTitle("Storage").hubStream("s3/list", path, to: $list, delayed: false)
       .contentTransition(.symbolEffect(.replace))
       .progressDraw()
 #endif
