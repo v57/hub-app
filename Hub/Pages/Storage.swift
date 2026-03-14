@@ -147,7 +147,7 @@ struct StorageView: View {
       var fileIcon: String {
         switch file.name.fileType {
         case .image: "photo"
-        case .video: "video"
+        case .video: "film"
         case .audio: "speaker.wave.2"
         case .document: "document"
         }
