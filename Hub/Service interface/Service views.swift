@@ -129,10 +129,10 @@ extension Element: @retroactive View {
         let progress = progress(current: current)
         SwiftUI.ZStack {
           Circle().trim(from: 0, to: 1)
-            .stroke(.blue.opacity(0.2), lineWidth: 3)
+            .stroke(.red.opacity(0.2), lineWidth: 3)
           Circle().trim(from: 0, to: progress)
             .rotation(.degrees(-90))
-            .stroke(.blue.gradient, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+            .stroke(.red.gradient, style: StrokeStyle(lineWidth: 3, lineCap: .round))
             .animation(.smooth, value: progress)
         }.frame(width: 18, height: 18)
       }
@@ -452,13 +452,9 @@ struct FileTaskStatus: View {
             AsyncButton {
               try await clear()
             } label: {
-              HStack(spacing: 4) {
-                Image(systemName: "trash.fill")
-                Text("Clear")
-              }.padding(.horizontal, 12).padding(.vertical, 4)
-                .background(Color.tertiaryBackground, in: .capsule)
-                .foregroundStyle(.secondary)
-            }.transition(.blurReplace)
+              Label("Clear", systemImage: "trash.fill")
+            }.buttonStyle(TabButtonStyle(selected: false))
+              .transition(.blurReplace)
           }
         }
         VStack {
@@ -467,12 +463,9 @@ struct FileTaskStatus: View {
             NavigationLink {
               StorageView(path: target).environment(hub).page()
             } label: {
-              HStack(spacing: 4) {
-                Image(systemName: "folder.fill")
-                Text("View")
-              }.padding(.horizontal, 12).padding(.vertical, 4)
-                .background(.blue, in: .capsule)
-            }.transition(.blurReplace)
+              Label("View", systemImage: "folder.fill")
+            }.buttonStyle(TabButtonStyle(selected: true))
+              .transition(.blurReplace)
           }
         }
       }.buttonStyle(.plain).fontWeight(.medium)
@@ -508,10 +501,10 @@ struct LargeProgressView: View {
           .gradientBlur(radius: running > 0 ? 1 : 4)
         Circle().trim(from: 0, to: appear ? 1 : 0)
           .rotation(.degrees(-90))
-          .stroke(.blue.opacity(0.2), lineWidth: 5)
+          .stroke(.red.opacity(0.2), lineWidth: 5)
         Circle().trim(from: 0, to: progress)
           .rotation(.degrees(-90))
-          .stroke(.blue.gradient, style: StrokeStyle(lineWidth: 5, lineCap: .round))
+          .stroke(.red.gradient, style: StrokeStyle(lineWidth: 5, lineCap: .round))
           .animation(.smooth, value: progress)
       }.frame(width: 48, height: 48)
       if running > 0 {
