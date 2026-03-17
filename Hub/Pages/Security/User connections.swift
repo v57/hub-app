@@ -23,11 +23,18 @@ struct UserConnections: View {
       ForEach($users) { $user in
         UserView(user: user, isMe: user.key == hub.key).contextMenu {
           if let key = user.key, hub.canManageGroups {
-            Menu("Group") {
-              ForEach(groups.groups) { group in
-                AsyncButton(group.name) {
-                  try await toggle(user: $user, key: key, group: group.name)
+            if !groups.groups.isEmpty {
+              Menu("Set Group", systemImage: "shield") {
+                ForEach(groups.groups) { group in
+                  AsyncButton(group.name) {
+                    try await toggle(user: $user, key: key, group: group.name)
+                  }
                 }
+              }
+            }
+            if let group = user.group {
+              AsyncButton("Remove Group", systemImage: "xmark") {
+                try await toggle(user: $user, key: key, group: group)
               }
             }
           }
