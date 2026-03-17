@@ -9,7 +9,7 @@ import SwiftUI
 
 extension View {
   func badgeStyle() -> some View {
-    font(.caption2).foregroundStyle(.white)
+    note().foregroundStyle(.red)
       .padding(.horizontal, 6).padding(.vertical, 2)
       .background(.red, in: .capsule)
   }

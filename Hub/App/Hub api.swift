@@ -146,8 +146,9 @@ extension Hub {
     var name: String
     var icon: Icon
     var apps: Int
+    var group: String?
     enum CodingKeys: CodingKey {
-      case id, key, services, apps, permissions, name, icon
+      case id, key, services, apps, permissions, name, icon, group
     }
     init(from decoder: any Decoder) throws {
       let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -157,6 +158,7 @@ extension Hub {
       apps = container.decodeIfPresent(.apps, 0)
       name = container.decodeIfPresent(.name, "")
       icon = container.decodeIfPresent(.icon) ?? Icon(symbol: .init(name: "hexagon"))
+      group = container.decodeIfPresent(.group)
     }
   }
   

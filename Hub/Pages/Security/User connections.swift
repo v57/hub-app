@@ -38,6 +38,7 @@ struct UserConnections: View {
   struct UserView: View {
     let user: Hub.User
     let isMe: Bool
+    var separator: Text { Text("•").foregroundStyle(.tertiary) }
     var body: some View {
       HStack {
         IconView(icon: user.icon).frame(width: 44, height: 44)
@@ -46,23 +47,27 @@ struct UserConnections: View {
             if !user.name.isEmpty {
               Text(user.name)
             }
+          }
+          HStack(spacing: 4) {
+            if let group = user.group {
+              Text(group).foregroundStyle(.red)
+              separator
+            }
             if let key = user.key {
               Text(isMe ? "\(key.suffix(8)) (You)" : key.suffix(8)).secondary()
                 .textSelection()
             } else {
               Text("Unauthorized")
             }
-          }
-          if user.services > 0 || user.apps > 0 {
-            HStack {
-              if user.services > 0 {
-                Text("\(user.services) services")
-              }
-              if user.apps > 0 {
-                Text("\(user.apps) apps")
-              }
-            }.secondary()
-          }
+            if user.services > 0 {
+              separator
+              Text("\(user.services) services")
+            }
+            if user.apps > 0 {
+              separator
+              Text("\(user.apps) apps")
+            }
+          }.secondary()
         }.lineLimit(1)
       }
     }
