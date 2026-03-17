@@ -20,19 +20,28 @@ struct UserConnections: View {
           Assign them to permission groups
           """) { }
       }
-      ForEach(users) { user in
+      ForEach($users) { $user in
         UserView(user: user, isMe: user.key == hub.key).contextMenu {
-          if let key = user.key {
+          if let key = user.key, hub.canManageGroups {
             Menu("Group") {
               ForEach(groups.groups) { group in
                 AsyncButton(group.name) {
-                  try await hub.add(key: key, group: group.name)
+                  try await toggle(user: $user, key: key, group: group.name)
                 }
               }
             }
           }
-        }
+        }.animation(.smooth, value: user.group)
       }
+    }
+  }
+  func toggle(user: Binding<Hub.User>, key: String, group: String) async throws {
+    if let current = user.wrappedValue.group, current == group {
+      try await hub.remove(key: key, group: group)
+      user.wrappedValue.group = nil
+    } else {
+      try await hub.add(key: key, group: group)
+      user.wrappedValue.group = group
     }
   }
   struct UserView: View {
@@ -49,24 +58,26 @@ struct UserConnections: View {
             }
           }
           HStack(spacing: 4) {
-            if let group = user.group {
-              Text(group).foregroundStyle(.red)
-              separator
-            }
-            if let key = user.key {
-              Text(isMe ? "\(key.suffix(8)) (You)" : key.suffix(8)).secondary()
-                .textSelection()
-            } else {
-              Text("Unauthorized")
-            }
-            if user.services > 0 {
-              separator
-              Text("\(user.services) services")
-            }
-            if user.apps > 0 {
-              separator
-              Text("\(user.apps) apps")
-            }
+            Group {
+              if let group = user.group {
+                Text(group).foregroundStyle(.red)
+                separator
+              }
+              if let key = user.key {
+                Text(isMe ? "\(key.suffix(8)) (You)" : key.suffix(8)).secondary()
+                  .textSelection()
+              } else {
+                Text("Unauthorized")
+              }
+              if user.services > 0 {
+                separator
+                Text("\(user.services) services")
+              }
+              if user.apps > 0 {
+                separator
+                Text("\(user.apps) apps")
+              }
+            }.transition(.blurReplace)
           }.secondary()
         }.lineLimit(1)
       }

@@ -58,14 +58,18 @@ struct HubStateStorage {
 struct HubState<T: Decodable>: DynamicProperty {
   @Environment(Hub.self) var hub
   typealias Path = KeyPath<HubStateStorage, HubStateStorage.Sync<T>>
-  @State var storage = Storage()
+  @State private var storage = Storage()
   let path: Path
   var wrappedValue: T {
-    storage.subscribeIfNeeded(hub: hub, path: path)
-    return hub.state[keyPath: path].value
+    get {
+      storage.subscribeIfNeeded(hub: hub, path: path)
+      return hub.state[keyPath: path].value
+    } nonmutating set {
+      hub.state[keyPath: path].value = newValue
+    }
   }
   var projectedValue: Binding<T> {
-    Binding(get: { hub.state[keyPath: path].value }, set: { hub.state[keyPath: path].value = $0 })
+    Binding { wrappedValue } set: { wrappedValue = $0 }
   }
   init(_ path: Path) {
     self.path = path
@@ -176,8 +180,14 @@ extension Hub {
     }
     return false
   }
+  var canManageGroups: Bool {
+    require(permissions: "hub/group/update/users")
+  }
   func add(key: String, group: String) async throws {
     try await client.send("hub/group/update/users", EditGroupUsers(group: group, add: [key], remove: nil))
+  }
+  func remove(key: String, group: String) async throws {
+    try await client.send("hub/group/update/users", EditGroupUsers(group: group, add: nil, remove: [key]))
   }
   func merge(other: Hub) async throws {
     let key: String = try await client.send("hub/key")
