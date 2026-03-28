@@ -44,12 +44,12 @@ private struct AppIcon<Title: View, Icon: View>: View {
       .contentTransition(.symbolEffect).icon()
       .blockBackground().overlay(alignment: .top) {
         if let badge {
-          badge.foregroundStyle(.white).font(.caption.bold()).padding(.horizontal, 6)
+          badge.foregroundStyle(.white).app().padding(.horizontal, 6)
             .padding(.vertical, 2)
             .background(.tint, in: .capsule)
             .frame(maxWidth: .infinity, alignment: .trailing)
-            .padding(.horizontal, -4)
-            .offset(y: -4)
+            .padding(.horizontal, -2)
+            .offset(y: -2)
             .transition(.blurReplace)
         }
       }.overlay {
