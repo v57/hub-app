@@ -10,12 +10,12 @@ import HubService
 
 extension Element.Action {
   
-  func perform(hub: Hub, app: ServiceApp, nested: NestedList?) async throws {
+  func perform(hub: Hub, app: ServiceApp, nested: NestedList?, context: Hub.Context?) async throws {
     let body = body.resolve(app: app, nested: nested)
-    let result: AnyCodable = try await hub.client.send(path, body)
+    let result: AnyCodable = try await hub.client.send(path, body, context: context)
     result.update(app: app, nested: nested, output: output)
   }
-  func perform(hub: Hub, app: ServiceApp, nested: NestedList?, customValues: (inout [String: AnyCodable]) -> Void) async throws {
+  func perform(hub: Hub, app: ServiceApp, nested: NestedList?, context: Hub.Context?, customValues: (inout [String: AnyCodable]) -> Void) async throws {
     var body: AnyCodable? = body.resolve(app: app, nested: nested)
     switch body {
     case .dictionary(var dictionary):
@@ -26,7 +26,7 @@ extension Element.Action {
       customValues(&dictionary)
       body = .dictionary(dictionary)
     }
-    let result: AnyCodable = try await hub.client.send(path, body)
+    let result: AnyCodable = try await hub.client.send(path, body, context: context)
     result.update(app: app, nested: nested, output: output)
   }
 }

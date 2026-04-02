@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import HubService
 
 extension View {
   // MARK: Without body
@@ -41,20 +42,29 @@ extension View {
   }
 }
 
+extension ServiceProvider {
+  var label: String {
+    let name = name?.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard let name, !name.isEmpty else { return id }
+    return "\(name) (\(id))"
+  }
+}
+
 private struct HubStreamModifier<T: Decodable>: ViewModifier {
   let path: String
   let initial: T?
   let delayed: Bool
   let action: @MainActor (T) -> Void
   @Environment(Hub.self) private var hub
+  @Environment(\.serviceContext) private var context
   func body(content: Content) -> some View {
-    content.task(id: hub.taskId(path: path)) {
+    content.task(id: hub.taskId(path: path, context: context)) {
       if let initial {
         action(initial)
       }
       guard hub.isConnected && hub.api.contains(path) else { return }
       do {
-        for try await value: T in hub.client.values(path) {
+        for try await value: T in hub.client.values(path, context: context) {
           if delayed {
             EventDelayManager.main.execute {
               action(value)
@@ -78,14 +88,15 @@ private struct HubStreamBodyModifier<T: Decodable, Body: Encodable & Hashable & 
   let delayed: Bool
   let action: @MainActor (T) -> Void
   @Environment(Hub.self) private var hub
+  @Environment(\.serviceContext) private var context
   func body(content: Content) -> some View {
-    content.task(id: hub.taskId(path: path, body: body)) {
+    content.task(id: hub.taskId(path: path, body: body, context: context)) {
       if let initial {
         action(initial)
       }
       guard hub.isConnected && hub.api.contains(path) else { return }
       do {
-        for try await value: T in hub.client.values(path, body) {
+        for try await value: T in hub.client.values(path, body, context: context) {
           if delayed {
             EventDelayManager.main.execute {
               action(value)
@@ -103,22 +114,24 @@ private struct HubStreamBodyModifier<T: Decodable, Body: Encodable & Hashable & 
   }
 }
 extension Hub {
-  func taskId(path: String) -> TaskId {
-    TaskId(id: id, isConnected: isConnected && api.contains(path))
+  func taskId(path: String, context: Hub.Context?) -> TaskId {
+    TaskId(id: id, isConnected: isConnected && api.contains(path), service: context?.service)
   }
-  func taskId<Body: Hashable>(path: String, body: Body) -> TaskBodyId<Body> {
-    TaskBodyId(id: id, isConnected: isConnected && api.contains(path), body: body)
+  func taskId<Body: Hashable>(path: String, body: Body, context: Hub.Context?) -> TaskBodyId<Body> {
+    TaskBodyId(id: id, isConnected: isConnected && api.contains(path), body: body, service: context?.service)
   }
   @MainActor
   struct TaskId: Hashable {
     var id: Hub.ID
     var isConnected: Bool
+    var service: String?
   }
   @MainActor
   struct TaskBodyId<Body: Hashable>: Hashable {
     var id: Hub.ID
     var isConnected: Bool
     var body: Body
+    var service: String?
   }
 }
 
@@ -148,3 +161,4 @@ extension Hub {
     }
   }
 }
+

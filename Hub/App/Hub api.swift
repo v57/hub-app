@@ -228,4 +228,18 @@ extension Hub {
     var services: Int?
     var isOnline: Bool { (services ?? 1) != 0 }
   }
+  struct Context: Codable, Sendable, Hashable {
+    var service: String?
+    init(service: String? = nil) {
+      self.service = service
+    }
+  }
+}
+struct ServiceProvider: Codable, Sendable, Hashable, Identifiable {
+  public let id: String
+  public let name: String?
+  public init(id: String, name: String? = nil) {
+    self.id = id
+    self.name = name
+  }
 }

@@ -7,19 +7,21 @@
 
 import SwiftUI
 import UniformTypeIdentifiers
+import HubService
 
 struct StorageView: View {
   @Environment(Hub.self) var hub
+  @State private var context = Hub.Context()
   @State var list = FileList(count: 0, files: [], directories: [])
   @State var selected: Set<String> = []
   @State var path: String = ""
   var directories: [FileInfo] {
-    uploadManager.directories(for: hub, at: path, with: list.directories)
+    uploadManager.directories(for: hub, at: path, with: list.directories, context: context)
       .map { FileInfo(name: $0, size: 0, lastModified: nil) }
       .sorted(using: sortOrder)
   }
   var files: [FileInfo] {
-    uploadManager.files(for: hub, at: path, with: list.files)
+    uploadManager.files(for: hub, at: path, with: list.files, context: context)
       .sorted(using: sortOrder)
   }
   @State var uploadManager = UploadManager.main
@@ -44,16 +46,16 @@ struct StorageView: View {
     } rows: {
       TableRow(FileInfo(name: path.isEmpty ? "$\(hub.settings.name)" : "/\(path)", size: 0, lastModified: nil))
       ForEach(directories, id: \.self) { file in
-        TableRow(file).draggable(DirectoryTransfer(hub: hub, name: file.name))
+        TableRow(file).draggable(DirectoryTransfer(hub: hub, name: file.name, context: context))
       }
       ForEach(files) { file in
-        TableRow(file).draggable(FileInfoTransfer(hub: hub, file: file))
+        TableRow(file).draggable(FileInfoTransfer(hub: hub, file: file, context: context))
       }
     }.contextMenu(forSelectionType: String.self) { (files: Set<String>) in
       if files.count == 1, let file = files.first, file.last != "/" {
         Button("Copy temporary link", systemImage: "link") {
           Task {
-            let link: String = try await hub.client.send("s3/read", path + file)
+            let link: String = try await hub.client.send("s3/read", path + file, context: context)
             link.copyToClipboard()
           }
         }
@@ -71,6 +73,7 @@ struct StorageView: View {
         }
       }
     }.toolbar {
+      ServiceProvider.Picker(path: "s3/list", context: $context)
       if !path.isEmpty {
         Button("Back", systemImage: "chevron.left") {
           path = path.parentDirectory
@@ -83,21 +86,24 @@ struct StorageView: View {
           }
         }.keyboardShortcut(.delete)
       }
-    }.dropDestination { (files: [URL], point: CGPoint) -> Bool in
+    }.syncProviders(path: "s3/list").dropDestination { (files: [URL], point: CGPoint) -> Bool in
       add(files: files)
       return true
-    }.navigationTitle("Storage").hubStream("s3/list", path, to: $list, delayed: false)
+    }.environment(\.serviceContext, context)
+      .navigationTitle("Storage").hubStream("s3/list", path, initial: FileList(count: 0, files: [], directories: []), to: $list, delayed: false)
       .contentTransition(.symbolEffect(.replace))
-      .progressDraw()
+      .progressDraw().onChange(of: context.service) {
+        selected = []
+      }
 #endif
   }
   func add(files: [URL]) {
-    uploadManager.upload(files: files, directory: path, to: hub)
+    uploadManager.upload(files: files, directory: path, to: hub, context: context)
   }
   func remove(files: [String]) async {
     do {
       for file in files {
-        try await hub.client.send("s3/delete", path + file)
+        try await hub.client.send("s3/delete", path + file, context: context)
       }
     } catch {
       print(error)
@@ -131,12 +137,13 @@ struct StorageView: View {
     }
     struct IconView: View {
       @Environment(Hub.self) private var hub
+      @Environment(\.serviceContext) private var context
       @State private var uploadManager = UploadManager.main
       
       let file: FileInfo
       let path: String
       var body: some View {
-        let progress = uploadManager.progress(for: hub, at: path + file.name)
+        let progress = uploadManager.progress(for: hub, at: path + file.name, context: context)
         let isCompleted: Bool = progress == 1
         Image(systemName: isCompleted ? "checkmark" : icon, variableValue: progress)
           .symbolVariant(progress != nil ? .circle : .fill)
@@ -164,7 +171,11 @@ struct StorageView: View {
 @Observable @MainActor
 final class UploadManager: Sendable {
   static let main = UploadManager()
-  private var tasks = [Hub.ID: PathContent]()
+  private struct Path: Hashable, Sendable {
+    let hub: Hub.ID
+    let service: String?
+  }
+  private var tasks = [Path: PathContent]()
   private var uploadingSize: Int64 = 0
   private var running = Set<PendingTask>()
   private var pending = [PendingTask]()
@@ -176,40 +187,43 @@ final class UploadManager: Sendable {
     self.delegate = delegate
     session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: .main)
   }
+  private func scope(for hub: Hub, context: Hub.Context?) -> Path {
+    Path(hub: hub.id, service: context?.service)
+  }
   // MARK: Download
-  func download(file: FileInfo, from hub: Hub) async throws -> URL {
-    let link: URL = try await hub.client.send("s3/read", file.name)
+  func download(file: FileInfo, from hub: Hub, context: Hub.Context? = nil) async throws -> URL {
+    let link: URL = try await hub.client.send("s3/read", file.name, context: context)
     let progress = ObservableProgress()
     progress.progress.total = Int64(file.size)
-    set(path: file.name, hub: hub, task: progress)
+    set(path: file.name, hub: hub, context: context, task: progress)
     defer {
       Task {
         try await Task.sleep(for: .seconds(1))
-        remove(path: file.name, hub: hub)
+        remove(path: file.name, hub: hub, context: context)
       }
     }
     let url = URL.temporaryDirectory.appending(component: UUID().uuidString, directoryHint: .notDirectory)
     try await session.download(from: link, to: url, delegate: delegate, progress: progress)
     return url
   }
-  func download(directory name: String, from hub: Hub) async throws -> URL {
+  func download(directory name: String, from hub: Hub, context: Hub.Context? = nil) async throws -> URL {
     let manager = FileManager.default
-    let files: [FileInfo] = try await hub.client.send("s3/read/directory", name)
+    let files: [FileInfo] = try await hub.client.send("s3/read/directory", name, context: context)
     let root = URL.temporaryDirectory.appending(component: UUID().uuidString, directoryHint: .isDirectory)
     let progresses = files.map { (file: FileInfo) -> ObservableProgress in
       let progress = ObservableProgress()
       progress.progress.total = Int64(file.size)
-      set(path: file.name, hub: hub, task: progress)
+      set(path: file.name, hub: hub, context: context, task: progress)
       return progress
     }
     defer {
       Task {
         try await Task.sleep(for: .seconds(1))
-        files.forEach { file in remove(path: file.name, hub: hub) }
+        files.forEach { file in remove(path: file.name, hub: hub, context: context) }
       }
     }
     for (file, progress) in zip(files, progresses) {
-      let link: URL = try await hub.client.send("s3/read", file.name)
+      let link: URL = try await hub.client.send("s3/read", file.name, context: context)
       let path = file.name.components(separatedBy: "/").dropFirst().joined(separator: "/")
       let target = root.appending(path: path, directoryHint: .notDirectory)
       try? manager.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -219,7 +233,7 @@ final class UploadManager: Sendable {
   }
   // MARK: Upload
   @discardableResult
-  func upload(files: [URL], directory: String, to hub: Hub) -> UploadSession {
+  func upload(files: [URL], directory: String, to hub: Hub, context: Hub.Context? = nil) -> UploadSession {
     let session = UploadSession()
     session.tasks += 1
     defer { session.tasks -= 1 }
@@ -234,9 +248,9 @@ final class UploadManager: Sendable {
           let file = UploadingFile(target: directory + String(name.suffix(name.count - prefix)), content: url)
           let task = ObservableProgress()
           task.progress.total = url.fileSize
-          set(path: file.target, hub: hub, task: task)
+          set(path: file.target, hub: hub, context: context, task: task)
           session.files.append(file)
-          upload(file: file, with: task, to: hub) { result in
+          upload(file: file, with: task, to: hub, context: context) { result in
             session.completeTask(result: result)
           }
         }
@@ -246,9 +260,9 @@ final class UploadManager: Sendable {
         let task = ObservableProgress()
         task.progress.total = url.fileSize
         session.files.append(file)
-        set(path: file.target, hub: hub, task: task)
+        set(path: file.target, hub: hub, context: context, task: task)
         
-        upload(file: file, with: task, to: hub) { result in
+        upload(file: file, with: task, to: hub, context: context) { result in
           session.completeTask(result: result)
         }
       }
@@ -270,8 +284,8 @@ final class UploadManager: Sendable {
       tasks -= 1
     }
   }
-  private func upload(file: UploadingFile, with task: ObservableProgress, to hub: Hub, completion: @escaping (Result<Void, Error>) -> Void) {
-    let task = PendingTask(hub: hub, file: file, progress: task, completion: completion)
+  private func upload(file: UploadingFile, with task: ObservableProgress, to hub: Hub, context: Hub.Context?, completion: @escaping (Result<Void, Error>) -> Void) {
+    let task = PendingTask(hub: hub, context: context, file: file, progress: task, completion: completion)
     pending.append(task)
     if running.isEmpty {
       nextPending()
@@ -293,7 +307,7 @@ final class UploadManager: Sendable {
       if running.isEmpty {
         try await Task.sleep(for: .seconds(1))
         completed.forEach { task in
-          remove(path: task.file.target, hub: task.hub)
+          remove(path: task.file.target, hub: task.hub, context: task.context)
         }
         completed = []
       }
@@ -337,18 +351,21 @@ final class UploadManager: Sendable {
   }
   // MARK: Pending task
   private struct PendingTask: Hashable {
-    let hub: Hub, file: UploadingFile, progress: ObservableProgress
+    let hub: Hub
+    let context: Hub.Context?
+    let file: UploadingFile
+    let progress: ObservableProgress
     let completion: (Result<Void, Error>) -> Void
     @MainActor
     func start() async throws {
       do {
-        let url: URL = try await hub.client.send("s3/write", file.target)
+        let url: URL = try await hub.client.send("s3/write", file.target, context: context)
         let manager = UploadManager.main
         _ = try await manager.session.upload(file: file.content, to: url, delegate: manager.delegate, progress: progress)
         let parent = file.target.parentDirectory
-        try await hub.client.send("s3/updated", parent)
+        try await hub.client.send("s3/updated", parent, context: context)
         if !parent.isEmpty {
-          try await hub.client.send("s3/updated", parent.parentDirectory)
+          try await hub.client.send("s3/updated", parent.parentDirectory, context: context)
         }
         completion(.success(()))
       } catch {
@@ -363,57 +380,59 @@ final class UploadManager: Sendable {
     }
   }
   // MARK: Path content controls
-  func directories(for hub: Hub, at path: String, with current: [String]) -> [String] {
+  func directories(for hub: Hub, at path: String, with current: [String], context: Hub.Context? = nil) -> [String] {
     let set = Set(current)
     var current = current
     let components = path.components(separatedBy: "/")
     var iterator = components.makeIterator()
-    tasks[hub.id]?.resolve(path: &iterator)?.directories.sorted().forEach { key in
+    tasks[scope(for: hub, context: context)]?.resolve(path: &iterator)?.directories.sorted().forEach { key in
       if !set.contains(key) {
         current.append(key)
       }
     }
     return current
   }
-  func files(for hub: Hub, at path: String, with current: [FileInfo]) -> [FileInfo] {
+  func files(for hub: Hub, at path: String, with current: [FileInfo], context: Hub.Context? = nil) -> [FileInfo] {
     let set = Set(current.map { $0.name })
     var current = current
     let components = path.components(separatedBy: "/")
     var iterator = components.makeIterator()
-    tasks[hub.id]?.resolve(path: &iterator)?.files.sorted().forEach { key in
+    tasks[scope(for: hub, context: context)]?.resolve(path: &iterator)?.files.sorted().forEach { key in
       if !set.contains(key) {
         current.append(FileInfo(name: key, size: 0, lastModified: nil))
       }
     }
     return current
   }
-  private func set(path: String, hub: Hub, task: ObservableProgress) {
+  private func set(path: String, hub: Hub, context: Hub.Context?, task: ObservableProgress) {
     let components = path.components(separatedBy: "/")
     var iterator = components.makeIterator()
-    var tasks = tasks[hub.id] ?? .directory([:])
-    tasks.set(path: &iterator, task: task)
-    self.tasks[hub.id] = tasks
+    let scope = scope(for: hub, context: context)
+    var content = tasks[scope] ?? .directory([:])
+    content.set(path: &iterator, task: task)
+    self.tasks[scope] = content
   }
-  private func remove(path: String, hub: Hub) {
+  private func remove(path: String, hub: Hub, context: Hub.Context?) {
     let components = path.components(separatedBy: "/")
     var iterator = components.makeIterator()
-    guard var tasks = tasks[hub.id] else { return }
-    if tasks.remove(path: &iterator) {
-      tasks = .directory([:])
+    let scope = scope(for: hub, context: context)
+    guard var content = tasks[scope] else { return }
+    if content.remove(path: &iterator) {
+      content = .directory([:])
     }
-    self.tasks[hub.id] = tasks
+    self.tasks[scope] = content
   }
-  func progress(for hub: Hub, paths: [String], defaultValue: Double) -> Double {
+  func progress(for hub: Hub, paths: [String], context: Hub.Context? = nil, defaultValue: Double) -> Double {
     var total: Double = 0
     for path in paths {
-      total += progress(for: hub, at: path) ?? defaultValue
+      total += progress(for: hub, at: path, context: context) ?? defaultValue
     }
     return total / Double(paths.count)
   }
-  func progress(for hub: Hub, at path: String) -> Double? {
+  func progress(for hub: Hub, at path: String, context: Hub.Context? = nil) -> Double? {
     let components = path.components(separatedBy: "/")
     var iterator = components.makeIterator()
-    return tasks[hub.id]?.progress(path: &iterator)
+    return tasks[scope(for: hub, context: context)]?.progress(path: &iterator)
   }
   // MARK: Path content
   private enum PathContent: Sendable {
@@ -621,6 +640,7 @@ extension Optional: @retroactive Comparable where Wrapped == Date {
 struct FileInfoTransfer: Transferable {
   let hub: Hub
   let file: FileInfo
+  let context: Hub.Context?
   static var transferRepresentation: some TransferRepresentation {
     FileRepresentation<Self>(exportedContentType: .data) { file in
       try await SentTransferredFile(file.download(), allowAccessingOriginalFile: false)
@@ -628,7 +648,7 @@ struct FileInfoTransfer: Transferable {
   }
   func download() async throws -> URL {
     do {
-      return try await UploadManager.main.download(file: file, from: hub)
+      return try await UploadManager.main.download(file: file, from: hub, context: context)
     } catch {
       print(error)
       throw error
@@ -639,6 +659,7 @@ struct FileInfoTransfer: Transferable {
 struct DirectoryTransfer: Transferable {
   let hub: Hub
   let name: String
+  let context: Hub.Context?
   static var transferRepresentation: some TransferRepresentation {
     FileRepresentation<Self>(exportedContentType: .folder) { file in
       try await SentTransferredFile(file.download(), allowAccessingOriginalFile: false)
@@ -646,7 +667,7 @@ struct DirectoryTransfer: Transferable {
   }
   func download() async throws -> URL {
     do {
-      return try await UploadManager.main.download(directory: name, from: hub)
+      return try await UploadManager.main.download(directory: name, from: hub, context: context)
     } catch {
       print(error)
       throw error

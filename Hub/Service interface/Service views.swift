@@ -26,10 +26,10 @@ class ServiceApp {
     
   }
   @MainActor
-  func sync(hub: Hub, path: String) async {
+  func sync(hub: Hub, path: String, context: Hub.Context? = nil) async {
     do {
       print("syncing", path)
-      for try await event: AppInterface in hub.client.values(path) {
+      for try await event: AppInterface in hub.client.values(path, context: context) {
         if let header = event.header {
           self.app.header = header
         }
@@ -53,19 +53,35 @@ class ServiceApp {
       data[key] = value
     }
   }
+  func reset() {
+    app = AppInterface()
+    data = [:]
+    lists = [:]
+  }
 }
 
 
 
 extension Element: @retroactive View {
+  @MainActor
   struct AppState: DynamicProperty {
     @Environment(ServiceApp.self) var app
     @Environment(NestedList.self) var nested: NestedList?
+    @Environment(Hub.self) var hub
+    @Environment(\.serviceContext) var context
+    var name: String { app.app.header?.name ?? "Services" }
     func translate(_ value: String) -> String? {
-      value.staticText ?? self.value(String(value.dropFirst()))
+      value.staticText ?? self.string(String(value.dropFirst()))
     }
-    func value(_ value: String) -> String? {
+    func string(_ value: String) -> String? {
       nested?.data?[value]?.string ?? app.data[value]?.string
+    }
+    func stringBinding(_ value: String, defaultValue: String) -> Binding<String> {
+      Binding {
+        self.string(value) ?? defaultValue
+      } set: { newValue in
+        app.store(.string(newValue), for: value, nested: nested)
+      }
     }
     func double(_ value: String) -> Double? {
       nested?.data?[value]?.double ?? app.data[value]?.double
@@ -76,6 +92,30 @@ extension Element: @retroactive View {
       } set: { newValue in
         app.store(.double(newValue), for: value, nested: nested)
       }
+    }
+    func send<Output: Decodable>(_ path: String) async throws -> Output {
+      try await hub.client.send(path, context: context)
+    }
+    func send(_ path: String) async throws {
+      try await hub.client.send(path, context: context)
+    }
+    func send<Body: Encodable>(_ path: String, _ body: Body?) async throws {
+      try await hub.client.send(path, body, context: context)
+    }
+    func send<Body: Encodable, Output: Decodable>(_ path: String, _ body: Body?) async throws -> Output {
+      try await hub.client.send(path, body, context: context)
+    }
+    func store(_ value: AnyCodable, for key: String) {
+      app.store(value, for: key, nested: nested)
+    }
+    func perform(action: Action) async throws {
+      try await action.perform(hub: hub, app: app, nested: nested, context: context)
+    }
+    func perform(action: Action, customValues: (inout [String: AnyCodable]) -> Void) async throws {
+      try await action.perform(hub: hub, app: app, nested: nested, context: context, customValues: customValues)
+    }
+    func upload(files: [URL]) -> UploadManager.UploadSession {
+      UploadManager.main.upload(files: files, directory: name + "/", to: hub, context: context)
     }
   }
   
@@ -172,10 +212,9 @@ extension Element: @retroactive View {
     let value: TextField
     @State var text: String = ""
     @State var disableUpdates = true
-    @Environment(Hub.self) var hub
     let state = AppState()
     var body: some View {
-      let data = state.value(value.value)
+      let data = state.string(value.value)
       SwiftUI.TextField(value.placeholder, text: $text)
         .task(id: data) {
           if let data, data != text {
@@ -185,7 +224,9 @@ extension Element: @retroactive View {
         }.task(id: text) {
           if !disableUpdates {
             state.app.store(.string(text), for: value.value, nested: state.nested)
-            try? await value.action?.perform(hub: hub, app: state.app, nested: state.nested)
+            if let action = value.action {
+              try? await state.perform(action: action)
+            }
           } else {
             disableUpdates = false
           }
@@ -195,24 +236,13 @@ extension Element: @retroactive View {
   struct PickerView: View {
     let value: Picker
     @State var selected: String = ""
-    @Environment(ServiceApp.self) var app
-    @Environment(NestedList.self) var nested: NestedList?
+    let state = AppState()
     var body: some View {
-      let selected = nested?.data?[value.selected]?.string ?? app.data[value.selected]?.string
-      SwiftUI.Picker("", selection: $selected) {
+      SwiftUI.Picker("", selection: state.stringBinding(value.selected, defaultValue: "")) {
         ForEach(value.options, id: \.self) { value in
           SwiftUI.Text(value).tag(value)
         }
-      }.task(id: selected) {
-          if let selected {
-            self.selected = selected
-          } else if let selected = value.options.first {
-            self.selected = selected
-          }
-        }
-        .onChange(of: self.selected) {
-          app.store(.string(self.selected), for: value.selected, nested: nested)
-        }
+      }
     }
   }
   struct SliderView: View {
@@ -232,12 +262,11 @@ extension Element: @retroactive View {
   }
   struct ButtonView: View {
     let value: Button
-    @Environment(Hub.self) var hub
     let state = AppState()
     var body: some View {
       if let title = state.translate(value.title) {
         AsyncButton(title) {
-          try await value.action.perform(hub: hub, app: state.app, nested: state.nested)
+          try await state.perform(action: value.action)
         }
       }
     }
@@ -266,12 +295,10 @@ extension Element: @retroactive View {
   }
   struct FilesView: View {
     let value: Files
-    @Environment(Hub.self) private var hub
-    @Environment(ServiceApp.self) private var app
-    @Environment(NestedList.self) private var nested: NestedList?
+    let state = AppState()
     @State private var files = [String]()
     @State private var session: UploadManager.UploadSession?
-    var path: String { app.app.header?.name ?? "Services" }
+    var path: String { state.name }
     var body: some View {
       RoundedRectangle(cornerRadius: 16).fill(Color.gray.opacity(0.1))
         .frame(height: 80).overlay {
@@ -286,7 +313,7 @@ extension Element: @retroactive View {
           }
         }.dropFiles { (files: [URL], point: CGPoint) -> Bool in
           self.files = files.map(\.lastPathComponent)
-          session = UploadManager.main.upload(files: files, directory: path, to: hub)
+          session = state.upload(files: files)
           return true
         }.onChange(of: session?.tasks == 0) {
           guard let session, session.tasks == 0 else { return }
@@ -294,27 +321,24 @@ extension Element: @retroactive View {
           Task {
             var links = [AnyCodable]()
             for path in files {
-              let url: URL = try await hub.client.send("s3/read", path)
+              let url: URL = try await state.send("s3/read", path)
               links.append(.string(url.absoluteString))
             }
-            app.store(.array(links), for: value.value, nested: nested)
-            try await value.action.perform(hub: hub, app: app, nested: nested)
+            state.store(.array(links), for: value.value)
+            try await state.perform(action: value.action)
           }
         }
     }
   }
   struct FileOperationView: View {
     let value: FileOperation
-    @Environment(Hub.self) private var hub
-    @Environment(ServiceApp.self) private var app
-    @Environment(NestedList.self) private var nested: NestedList?
     @State private var files = [String]()
     @State private var session: UploadManager.UploadSession?
     @State private var processed = 0
     @State private var isClearing = false
     @State private var failed = Set<String>()
     let state = AppState()
-    var path: String { (app.app.header?.name ?? "Services") + "/" }
+    var path: String { state.name + "/" }
     var body: some View {
       RoundedRectangle(cornerRadius: 16).fill(Color.gray.opacity(0.1))
         .frame(height: 140).overlay {
@@ -334,7 +358,7 @@ extension Element: @retroactive View {
             isClearing = false
             self.files = files.map(\.lastPathComponent)
             processed = 0
-            session = UploadManager.main.upload(files: files, directory: path, to: hub)
+            session = state.upload(files: files)
           }
           return true
         }.onChange(of: session?.tasks == 0) {
@@ -343,10 +367,10 @@ extension Element: @retroactive View {
           Task {
             for path in files {
               do {
-                let from: String = try await hub.client.send("s3/read", path)
+                let from: String = try await state.send("s3/read", path)
                 let target = target(from: path)
-                let to: String = try await hub.client.send("s3/write", target)
-                try await value.action.perform(hub: hub, app: app, nested: nested) { data in
+                let to: String = try await state.send("s3/write", target)
+                try await state.perform(action: value.action) { data in
                   data["from"] = .string(from)
                   data["to"] = .string(to)
                 }
@@ -399,6 +423,7 @@ struct ServiceView: View {
   @Environment(Hub.self) private var hub
   @State private var app = ServiceApp()
   let header: Hub.AppHeader
+  @State private var context = Hub.Context()
   var body: some View {
     GeometryReader { view in
       ScrollView {
@@ -410,16 +435,26 @@ struct ServiceView: View {
           }
         }.frame(minHeight: view.size.height)
       }
-    }.safeAreaPadding()
+    }.safeAreaPadding().toolbar {
+      ServiceProvider.Picker(path: header.path, context: $context)
+    }.syncProviders(path: header.path)
     .navigationTitle(app.app.header?.name ?? header.name)
     .environment(app)
-    .task(id: header.path) { await app.sync(hub: hub, path: header.path) }
+    .task(id: SyncTask(path: header.path, context: context)) {
+      app.reset()
+      await app.sync(hub: hub, path: header.path, context: context)
+    }
+  }
+  struct SyncTask: Hashable {
+    let path: String
+    let context: Hub.Context
   }
 }
 
 
 struct FileTaskStatus: View {
   @Environment(Hub.self) private var hub
+  @Environment(\.serviceContext) private var context
   let session: UploadManager.UploadSession
   let files: [String]
   let uploaded: Int
@@ -441,7 +476,7 @@ struct FileTaskStatus: View {
     }
   }
   var progress: Double {
-    return UploadManager.main.progress(for: hub, paths: files, defaultValue: 1)
+    return UploadManager.main.progress(for: hub, paths: files, context: context, defaultValue: 1)
   }
   var body: some View {
     VStack {
@@ -461,7 +496,7 @@ struct FileTaskStatus: View {
           LargeProgressView(progress: Double(processed) / Double(files.count), running: files.count - processed, completed: processed, icon: "photo", title: isProcessing ? "Processing" : "Processed")
           if !isProcessing {
             NavigationLink {
-              StorageView(path: target).environment(hub).page()
+              StorageView(path: target).environment(hub).environment(\.serviceContext, context).page()
             } label: {
               Label("View", systemImage: "folder.fill")
             }.buttonStyle(TabButtonStyle(selected: true))
@@ -477,7 +512,7 @@ struct FileTaskStatus: View {
       toClear = session.files.count
     }
     for file in session.files.map(\.target) {
-      try await hub.client.send("s3/delete", file)
+      try await hub.client.send("s3/delete", file, context: context)
       withAnimation {
         toClear -= 1
       }
@@ -522,4 +557,3 @@ struct LargeProgressView: View {
 #Preview {
   ServiceView(header: Hub.AppHeader(name: "Video Encoder", path: "video/encode/ui")).test()
 }
-
