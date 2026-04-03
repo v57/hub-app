@@ -434,6 +434,10 @@ struct ServiceView: View {
             }
           }
         }.frame(minHeight: view.size.height)
+      }.safeAreaInset(edge: .bottom) {
+        if app.app.warnings > 0 {
+          Text("Service is using newer interface. Some elements will not be displayed properly").secondary()
+        }
       }
     }.safeAreaPadding().toolbar {
       ServiceProvider.Picker(path: header.path, context: $context)
