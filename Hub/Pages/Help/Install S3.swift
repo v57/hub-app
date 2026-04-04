@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import HubUI
 
 struct InstallS3: View {
   typealias CodeView = InstallationGuide.CodeView
@@ -26,7 +27,7 @@ struct InstallS3: View {
   @State var step = 0
   var body: some View {
     if open {
-      StorageView().transition(.blurReplace)
+      HubFiles().transition(.blurReplace)
     } else {
       VStack {
         Group {

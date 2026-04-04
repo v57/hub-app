@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import HubUI
 
 struct InstallationGuide: View {
   enum OS {

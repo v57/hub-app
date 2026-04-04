@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import HubUI
 
 extension View {
   func badgeStyle() -> some View {
@@ -42,29 +43,6 @@ struct ActionButtonStyle: ButtonStyle {
       .scaleEffect(up ? 1.1 : 1.0)
       .animation(.spring(response: up ? 0.1 : 0.5, dampingFraction: up ? 1.0 : 0.5), value: up)
       .contentTransition(.numericText())
-  }
-}
-struct TabButtonStyle: ButtonStyle {
-  let selected: Bool
-  func makeBody(configuration: Configuration) -> some View {
-    let up = configuration.isPressed
-    configuration.label.note()
-      .foregroundStyle(.red)
-      .labelStyle(LabelStyle())
-      .padding(.horizontal, 8).padding(.vertical, 4)
-      .background(.black.opacity(0.001))
-      .background(.red.opacity(selected ? 0.1 : 0), in: .capsule)
-      .scaleEffect(up ? 1.1 : 1.0)
-      .animation(.spring(response: up ? 0.1 : 0.5, dampingFraction: up ? 1.0 : 0.5), value: up)
-      .contentTransition(.numericText())
-  }
-  struct LabelStyle: SwiftUI.LabelStyle {
-    func makeBody(configuration: Configuration) -> some View {
-      HStack(spacing: 4) {
-        configuration.icon.frame(height: 0).contentTransition(.symbolEffect)
-        configuration.title
-      }
-    }
   }
 }
 struct Background: ShapeStyle {

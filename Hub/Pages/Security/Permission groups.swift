@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import HubUI
 
 struct PermissionGroups: View {
   @Environment(Hub.self) var hub

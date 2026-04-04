@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import HubUI
 import HubService
 
 struct HomeView: View {
@@ -24,7 +25,7 @@ struct HomeView: View {
         VStack(alignment: .leading) {
           HeaderSection(focus: $focus)
           ForEach(Hubs.main.list) { hub in
-            HubSection().environment(hub)
+            HubSection().hub(hub)
           }
           Text("My Apps").sectionTitle()
           HomeGrid {
@@ -66,7 +67,7 @@ struct HomeView: View {
           }.blockBackground().transitionSource(id: "guide", namespace: namespace)
         }.gridSize(.x21)
         ForEach(Hubs.main.list) { hub in
-          HubView(merging: $merging).environment(hub)
+          HubView(merging: $merging).hub(hub)
             .gridSize(.x21)
         }
         Button(copied ? "Copied" : "My Key", systemImage: copied ? "checkmark.circle.fill" : "key") {
@@ -172,8 +173,8 @@ struct HomeView: View {
           }.labelStyle(.appIcon)
         }
       }
-      .navigationDestination(for: Hub.AppHeader.self) { app in
-        ServiceView(header: app).environment(hub)
+      .navigationDestination(for: AppHeader.self) { app in
+        HubAppView(header: app).hub(hub)
           .transitionTarget(id: app.id, namespace: namespace)
       }
       .navigationDestination(item: $sheet) { sheet in
@@ -192,12 +193,11 @@ struct HomeView: View {
           case .launcher:
             LauncherView()
           case .files:
-            StorageView()
+            HubFiles()
           case .installS3:
             InstallS3()
           }
-        }.safeAreaPadding(.top).frame(minHeight: 400)
-          .environment(hub)
+        }.safeAreaPadding(.top).frame(minHeight: 400).hub(hub)
           .transitionTarget(id: sheet, namespace: namespace)
       }
     }
@@ -360,7 +360,7 @@ struct HomeView: View {
             }
           }
         }.sheet(item: $editing) {
-          EditApp(app: $0).environment(hub).frame(minHeight: 300)
+          EditApp(app: $0).hub(hub).frame(minHeight: 300)
         }.labelStyle(.titleAndIcon).task(id: app.instances) {
           targetInstances = app.instances
         }.gridSize(showsStepper || canUpgrade ? .x22 : .x21)

@@ -44,9 +44,9 @@ struct LauncherView: View {
     }.sheet(isPresented: $creating) {
       CreateApp().padding().frame(maxWidth: 300).page()
     }.sheet(item: $editing) {
-      EditApp(app: $0).environment(hub).frame(minHeight: 300).page()
+      EditApp(app: $0).hub(hub).frame(minHeight: 300).page()
     }.navigationDestination(isPresented: $openStore) {
-      StoreView().environment(hub).page()
+      StoreView().hub(hub).page()
     }.task(id: task) {
 #if PRO
       if task.isConnected {

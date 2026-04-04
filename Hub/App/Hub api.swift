@@ -221,20 +221,8 @@ extension Hub {
     var security: Int?
     var apps: [AppHeader]?
   }
-  struct AppHeader: Identifiable, Hashable, Decodable {
-    var id: String { path }
-    var name: String
-    var path: String
-    var services: Int?
-    var isOnline: Bool { (services ?? 1) != 0 }
-  }
-  struct Context: Codable, Sendable, Hashable {
-    var service: String?
-    init(service: String? = nil) {
-      self.service = service
-    }
-  }
 }
+
 struct ServiceProvider: Codable, Sendable, Hashable, Identifiable {
   public let id: String
   public let name: String?

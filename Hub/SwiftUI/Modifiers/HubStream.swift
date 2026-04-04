@@ -7,6 +7,7 @@
 
 import SwiftUI
 import HubService
+import HubUI
 
 extension View {
   // MARK: Without body
@@ -114,10 +115,10 @@ private struct HubStreamBodyModifier<T: Decodable, Body: Encodable & Hashable & 
   }
 }
 extension Hub {
-  func taskId(path: String, context: Hub.Context?) -> TaskId {
+  func taskId(path: String, context: HubContext?) -> TaskId {
     TaskId(id: id, isConnected: isConnected && api.contains(path), service: context?.service)
   }
-  func taskId<Body: Hashable>(path: String, body: Body, context: Hub.Context?) -> TaskBodyId<Body> {
+  func taskId<Body: Hashable>(path: String, body: Body, context: HubContext?) -> TaskBodyId<Body> {
     TaskBodyId(id: id, isConnected: isConnected && api.contains(path), body: body, service: context?.service)
   }
   @MainActor

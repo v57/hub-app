@@ -9,6 +9,8 @@
 /* Begin PBXBuildFile section */
 		132DD8B82F4CDDE300282A30 /* HubService in Frameworks */ = {isa = PBXBuildFile; productRef = 132DD8B72F4CDDE300282A30 /* HubService */; };
 		132DD8BA2F4CDDEB00282A30 /* HubService in Frameworks */ = {isa = PBXBuildFile; productRef = 132DD8B92F4CDDEB00282A30 /* HubService */; };
+		13B4EC572F817DF50060DAE1 /* HubUI in Frameworks */ = {isa = PBXBuildFile; productRef = 13B4EC562F817DF50060DAE1 /* HubUI */; };
+		13B4EC592F817DF80060DAE1 /* HubUI in Frameworks */ = {isa = PBXBuildFile; productRef = 13B4EC582F817DF80060DAE1 /* HubUI */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -51,6 +53,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				13B4EC572F817DF50060DAE1 /* HubUI in Frameworks */,
 				132DD8B82F4CDDE300282A30 /* HubService in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -59,6 +62,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				13B4EC592F817DF80060DAE1 /* HubUI in Frameworks */,
 				132DD8BA2F4CDDEB00282A30 /* HubService in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -113,6 +117,7 @@
 			name = Hub;
 			packageProductDependencies = (
 				132DD8B72F4CDDE300282A30 /* HubService */,
+				13B4EC562F817DF50060DAE1 /* HubUI */,
 			);
 			productName = Hub;
 			productReference = 13C54C712D638AA1000C4CA5 /* Hub.app */;
@@ -136,6 +141,7 @@
 			name = "Hub Pro";
 			packageProductDependencies = (
 				132DD8B92F4CDDEB00282A30 /* HubService */,
+				13B4EC582F817DF80060DAE1 /* HubUI */,
 			);
 			productName = HubAdmin;
 			productReference = 13F5738E2D68EDB4008546EB /* Hub Pro.app */;
@@ -572,6 +578,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 132DD8B62F4CDDE300282A30 /* XCRemoteSwiftPackageReference "HubService" */;
 			productName = HubService;
+		};
+		13B4EC562F817DF50060DAE1 /* HubUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 132DD8B62F4CDDE300282A30 /* XCRemoteSwiftPackageReference "HubService" */;
+			productName = HubUI;
+		};
+		13B4EC582F817DF80060DAE1 /* HubUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 132DD8B62F4CDDE300282A30 /* XCRemoteSwiftPackageReference "HubService" */;
+			productName = HubUI;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

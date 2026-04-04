@@ -8,6 +8,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
 import Combine
+import HubUI
 
 enum ImageType: String, Codable, CaseIterable {
   case heic, avif, jpeg, png

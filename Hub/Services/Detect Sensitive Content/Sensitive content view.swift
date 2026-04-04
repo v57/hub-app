@@ -9,6 +9,7 @@
 import SwiftUI
 import SensitiveContentAnalysis
 import AVKit
+import HubUI
 
 extension SCSensitivityAnalyzer {
   static let shared = SCSensitivityAnalyzer()

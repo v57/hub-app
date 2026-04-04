@@ -152,3 +152,10 @@ extension Task {
     }
   }
 }
+
+
+extension View {
+  func hub(_ hub: Hub) -> some View {
+    environment(hub).environmentObject(hub.client)
+  }
+}
