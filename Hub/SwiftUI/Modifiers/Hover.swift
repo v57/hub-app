@@ -18,6 +18,7 @@ struct HoverModifier: ViewModifier {
   @State var hovering: Bool = false
   @State var dragging: Bool = false
   @State var offset: CGPoint = .zero
+  @State var size: CGSize = CGSize(width: 1, height: 1)
   var rotation: Double { 8 }
   var offsetMultiplier: Double { 8 }
   var gradientOpacity: Double {
@@ -30,6 +31,7 @@ struct HoverModifier: ViewModifier {
     content.overlay {
       RoundedRectangle(cornerRadius: 16).fill(RadialGradient(colors: [.white.opacity(gradientOpacity), .clear], center: UnitPoint(x: offset.x * 0.9 + 0.5, y: offset.y * 0.9 + 0.5), startRadius: 0, endRadius: 32))
         .clipShape(RoundedRectangle(cornerRadius: 16))
+        .allowsHitTesting(false)
     }
     .rotation3DEffect(.degrees(-offset.y * rotation), axis: (x: 1, y: 0, z: 0))
     .rotation3DEffect(.degrees(offset.x * rotation), axis: (x: 0, y: 1, z: 0))
@@ -37,26 +39,36 @@ struct HoverModifier: ViewModifier {
     .shadow(color: .black.opacity(scheme == .dark ? 0.2 : 0.1), radius: hovering ? 12 : 10)
     .offset(x: offset.x * offsetMultiplier, y: offset.y * offsetMultiplier)
     .scaleEffect(scale)
-    .overlay {
+    .background {
       GeometryReader { view in
-        #if os(iOS)
-        if #available(iOS 18.0, *) {
-          Color.black.opacity(0.001).onContinuousHover {
-            hover(phase: $0, size: view.size)
-          }.gesture(gesture(size: view.size))
-        } else {
-          Color.black.opacity(0.001).onContinuousHover {
-            hover(phase: $0, size: view.size)
-          }
+        Color.clear.hidden().task(id: view.size) {
+          size = view.size
         }
-        #elseif os(macOS)
-        Color.black.opacity(0.001).onContinuousHover {
-          hover(phase: $0, size: view.size)
-        }
-        #endif
       }
-    }
+    }.modifier(HoverEvents(hovering: $hovering, dragging: $dragging, offset: $offset, size: size))
   }
+  struct HoverEvents: ViewModifier {
+    @Binding var hovering: Bool
+    @Binding var dragging: Bool
+    @Binding var offset: CGPoint
+    let size: CGSize
+    func body(content: Content) -> some View {
+#if os(iOS)
+      if #available(iOS 18.0, *) {
+        content.onContinuousHover {
+          hover(phase: $0, size: size)
+        }.gesture(gesture(size: size))
+      } else {
+        content.onContinuousHover {
+          hover(phase: $0, size: size)
+        }
+      }
+#elseif os(macOS)
+      content.onContinuousHover {
+        hover(phase: $0, size: size)
+      }
+#endif
+    }
 #if os(iOS)
   func gesture(size: CGSize) -> SimultaneousGesture {
     SimultaneousGesture {
@@ -97,6 +109,7 @@ struct HoverModifier: ViewModifier {
     let x = position.x / size.width - 0.5
     let y = position.y / size.height - 0.5
     offset = CGPoint(x: max(min(x, 0.5), -0.5), y: max(min(y, 0.5), -0.5))
+  }
   }
 }
 
