@@ -44,11 +44,8 @@ struct HoverModifier: ViewModifier {
       isActive ? 32 : 200
     }
   }
-  var scale: Double {
-    dragging ? 1.1 : hovering ? 1.05 : 1.0
-  }
   var zIndex: Double {
-    dragging || hovering ? -4 : 0
+    dragging || hovering ? -8 : 0
   }
   var gradient: RadialGradient {
     RadialGradient(colors: [
