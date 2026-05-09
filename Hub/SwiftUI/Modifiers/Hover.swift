@@ -21,25 +21,27 @@ struct HoverModifier: ViewModifier {
   @State var size: CGSize = CGSize(width: 1, height: 1)
   var rotation: Double { 8 }
   var offsetMultiplier: Double { 8 }
+  var isActive: Bool { hovering || dragging }
+  var isDark: Bool { scheme == .dark }
   var gradientOpacity: Double {
-    if scheme == .dark {
-      dragging || hovering ? 0.2 : 0
+    if isDark {
+      isActive ? 0.2 : 0
     } else {
-      dragging || hovering ? 1 : 0
+      isActive ? 1 : 0
     }
   }
   var gradientEndOpacity: Double {
-    if scheme == .dark {
-      dragging || hovering ? 0.02 : 0
+    if isDark {
+      isActive ? 0.02 : 0
     } else {
-      dragging || hovering ? 0 : 0
+      isActive ? 0 : 0
     }
   }
   var endRadius: Double {
-    if scheme == .dark {
-      hovering || dragging ? 64 : 200
+    if isDark {
+      isActive ? 64 : 200
     } else {
-      hovering || dragging ? 32 : 200
+      isActive ? 32 : 200
     }
   }
   var scale: Double {
@@ -54,9 +56,16 @@ struct HoverModifier: ViewModifier {
       .white.opacity(gradientEndOpacity)
     ], center: UnitPoint(x: offset.x * 0.9 + 0.5, y: offset.y * 0.9 + 0.5), startRadius: 0, endRadius: endRadius)
   }
+  var strokeGradient: RadialGradient {
+    RadialGradient(colors: [
+      .primary.opacity(isActive ? 1 : 0),
+      .primary.opacity(isActive ? 0 : 0)
+    ], center: UnitPoint(x: offset.x * 0.9 + 0.5, y: offset.y * 0.9 + 0.5), startRadius: 0, endRadius: isActive ? 32 : 200)
+  }
   func body(content: Content) -> some View {
     content.overlay {
       RoundedRectangle(cornerRadius: 16).fill(gradient)
+        .strokeBorder(strokeGradient, lineWidth: 1)
         .allowsHitTesting(false)
     }
     .rotation3DEffect(.degrees(-offset.y * rotation), axis: (x: 1, y: 0, z: 0), anchorZ: zIndex)
