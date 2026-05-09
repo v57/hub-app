@@ -22,23 +22,49 @@ struct HoverModifier: ViewModifier {
   var rotation: Double { 8 }
   var offsetMultiplier: Double { 8 }
   var gradientOpacity: Double {
-    dragging || hovering ? 1 : 0
+    if scheme == .dark {
+      dragging || hovering ? 0.2 : 0
+    } else {
+      dragging || hovering ? 1 : 0
+    }
+  }
+  var gradientEndOpacity: Double {
+    if scheme == .dark {
+      dragging || hovering ? 0.02 : 0
+    } else {
+      dragging || hovering ? 0 : 0
+    }
+  }
+  var endRadius: Double {
+    if scheme == .dark {
+      hovering || dragging ? 64 : 200
+    } else {
+      hovering || dragging ? 32 : 200
+    }
   }
   var scale: Double {
     dragging ? 1.1 : hovering ? 1.05 : 1.0
   }
+  var zIndex: Double {
+    dragging || hovering ? -4 : 0
+  }
+  var gradient: RadialGradient {
+    RadialGradient(colors: [
+      .white.opacity(gradientOpacity),
+      .white.opacity(gradientEndOpacity)
+    ], center: UnitPoint(x: offset.x * 0.9 + 0.5, y: offset.y * 0.9 + 0.5), startRadius: 0, endRadius: endRadius)
+  }
   func body(content: Content) -> some View {
     content.overlay {
-      RoundedRectangle(cornerRadius: 16).fill(RadialGradient(colors: [.white.opacity(gradientOpacity), .clear], center: UnitPoint(x: offset.x * 0.9 + 0.5, y: offset.y * 0.9 + 0.5), startRadius: 0, endRadius: 32))
+      RoundedRectangle(cornerRadius: 16).fill(gradient)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .allowsHitTesting(false)
     }
-    .rotation3DEffect(.degrees(-offset.y * rotation), axis: (x: 1, y: 0, z: 0))
-    .rotation3DEffect(.degrees(offset.x * rotation), axis: (x: 0, y: 1, z: 0))
+    .rotation3DEffect(.degrees(-offset.y * rotation), axis: (x: 1, y: 0, z: 0), anchorZ: zIndex)
+    .rotation3DEffect(.degrees(offset.x * rotation), axis: (x: 0, y: 1, z: 0), anchorZ: zIndex)
     .compositingGroup()
     .shadow(color: .black.opacity(scheme == .dark ? 0.2 : 0.1), radius: hovering ? 12 : 10)
     .offset(x: offset.x * offsetMultiplier, y: offset.y * offsetMultiplier)
-    .scaleEffect(scale)
     .background {
       GeometryReader { view in
         Color.clear.hidden().task(id: view.size) {
@@ -163,6 +189,7 @@ struct SimultaneousGesture: UIGestureRecognizerRepresentable {
     }
   }
 }
+#endif
 
 #Preview {
   ScrollView {
@@ -170,26 +197,26 @@ struct SimultaneousGesture: UIGestureRecognizerRepresentable {
       Button {
         print("Button touched")
       } label: {
-        RoundedRectangle(cornerRadius: 16).fill(.white)
+        RoundedRectangle(cornerRadius: 16).fill(.background)
           .frame(width: 64, height: 64)
           .overlay {
             Image(systemName: "greetingcard.fill")
               .font(.system(size: 36))
           }.modifier(HoverModifier())
       }
-      RoundedRectangle(cornerRadius: 16).fill(.white)
+      RoundedRectangle(cornerRadius: 16).fill(.background)
         .frame(width: 64, height: 64)
         .overlay {
           Image(systemName: "square.and.arrow.up.circle.fill")
             .font(.system(size: 48))
         }.modifier(HoverModifier())
-      RoundedRectangle(cornerRadius: 16).fill(.white)
+      RoundedRectangle(cornerRadius: 16).fill(.background)
         .frame(width: 64, height: 64)
         .overlay {
           Image(systemName: "waveform.path.ecg.text.clipboard")
             .font(.system(size: 36))
         }.modifier(HoverModifier())
-      RoundedRectangle(cornerRadius: 16).fill(.white)
+      RoundedRectangle(cornerRadius: 16).fill(.background)
         .frame(width: 64, height: 64)
         .overlay {
           Image(systemName: "trash.circle.fill")
@@ -197,6 +224,5 @@ struct SimultaneousGesture: UIGestureRecognizerRepresentable {
         }.modifier(HoverModifier())
     }
     Color.clear.frame(height: 2000)
-  }
+  }.buttonStyle(.plain)
 }
-#endif
