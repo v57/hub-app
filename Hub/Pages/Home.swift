@@ -624,11 +624,10 @@ struct HomeGrid<Content: View>: View {
 
 struct BlockStyle: ViewModifier {
   let cornerRadius: CGFloat
-  @Environment(\.colorScheme) var scheme
   func body(content: Content) -> some View {
     RoundedRectangle(cornerRadius: cornerRadius).fill(Background())
-      .shadow(color: .black.opacity(scheme == .dark ? 0.2 : 0.1), radius: 10)
       .overlay { content.safeAreaPadding(8) }
+      .hoverEffect()
       .padding(8)
       .modifier {
         #if os(macOS)
