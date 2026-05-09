@@ -41,6 +41,7 @@ struct HomeView: View {
       }.environment(\.homeGridSpacing, HomeGridLayout.spacing(width: view.size.width - 16))
     }.buttonStyle(.plain).navigationTitle("Home")
       .scrollDismissesKeyboard(.immediately)
+      .scrollBounceBehavior(.basedOnSize)
       .toolbarTitleDisplayMode(.inline)
       .contentTransition(.numericText())
       .scrollIndicators(.hidden)
