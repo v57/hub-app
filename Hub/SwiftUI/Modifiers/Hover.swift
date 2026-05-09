@@ -57,7 +57,6 @@ struct HoverModifier: ViewModifier {
   func body(content: Content) -> some View {
     content.overlay {
       RoundedRectangle(cornerRadius: 16).fill(gradient)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
         .allowsHitTesting(false)
     }
     .rotation3DEffect(.degrees(-offset.y * rotation), axis: (x: 1, y: 0, z: 0), anchorZ: zIndex)
