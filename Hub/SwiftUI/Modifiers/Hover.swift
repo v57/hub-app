@@ -21,12 +21,11 @@ struct HoverModifier: ViewModifier {
   var rotation: Double { 8 }
   var offsetMultiplier: Double { 8 }
   var gradientOpacity: Double {
-    dragging || hovering ? 0.3 : 0
+    dragging || hovering ? 1 : 0
   }
   var scale: Double {
-    dragging ? 0.9 : hovering ? 1.05 : 1.0
+    dragging ? 1.1 : hovering ? 1.05 : 1.0
   }
-  @GestureState var dragState: Bool = false
   func body(content: Content) -> some View {
     content.overlay {
       RoundedRectangle(cornerRadius: 16).fill(RadialGradient(colors: [.white.opacity(gradientOpacity), .clear], center: UnitPoint(x: offset.x * 0.9 + 0.5, y: offset.y * 0.9 + 0.5), startRadius: 0, endRadius: 32))
@@ -40,35 +39,57 @@ struct HoverModifier: ViewModifier {
     .scaleEffect(scale)
     .overlay {
       GeometryReader { view in
-        Color.black.opacity(0.001).onContinuousHover { phase in
-          switch phase {
-          case .active(let point):
-            withAnimation(.spring(response: 0.25, dampingFraction: 1)) {
-              update(position: point, size: view.size)
-              hovering = true
-            }
-          case .ended:
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-              offset = .zero
-              hovering = false
-            }
+        #if os(iOS)
+        if #available(iOS 18.0, *) {
+          Color.black.opacity(0.001).onContinuousHover {
+            hover(phase: $0, size: view.size)
+          }.gesture(gesture(size: view.size))
+        } else {
+          Color.black.opacity(0.001).onContinuousHover {
+            hover(phase: $0, size: view.size)
           }
-        }.simultaneousGesture(DragGesture(minimumDistance: 0, coordinateSpace: .local).updating($dragState) { _, state, _ in
-          state = true
-        }.onChanged { gesture in
-          if !hovering {
-            withAnimation(.spring(response: 0.25, dampingFraction: 1)) {
-              update(position: gesture.location, size: view.size)
-            }
-          }
-        })
+        }
+        #elseif os(macOS)
+        Color.black.opacity(0.001).onContinuousHover {
+          hover(phase: $0, size: view.size)
+        }
+        #endif
       }
-    }.onChange(of: dragState) {
+    }
+  }
+#if os(iOS)
+  func gesture(size: CGSize) -> SimultaneousGesture {
+    SimultaneousGesture {
       withAnimation(.spring(response: 0.25, dampingFraction: 1)) {
-        dragging = dragState
-        if !dragState && !hovering {
+        dragging = true
+      }
+    } onChanged: { point in
+      if !hovering {
+        withAnimation(.spring(response: 0.25, dampingFraction: 1)) {
+          update(position: point, size: size)
+        }
+      }
+    } onEnded: {
+      withAnimation(.spring(response: 0.25, dampingFraction: 1)) {
+        dragging = false
+        if !hovering {
           offset = .zero
         }
+      }
+    }
+  }
+#endif
+  func hover(phase: HoverPhase, size: CGSize) {
+    switch phase {
+    case .active(let point):
+      withAnimation(.spring(response: 0.25, dampingFraction: 1)) {
+        update(position: point, size: size)
+        hovering = true
+      }
+    case .ended:
+      withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+        offset = .zero
+        hovering = false
       }
     }
   }
@@ -79,31 +100,90 @@ struct HoverModifier: ViewModifier {
   }
 }
 
-#Preview {
-  HStack(spacing: 24) {
-    RoundedRectangle(cornerRadius: 16).fill(.white)
-      .frame(width: 64, height: 64)
-      .overlay {
-        Image(systemName: "greetingcard.fill")
-          .font(.system(size: 36))
-      }.modifier(HoverModifier())
-    RoundedRectangle(cornerRadius: 16).fill(.white)
-      .frame(width: 64, height: 64)
-      .overlay {
-        Image(systemName: "square.and.arrow.up.circle.fill")
-          .font(.system(size: 48))
-      }.modifier(HoverModifier())
-    RoundedRectangle(cornerRadius: 16).fill(.white)
-      .frame(width: 64, height: 64)
-      .overlay {
-        Image(systemName: "waveform.path.ecg.text.clipboard")
-          .font(.system(size: 36))
-      }.modifier(HoverModifier())
-    RoundedRectangle(cornerRadius: 16).fill(.white)
-      .frame(width: 64, height: 64)
-      .overlay {
-        Image(systemName: "trash.circle.fill")
-          .font(.system(size: 48))
-      }.modifier(HoverModifier())
-  }.frame(maxWidth: .infinity, maxHeight: .infinity)
+#if os(iOS)
+struct SimultaneousGesture: UIGestureRecognizerRepresentable {
+  let onBegan: () -> Void
+  let onChanged: (CGPoint) -> Void
+  let onEnded: () -> Void
+
+  init(onBegan: @escaping () -> Void,
+     onChanged: @escaping (CGPoint) -> Void,
+     onEnded: @escaping () -> Void) {
+    self.onBegan = onBegan
+    self.onChanged = onChanged
+    self.onEnded = onEnded
+  }
+  
+  func makeUIGestureRecognizer(context: Context) -> UILongPressGestureRecognizer {
+    let gesture = UILongPressGestureRecognizer()
+    gesture.minimumPressDuration = 0.0
+    gesture.allowableMovement = CGFloat.greatestFiniteMagnitude
+    gesture.delegate = context.coordinator
+    return gesture
+  }
+  
+  func handleUIGestureRecognizerAction(_ gesture: UILongPressGestureRecognizer, context: Context) {
+    switch gesture.state {
+    case .began:
+      onBegan()
+      onChanged(context.converter.localLocation)
+    case .changed:
+      onChanged(context.converter.localLocation)
+    case .ended, .cancelled:
+      onEnded()
+    default: break
+    }
+  }
+  
+  func updateUIGestureRecognizer(_ gesture: UILongPressGestureRecognizer, context: Context) { }
+  
+  func makeCoordinator(converter: CoordinateSpaceConverter) -> Coordinator {
+    Coordinator()
+  }
+  
+  class Coordinator: NSObject, UIGestureRecognizerDelegate {
+    func gestureRecognizer(_ gesture: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+      return true
+    }
+    func gestureRecognizerShouldBegin(_ gesture: UIGestureRecognizer) -> Bool {
+      return true
+    }
+  }
 }
+
+#Preview {
+  ScrollView {
+    HStack(spacing: 24) {
+      Button {
+        print("Button touched")
+      } label: {
+        RoundedRectangle(cornerRadius: 16).fill(.white)
+          .frame(width: 64, height: 64)
+          .overlay {
+            Image(systemName: "greetingcard.fill")
+              .font(.system(size: 36))
+          }.modifier(HoverModifier())
+      }
+      RoundedRectangle(cornerRadius: 16).fill(.white)
+        .frame(width: 64, height: 64)
+        .overlay {
+          Image(systemName: "square.and.arrow.up.circle.fill")
+            .font(.system(size: 48))
+        }.modifier(HoverModifier())
+      RoundedRectangle(cornerRadius: 16).fill(.white)
+        .frame(width: 64, height: 64)
+        .overlay {
+          Image(systemName: "waveform.path.ecg.text.clipboard")
+            .font(.system(size: 36))
+        }.modifier(HoverModifier())
+      RoundedRectangle(cornerRadius: 16).fill(.white)
+        .frame(width: 64, height: 64)
+        .overlay {
+          Image(systemName: "trash.circle.fill")
+            .font(.system(size: 48))
+        }.modifier(HoverModifier())
+    }
+    Color.clear.frame(height: 2000)
+  }
+}
+#endif
