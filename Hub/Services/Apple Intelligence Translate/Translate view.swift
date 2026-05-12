@@ -76,8 +76,21 @@ struct TranslateView: View {
             }
           }.frame(maxWidth: .infinity)
         }.frame(maxWidth: 400)
+#if os(visionOS)
         TextField("Text to translate", text: $task.text, axis: .vertical)
-          .textFieldStyle(.roundedBorder)
+          .padding(.horizontal).padding(.vertical, 6)
+#else
+        if #available(macOS 26.0, *) {
+          TextField("Text to translate", text: $task.text, axis: .vertical)
+            .padding(.horizontal).padding(.vertical, 6)
+            .textFieldStyle(.plain)
+            .glassEffect(.regular.interactive(), in: .capsule)
+        } else {
+          TextField("Text to translate", text: $task.text, axis: .vertical)
+            .padding(.horizontal).padding(.vertical, 6)
+            .textFieldStyle(.plain)
+        }
+#endif
       }.padding().task(id: task) { translate() }
     }.task {
       installed = await Set(LanguageAvailability().installed().map { $0.minimalIdentifier })

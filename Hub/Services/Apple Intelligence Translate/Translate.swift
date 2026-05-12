@@ -33,7 +33,6 @@ class Translation {
   }
   func translate(text: String, source: String, target: String) async throws -> String {
     guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return "" }
-    print(text, source, target)
     let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
     let source = source.language
     let target = target.language

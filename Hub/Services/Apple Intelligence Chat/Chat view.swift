@@ -44,7 +44,7 @@ struct ChatView: View {
         TextField("Type your message...", text: $text, axis: .vertical)
           .padding(.horizontal).padding(.vertical, 6)
           .textFieldStyle(.plain)
-          .glassEffect(.regular, in: .capsule)
+          .glassEffect(.regular.interactive(), in: .capsule)
         #endif
         Button("Send") {
           Task { try await send(text: text) }
