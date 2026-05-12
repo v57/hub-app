@@ -13,16 +13,17 @@ import Translation
 struct TranslateView: View {
   @State var languages = [String]()
   @State var installed: Set<String>?
-  @State var source: String = "en"
-  @State var target: String = "de"
+  @State var task = TranslationTask(text: "", source: "en", target: "de")
   @State var translation = Translation.main
-  @State var text: String = ""
   @State var result: String = ""
   @State private var isRefreshing = false
+  @State var translating: Bool = false
   var body: some View {
     GeometryReader { view in
       ScrollView {
-        Text(result).textSelection().contentTransition(.numericText())
+        Text(result).foregroundStyle(translating ? Color.primary.opacity(0.8) : Color.primary)
+          .textSelection().contentTransition(.numericText())
+          .animation(.smooth(duration: 0.4), value: translating)
           .task {
             languages = await LanguageAvailability().supportedLanguages
               .map(\.minimalIdentifier).sorted(by: { $0.languageName < $1.languageName })
@@ -30,7 +31,7 @@ struct TranslateView: View {
       }
     }.overlay {
       ZStack {
-        if text.isEmpty {
+        if task.text.isEmpty {
           Placeholder(image: "translate", title: "Translate", description: "by Apple Intelligence") {
             Label("Use in your Hub", systemImage: "circle.hexagonpath.fill")
               .foregroundStyle(.red.gradient, .primary)
@@ -41,7 +42,7 @@ struct TranslateView: View {
             Label("Select language and start typing to download it", systemImage: "arrow.down.circle")
           }
         }
-      }.animation(.smooth, value: text.isEmpty)
+      }.animation(.smooth, value: task.text.isEmpty)
     }.toolbar {
       Button("Refresh", systemImage: "arrow.clockwise") {
         Task {
@@ -53,7 +54,7 @@ struct TranslateView: View {
     }.safeAreaInset(edge: .bottom) {
       VStack(alignment: .leading) {
         HStack {
-          Picker("Source", selection: $source) {
+          Picker("Source", selection: $task.source) {
             ForEach(languages, id: \.self) { language in
               Label(language.languageName, systemImage: icon(status: installed?.contains(language)))
                 .symbolVariant(.circle.fill)
@@ -61,31 +62,48 @@ struct TranslateView: View {
             }
           }.frame(maxWidth: .infinity)
           Button("Switch", systemImage: "arrow.left.arrow.right") {
-            let source = source
+            let source = task.source
             withAnimation {
-              self.source = target
-              target = source
-              text = result
+              task.source = task.target
+              task.target = source
+              task.text = result
             }
           }.labelStyle(.iconOnly).buttonStyle(ActionButtonStyle())
-          Picker("Target", selection: $target) {
+          Picker("Target", selection: $task.target) {
             ForEach(languages, id: \.self) { language in
               Label(language.languageName, systemImage: icon(status: installed?.contains(language)))
                 .symbolVariant(.circle.fill).tag(language)
             }
           }.frame(maxWidth: .infinity)
         }.frame(maxWidth: 400)
-        TextField("Text to translate", text: $text, axis: .vertical)
+        TextField("Text to translate", text: $task.text, axis: .vertical)
           .textFieldStyle(.roundedBorder)
-      }.padding().task(id: text) {
-        do {
-          let text = try await translation.translate(text: text, source: source, target: target)
-          withAnimation { result = text }
-        } catch { }
-      }
+      }.padding().task(id: task) { translate() }
     }.task {
       installed = await Set(LanguageAvailability().installed().map { $0.minimalIdentifier })
     }.frame(maxWidth: .infinity).modifier(TranslationModifier()).environment(translation)
+  }
+  func translate() {
+    var task = task
+    guard !translating else { return }
+    Task {
+      translating = true
+      defer { translating = false }
+      while true {
+        try await translate(task: task)
+        guard self.task != task else { return }
+        task = self.task
+      }
+    }
+  }
+  func translate(task: TranslationTask) async throws {
+    let text = try await translation.translate(text: task.text, source: task.source, target: task.target)
+    withAnimation { result = text }
+  }
+  struct TranslationTask: Hashable {
+    var text: String
+    var source: String
+    var target: String
   }
   func icon(status: Bool?) -> String {
     switch status {
