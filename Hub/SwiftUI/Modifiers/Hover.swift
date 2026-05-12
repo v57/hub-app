@@ -101,46 +101,46 @@ struct HoverModifier: ViewModifier {
 #endif
     }
 #if os(iOS)
-  func gesture(size: CGSize) -> SimultaneousGesture {
-    SimultaneousGesture {
-      withAnimation(.spring(response: 0.25, dampingFraction: 1)) {
-        dragging = true
+    func gesture(size: CGSize) -> SimultaneousGesture {
+      SimultaneousGesture {
+        withAnimation(.spring(response: 0.25, dampingFraction: 1)) {
+          dragging = true
+        }
+      } onChanged: { point in
+        if !hovering {
+          withAnimation(.spring(response: 0.25, dampingFraction: 1)) {
+            update(position: point, size: size)
+          }
+        }
+      } onEnded: {
+        withAnimation(.spring(response: 0.25, dampingFraction: 1)) {
+          dragging = false
+          if !hovering {
+            offset = .zero
+          }
+        }
       }
-    } onChanged: { point in
-      if !hovering {
+    }
+#endif
+    func hover(phase: HoverPhase, size: CGSize) {
+      switch phase {
+      case .active(let point):
         withAnimation(.spring(response: 0.25, dampingFraction: 1)) {
           update(position: point, size: size)
+          hovering = true
         }
-      }
-    } onEnded: {
-      withAnimation(.spring(response: 0.25, dampingFraction: 1)) {
-        dragging = false
-        if !hovering {
+      case .ended:
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
           offset = .zero
+          hovering = false
         }
       }
     }
-  }
-#endif
-  func hover(phase: HoverPhase, size: CGSize) {
-    switch phase {
-    case .active(let point):
-      withAnimation(.spring(response: 0.25, dampingFraction: 1)) {
-        update(position: point, size: size)
-        hovering = true
-      }
-    case .ended:
-      withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-        offset = .zero
-        hovering = false
-      }
+    func update(position: CGPoint, size: CGSize) {
+      let x = position.x / size.width - 0.5
+      let y = position.y / size.height - 0.5
+      offset = CGPoint(x: max(min(x, 0.5), -0.5), y: max(min(y, 0.5), -0.5))
     }
-  }
-  func update(position: CGPoint, size: CGSize) {
-    let x = position.x / size.width - 0.5
-    let y = position.y / size.height - 0.5
-    offset = CGPoint(x: max(min(x, 0.5), -0.5), y: max(min(y, 0.5), -0.5))
-  }
   }
 }
 
