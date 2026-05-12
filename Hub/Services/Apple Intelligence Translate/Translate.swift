@@ -32,14 +32,14 @@ class Translation {
     Task { await updateLanguages() }
   }
   func translate(text: String, source: String, target: String) async throws -> String {
+    guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return "" }
+    print(text, source, target)
     let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
     let source = source.language
     let target = target.language
     guard !text.isEmpty else { return "" }
     if let session, session.sourceLanguage == source && session.targetLanguage == target {
-      return try await Task {
-        try await session.translate(text).targetText
-      }.value
+      return try await session.translate(text).targetText
     }
     return try await withTaskCancellationHandler {
       try await withCheckedThrowingContinuation { continuation in
@@ -101,13 +101,13 @@ class Translation {
   }
 }
 
-@available(macOS 15.0, iOS 18.0, *)
 struct TranslationModifier: ViewModifier {
-  @Environment(Translation.self) var translation
   func body(content: Content) -> some View {
-    content.translationTask(translation.configuration) { session in
-      Task {
-        try await translation.run(session: session)
+    if #available(macOS 15.0, iOS 18.0, *) {
+      content.translationTask(Translation.main.configuration) { session in
+        Task {
+          try await Translation.main.run(session: session)
+        }
       }
     }
   }

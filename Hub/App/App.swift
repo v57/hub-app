@@ -17,7 +17,7 @@ struct HubApp: App {
       if !ProcessInfo.isPreviews {
         NavigationStack {
           HomeView().page()
-        }
+        }.modifier(TranslationModifier())
       }
     }
   }
