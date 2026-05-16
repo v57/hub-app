@@ -27,7 +27,9 @@ extension HubService.Group {
       .fileOperation(.init(title: nil, format: "mov", action: .init(path: "video/encode/hevc", body: .void))),
     ], data: ["quality": .double(0.6)]))
     .post("video/encode/hevc") { (request: EncodeVideoRequest) in
-      try await Self.encodeVideo(request: request)
+      try await Statistics.updating(\.video) {
+        try await Self.encodeVideo(request: request)
+      }
     }
   }
   func imageService() -> Self {
@@ -48,15 +50,19 @@ extension HubService.Group {
       ]))
     ], data: ["quality": .double(0.8), "type": .string("heic")]))
     .post("image/encode") { (request: EncodeImageRequest) in
-      try await Self.encodeImage(request: request)
+      try await Statistics.updating(\.image) {
+        try await Self.encodeImage(request: request)
+      }
     }
   }
 #if os(macOS) || os(iOS) || os(visionOS)
   func sensitiveContentService() -> Self {
     post("image/sensitive") { (url: URL) -> Bool in
-      let file = try await Self.download(from: url)
-      defer { file.delete() }
-      return await file.isSensitive()
+      try await Statistics.updating(\.sensitiveContent) {
+        let file = try await Self.download(from: url)
+        defer { file.delete() }
+        return await file.isSensitive()
+      }
     }
   }
 #endif

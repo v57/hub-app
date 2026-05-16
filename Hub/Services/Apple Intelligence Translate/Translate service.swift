@@ -14,9 +14,13 @@ extension HubService.Group {
   @available(macOS 15.0, iOS 18.0, *)
   func translate(_ languages: LanguageAvailability.LanguagePair) -> Self {
     post("text/translate/\(languages.sourceId.lowercased())/\(languages.targetId.lowercased())") { text in
-      try await Translation.main.translate(text: text, source: languages.sourceId, target: languages.targetId)
+      try await Statistics.updating(\.translate) {
+        try await Translation.main.translate(text: text, source: languages.sourceId, target: languages.targetId)
+      }
     }.post("text/translate/\(languages.targetId.lowercased())/\(languages.sourceId.lowercased())") { text in
-      try await Translation.main.translate(text: text, source: languages.targetId, target: languages.sourceId)
+      try await Statistics.updating(\.translate) {
+        try await Translation.main.translate(text: text, source: languages.targetId, target: languages.sourceId)
+      }
     }
   }
 }

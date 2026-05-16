@@ -80,7 +80,7 @@ struct TranslateView: View {
         TextField("Text to translate", text: $task.text, axis: .vertical)
           .padding(.horizontal).padding(.vertical, 6)
 #else
-        if #available(macOS 26.0, *) {
+        if #available(macOS 26.0, iOS 26.0, *) {
           TextField("Text to translate", text: $task.text, axis: .vertical)
             .padding(.horizontal).padding(.vertical, 6)
             .textFieldStyle(.plain)

@@ -85,6 +85,20 @@ struct FarmView: View {
             withAnimation {
               farm.isRunning = false
             }
+          }.overlay {
+#if os(iOS)
+            if blackOverlay {
+              StatisticsView().task(id: farm.lowerBrightness && Statistics.main.hasActivity) {
+                guard farm.lowerBrightness else { return }
+                do {
+                  if !Statistics.main.hasActivity {
+                    try await Task.sleep(for: .seconds(1))
+                  }
+                  farm.lowerBrightness(enabled: !Statistics.main.hasActivity)
+                } catch { }
+              }
+            }
+#endif
           }.ignoresSafeArea()
         }
       }.disableSystemOverlay(farm.isRunning)
@@ -109,7 +123,7 @@ struct FarmView: View {
 extension View {
   func disableSystemOverlay(_ hidden: Bool) -> some View {
     #if os(iOS)
-    statusBarHidden(hidden)
+    statusBarHidden(hidden).toolbar(.hidden, for: .navigationBar)
     #else
     self
     #endif
@@ -268,7 +282,7 @@ class Farm {
     }
   }
   
-  private func lowerBrightness(enabled: Bool) {
+  func lowerBrightness(enabled: Bool) {
 #if os(iOS)
     if enabled {
       if lowerBrightness {
