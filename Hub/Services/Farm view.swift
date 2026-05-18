@@ -20,6 +20,7 @@ struct FarmView: View {
 #else
   @State var blackOverlay: Bool = false
 #endif
+  @State var statistics: Bool = true
   @Bindable var farm = Farm.main
   var canStart: Bool {
     guard let battery = farm.battery else { return true }
@@ -29,35 +30,44 @@ struct FarmView: View {
     VStack(spacing: 16) {
       if !farm.isRunning {
         Placeholder(image: "tree", title: "Farm", description: "Prevents your device from sleeping while enabled") { }
-      }
-      VStack {
-        HStack {
-          Slider(value: $farm.minimumBattery, in: 0...1, step: 0.05)
-            .frame(maxWidth: 200)
-          Image(battery: farm.minimumBattery, charging: false)
+        VStack {
+          HStack {
+            Slider(value: $farm.minimumBattery, in: 0...1, step: 0.10)
+              .frame(maxWidth: 200)
+            Image(battery: farm.minimumBattery, charging: false)
+          }
+          Text(text).secondary()
         }
-        Text(text).secondary()
-      }
 #if os(iOS)
-      HStack {
-        VStack(alignment: .leading) {
-          Text("Lower brightness")
-          Text("Lowers brightness to minimum level until stops. Helps to save battery").secondary()
+        HStack {
+          VStack(alignment: .leading) {
+            Text("Lower brightness")
+            Text("Lowers brightness to minimum level until stops. Helps to save battery").secondary()
+          }
+          Spacer()
+          Toggle("Lower brightness", isOn: $farm.lowerBrightness)
+            .labelsHidden()
         }
-        Spacer()
-        Toggle("Lower brightness", isOn: $farm.lowerBrightness)
-          .labelsHidden()
-      }
-      HStack {
-        VStack(alignment: .leading) {
-          Text("Black overlay")
-          Text("Adds black screen, increasing battery life on OLED and XDR displays").secondary()
+        HStack {
+          VStack(alignment: .leading) {
+            Text("Black overlay")
+            Text("Adds black screen, increasing battery life on OLED and XDR displays").secondary()
+          }
+          Spacer()
+          Toggle("Black overlay", isOn: $blackOverlay)
+            .labelsHidden()
         }
-        Spacer()
-        Toggle("Black overlay", isOn: $blackOverlay)
-          .labelsHidden()
-      }
 #endif
+        HStack {
+          VStack(alignment: .leading) {
+            Text("Show Activity")
+            Text("Will display requests when they happen").secondary()
+          }
+          Spacer()
+          Toggle("Show Activity", isOn: $statistics)
+            .labelsHidden()
+        }
+      }
       if !canStart {
         VStack {
           Text("Start charging your device\nor change minimum battery level")
@@ -78,28 +88,23 @@ struct FarmView: View {
       .toggleStyle(.switch)
       .overlay {
         if farm.isRunning {
-#if os(iOS)
-          Color.clear.toolbar(.hidden, for: .tabBar)
-#endif
           Color.black.opacity(blackOverlay ? 1 : 0.001).onTapGesture {
             withAnimation {
               farm.isRunning = false
             }
-          }.overlay {
-#if os(iOS)
-            if blackOverlay {
-              StatisticsView().task(id: farm.lowerBrightness && Statistics.main.hasActivity) {
-                guard farm.lowerBrightness else { return }
-                do {
-                  if !Statistics.main.hasActivity {
-                    try await Task.sleep(for: .seconds(1))
-                  }
-                  farm.lowerBrightness(enabled: !Statistics.main.hasActivity)
-                } catch { }
-              }
-            }
-#endif
           }.ignoresSafeArea()
+        }
+      }.overlay(alignment: farm.isRunning ? .center : .topTrailing) {
+        if statistics {
+          StatisticsView().padding().task(id: farm.lowerBrightness && Statistics.main.hasActivity) {
+            guard farm.lowerBrightness else { return }
+            do {
+              if !Statistics.main.hasActivity {
+                try await Task.sleep(for: .seconds(1))
+              }
+              farm.lowerBrightness(enabled: !Statistics.main.hasActivity)
+            } catch { }
+          }
         }
       }.disableSystemOverlay(farm.isRunning)
   }
@@ -124,6 +129,7 @@ extension View {
   func disableSystemOverlay(_ hidden: Bool) -> some View {
     #if os(iOS)
     statusBarHidden(hidden).toolbar(.hidden, for: .navigationBar)
+      .toolbar(.hidden, for: .tabBar)
     #else
     self
     #endif
