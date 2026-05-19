@@ -46,6 +46,7 @@ struct StatisticsView: View {
               Text(amount, format: .number)
                 .font(.system(size: 22 * scale, weight: .semibold, design: .rounded))
                 .monospacedDigit()
+                .padding(.horizontal, 8)
                 .task(id: stats.completed) {
                   if stats.completed > 1000 {
                     amount = stats.completed
