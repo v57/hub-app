@@ -176,39 +176,17 @@ struct StatisticsView: View {
   }
 }
 
+@MainActor
 @Observable class Statistics {
   static let main = Statistics()
   typealias Path = ReferenceWritableKeyPath<Statistics, Item>
-  var list: [Item] = [
-    Item(service: .videoEncoder),
-    Item(service: .imageEncoder),
-    Item(service: .translate),
-    Item(service: .chat),
-    Item(service: .sensitiveContent)
-  ]
-  var video: Item {
-    get { list[0] }
-    set { list[0] = newValue }
-  }
-  var image: Item {
-    get { list[1] }
-    set { list[1] = newValue }
-  }
-  var translate: Item {
-    get { list[2] }
-    set { list[2] = newValue }
-  }
-  var chat: Item {
-    get { list[3] }
-    set { list[3] = newValue }
-  }
-  var sensitiveContent: Item {
-    get { list[4] }
-    set { list[4] = newValue }
+  var list: [Item] = AppServices.Service.allCases.map {
+    Item(service: $0)
   }
   var hasActivity: Bool {
     list.contains(where: { $0.first != nil })
   }
+  @MainActor
   struct Item: Identifiable, Hashable {
     var id: AppServices.Service { service }
     let service: AppServices.Service
@@ -235,14 +213,16 @@ struct StatisticsView: View {
       failed += 1
     }
   }
-  static func updating<Result>(_ path: Path, action: @Sendable () async throws -> Result) async throws -> Result {
-    Statistics.main[keyPath: path].start()
+  static func updating<Result>(_ service: AppServices.Service, action: @Sendable () async throws -> Result) async throws -> Result {
+    let stats = Statistics.main
+    let index = service.rawValue
+    stats.list[index].start()
     do {
       let result = try await action()
-      Statistics.main[keyPath: path].success()
+      stats.list[index].success()
       return result
     } catch {
-      Statistics.main[keyPath: path].fail()
+      stats.list[index].fail()
       throw error
     }
   }

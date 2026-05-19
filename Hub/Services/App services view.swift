@@ -93,7 +93,7 @@ extension AppServices {
       }
     }
   }
-  enum Service: CaseIterable {
+  enum Service: Int, CaseIterable {
     case imageEncoder, videoEncoder, translate, chat, sensitiveContent
     var title: LocalizedStringKey {
       switch self {

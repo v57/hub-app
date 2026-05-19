@@ -14,11 +14,11 @@ extension HubService.Group {
   @available(macOS 26.0, iOS 26.0, *)
   func chat() -> Self {
     post("text/llm/apple") { (request: ChatRequest) in
-      try await Statistics.updating(\.chat) {
+      try await Statistics.updating(.chat) {
         try await request.response()
       }
     }.stream("text/llm/apple") { (request: ChatRequest, continuation) in
-      try await Statistics.updating(\.chat) {
+      try await Statistics.updating(.chat) {
         try await request.stream(continuation: continuation)
       }
     }
