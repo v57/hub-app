@@ -52,7 +52,7 @@ private struct AppIcon<Title: View, Icon: View>: View {
             .offset(y: -2)
             .transition(.blurReplace)
         }
-      }.overlay {
+      }.background {
         GeometryReader { view in
           title.app().offset(y: view.size.height - 4)
             .multilineTextAlignment(.center)
