@@ -37,7 +37,6 @@ struct HomeView: View {
           SupportView()
         }.padding(.top).animation(.home, value: isFocusing)
           .animation(.home, value: hubs.list.count)
-          .animation(.smooth, value: view.size.width)
       }.environment(\.homeGridSpacing, HomeGridLayout.spacing(width: view.size.width - 16))
     }.buttonStyle(.plain).navigationTitle("Home")
       .scrollDismissesKeyboard(.immediately)
@@ -610,7 +609,9 @@ extension AnyTransition {
 }
 
 extension Animation {
-  static var home: Animation { .spring(response: 0.5, dampingFraction: 0.7) }
+  static var home: Animation {
+    .spring(response: 0.4, dampingFraction: 0.8)
+  }
 }
 struct HomeGrid<Content: View>: View {
   @ViewBuilder var content: Content
