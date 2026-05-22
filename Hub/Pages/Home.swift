@@ -214,7 +214,7 @@ struct HomeView: View {
           Spacer()
           ForEach(status.services.sorted(by: { $0.requests > $1.requests }).prefix(3), id: \.name) { service in
             VStack(alignment: .leading) {
-              Text(service.name).foregroundStyle(.primary)
+              Text(service.name).foregroundStyle(.primary).truncationMode(.middle)
               HStack(spacing: 4) {
                 if service.requests > 0 {
                   Label("\(service.requests)", systemImage: "checkmark")
@@ -229,7 +229,7 @@ struct HomeView: View {
                   Label("\(pending)", systemImage: "bolt.badge.clock.fill")
                 }
               }.labelStyle(LabelStyle())
-            }
+            }.lineLimit(1)
             .frame(maxWidth: .infinity, alignment: .leading).background {
               RoundedRectangle(cornerRadius: 4)
                 .fill(.background).padding(.horizontal, -4).padding(.vertical, -2)
