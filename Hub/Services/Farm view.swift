@@ -96,8 +96,8 @@ struct FarmView: View {
         }
       }.overlay(alignment: farm.isRunning ? .center : .topTrailing) {
         if statistics {
-          StatisticsView().padding().task(id: farm.lowerBrightness && Statistics.main.hasActivity) {
-            guard farm.lowerBrightness else { return }
+          StatisticsView().padding().task(id: farm.lowerBrightness && Statistics.main.hasActivity && farm.isRunning) {
+            guard farm.lowerBrightness && farm.isRunning else { return }
             do {
               if !Statistics.main.hasActivity {
                 try await Task.sleep(for: .seconds(1))
