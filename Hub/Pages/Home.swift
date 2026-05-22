@@ -114,7 +114,7 @@ struct HomeView: View {
     var body: some View {
       Text(hub.settings.name).sectionTitle()
       HomeGrid {
-        if statusBadges.services == 0 {
+        if statusBadges.services > 0 {
           Button {
             sheet = .services
           } label: {
