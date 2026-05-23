@@ -45,8 +45,20 @@ struct HoverModifier: ViewModifier {
     }
   }
   var zIndex: Double {
-    dragging || hovering ? -8 : 0
+    (dragging || hovering) && !isLowResolution ? -8 : 0
   }
+  @Environment(\.displayScale) var scale
+  var verticalAngle: Angle {
+    isLowResolution ? .degrees(0) : .degrees(-offset.y * rotation)
+  }
+  var horizontalAngle: Angle {
+    isLowResolution ? .degrees(0) : .degrees(offset.x * rotation)
+  }
+  var isLowResolution: Bool {
+    scale < 1.5
+  }
+  
+  
   var gradient: RadialGradient {
     RadialGradient(colors: [
       .white.opacity(gradientOpacity),
@@ -65,8 +77,8 @@ struct HoverModifier: ViewModifier {
         .strokeBorder(strokeGradient, lineWidth: 1)
         .allowsHitTesting(false)
     }
-    .rotation3DEffect(.degrees(-offset.y * rotation), axis: (x: 1, y: 0, z: 0), anchorZ: zIndex)
-    .rotation3DEffect(.degrees(offset.x * rotation), axis: (x: 0, y: 1, z: 0), anchorZ: zIndex)
+    .rotation3DEffect(verticalAngle, axis: (x: 1, y: 0, z: 0), anchorZ: zIndex)
+    .rotation3DEffect(horizontalAngle, axis: (x: 0, y: 1, z: 0), anchorZ: zIndex)
     .compositingGroup()
     .shadow(color: .black.opacity(scheme == .dark ? 0.2 : 0.1), radius: hovering ? 12 : 10)
     .offset(x: offset.x * offsetMultiplier, y: offset.y * offsetMultiplier)
