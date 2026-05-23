@@ -24,7 +24,7 @@ class Translation {
       oldValue?.cancel()
     }
   }
-  var isRunning = false
+  var translating = 0
   @ObservationIgnored
   @Published var pairs: LanguageAvailability.Pairs?
   
@@ -38,6 +38,13 @@ class Translation {
     let target = target.language
     guard !text.isEmpty else { return "" }
     if let session, session.sourceLanguage == source && session.targetLanguage == target {
+      translating += 1
+      defer {
+        translating -= 1
+        if translating == 0 {
+          resume()
+        }
+      }
       return try await session.translate(text).targetText
     }
     return try await withTaskCancellationHandler {
@@ -46,7 +53,7 @@ class Translation {
           continuation.resume(with: result)
         }
         tasks.append(task)
-        if !isRunning {
+        if translating == 0 {
           resume()
         }
       }
@@ -62,7 +69,8 @@ class Translation {
   @MainActor
   func run(session: TranslationSession) async throws {
     self.session = session
-    isRunning = true
+    guard !tasks.isEmpty else { return }
+    translating += 1
     while let index = tasks.firstIndex(where: { $0.source == session.sourceLanguage && $0.target == session.targetLanguage }) {
       let task = tasks[index]
       tasks.remove(at: index)
@@ -75,17 +83,16 @@ class Translation {
         }
       }.value
     }
-    isRunning = false
-    resume()
+    translating -= 1
+    if translating == 0 {
+      resume()
+    }
   }
   
   func resume() {
-    if let task = tasks.first {
-      if configuration?.source != task.source || configuration?.target != task.target {
-        configuration = .init(source: task.source, target: task.target)
-      }
-    } else {
-      isRunning = false
+    guard let task = tasks.first else { return }
+    if configuration?.source != task.source || configuration?.target != task.target {
+      configuration = .init(source: task.source, target: task.target)
     }
   }
   func updateLanguages() async {
@@ -104,6 +111,7 @@ struct TranslationModifier: ViewModifier {
   func body(content: Content) -> some View {
     if #available(macOS 15.0, iOS 18.0, *) {
       content.translationTask(Translation.main.configuration) { session in
+        print("Switching language to \(session.targetLanguage!.minimalIdentifier)")
         Task {
           try await Translation.main.run(session: session)
         }
