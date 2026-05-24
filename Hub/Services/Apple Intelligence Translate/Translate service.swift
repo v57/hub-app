@@ -12,7 +12,7 @@ import Combine
 
 extension HubService.Group {
   @available(macOS 15.0, iOS 18.0, *)
-  func translate(_ languages: LanguageAvailability.LanguagePair) -> Self {
+  func translate(_ languages: LanguagePair) -> Self {
     post("text/translate/\(languages.sourceId.lowercased())/\(languages.targetId.lowercased())", options: .init(limit: 4)) { text in
       try await Statistics.updating(.translate) {
         try await Translation.main.translate(text: text, source: languages.sourceId, target: languages.targetId)

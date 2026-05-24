@@ -134,18 +134,16 @@ extension LanguageAvailability {
     var available = Set<LanguagePair>()
     var unavailable = Set<LanguagePair>()
   }
-  struct LanguagePair: Hashable, Identifiable {
-    var id: String { sourceId + targetId }
-    let source: Locale.Language
-    let target: Locale.Language
-    var sourceId: String { source.minimalIdentifier }
-    var targetId: String { target.minimalIdentifier }
-  }
   func pairs() async -> Pairs {
     var pairs = Pairs()
     guard !ProcessInfo.isPreviews else { return pairs }
     let languages = await supportedLanguages
-    let sendable = LanguageAvailability()
+    let sendable: LanguageAvailability
+    if #available(iOS 26.4, *), #available(macOS 26.4, *) {
+      sendable = LanguageAvailability(preferredStrategy: .lowLatency)
+    } else {
+      sendable = LanguageAvailability()
+    }
     for i in 0..<languages.count - 1 {
       let source = languages[i]
       for j in (i+1)..<languages.count {
@@ -184,6 +182,13 @@ extension LanguageAvailability {
     }
     return installed
   }
+}
+struct LanguagePair: Hashable, Identifiable {
+  var id: String { sourceId + targetId }
+  let source: Locale.Language
+  let target: Locale.Language
+  var sourceId: String { source.minimalIdentifier }
+  var targetId: String { target.minimalIdentifier }
 }
 
 extension String {

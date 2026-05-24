@@ -6,7 +6,7 @@
 //
 
 #if os(macOS) || os(iOS)
-import Translation
+@preconcurrency import Translation
 import SwiftUI
 
 @available(macOS 15.0, iOS 18.0, *)
@@ -14,17 +14,20 @@ import SwiftUI
 @MainActor
 class Translation {
   static let main = Translation()
-  var configuration: TranslationSession.Configuration?
-  var tasks = [TranslationTask]()
-  @ObservationIgnored
-  var session: TranslationSession?
-  @ObservationIgnored
-  var task: Task<Void, Error>? {
-    didSet {
-      oldValue?.cancel()
+  var processes: [LanguageProcess] = []
+  func process(languages: LanguagePair) -> LanguageProcess {
+    if let process = processes.first(where: { $0.languages == languages }) {
+      return process
+    } else {
+      let process = LanguageProcess(languages: languages)
+      processes.append(process)
+      return process
     }
   }
-  var translating = 0
+  func cleanup() {
+    processes.removeAll(where: { $0.isEmpty })
+  }
+  
   @ObservationIgnored
   @Published var pairs: LanguageAvailability.Pairs?
   
@@ -34,75 +37,88 @@ class Translation {
   func translate(text: String, source: String, target: String) async throws -> String {
     guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return "" }
     let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
-    let source = source.language
-    let target = target.language
     guard !text.isEmpty else { return "" }
-    if let session, session.sourceLanguage == source && session.targetLanguage == target {
-      translating += 1
-      defer {
-        translating -= 1
-        if translating == 0 {
-          resume()
+    let languages = LanguagePair(source: source.language, target: target.language)
+    let process = process(languages: languages)
+    let id = UUID()
+    if let session = process.session {
+      return try await process.translate(session: session, text: text)
+    } else {
+      return try await withTaskCancellationHandler {
+        try await withCheckedThrowingContinuation { continuation in
+          let task = TranslationTask(id: id, text: text) { result in
+            continuation.resume(with: result)
+          }
+          process.tasks.append(task)
+        }
+      } onCancel: {
+        Task { @MainActor in
+          process.cancelled(id)
         }
       }
-      return try await session.translate(text).targetText
-    }
-    return try await withTaskCancellationHandler {
-      try await withCheckedThrowingContinuation { continuation in
-        let task = TranslationTask(text: text, source: source, target: target) { result in
-          continuation.resume(with: result)
-        }
-        tasks.append(task)
-        if translating == 0 {
-          resume()
-        }
-      }
-    } onCancel: {
-      Task { @MainActor in
-        if let index = tasks.firstIndex(where: { $0.text == text && $0.source == source && $0.target == target }) {
-          tasks[index].completion(.failure(CancellationError()))
-          tasks.remove(at: index) // unsafe
-        }
-      }
-    }
-  }
-  @MainActor
-  func run(session: TranslationSession) async throws {
-    self.session = session
-    guard !tasks.isEmpty else { return }
-    translating += 1
-    while let index = tasks.firstIndex(where: { $0.source == session.sourceLanguage && $0.target == session.targetLanguage }) {
-      let task = tasks[index]
-      tasks.remove(at: index)
-      await Task {
-        do {
-          let result = try await session.translate(task.text).targetText
-          task.completion(.success(result))
-        } catch {
-          task.completion(.failure(error))
-        }
-      }.value
-    }
-    translating -= 1
-    if translating == 0 {
-      resume()
-    }
-  }
-  
-  func resume() {
-    guard let task = tasks.first else { return }
-    if configuration?.source != task.source || configuration?.target != task.target {
-      configuration = .init(source: task.source, target: task.target)
     }
   }
   func updateLanguages() async {
     pairs = await LanguageAvailability().pairs()
   }
+  @MainActor
+  class LanguageProcess {
+    let languages: LanguagePair
+    var isEmpty: Bool {
+      translating == 0 && tasks.isEmpty
+    }
+    var configuration: TranslationSession.Configuration {
+      TranslationSession.Configuration(source: languages.source, target: languages.target)
+    }
+    var session: TranslationSession?
+    var tasks: [TranslationTask] = []
+    var translating = 0
+    init(languages: LanguagePair) {
+      self.languages = languages
+    }
+    func translate(session: TranslationSession, text: String) async throws -> String {
+      try await translate {
+        try await session.translate(text).targetText
+      }
+    }
+    func run(session: TranslationSession) async throws {
+      self.session = session
+      try await translate {
+        while !tasks.isEmpty {
+          let task = tasks[0]
+          do {
+            let result = try await session.translate(task.text).targetText
+            guard !Task.isCancelled else { continue }
+            guard tasks.first?.id == task.id else { continue }
+            task.completion(.success(result))
+          } catch {
+            guard tasks.first?.id == task.id else { continue }
+            task.completion(.failure(error))
+          }
+          tasks.removeFirst()
+        }
+      }
+    }
+    func translate<T>(_ action: () async throws -> T) async throws -> T {
+      translating += 1
+      defer {
+        translating -= 1
+        if isEmpty {
+          Translation.main.cleanup()
+        }
+      }
+      return try await action()
+    }
+    func cancelled(_ id: UUID) {
+      if let index = tasks.firstIndex(where: { $0.id == id }) {
+        tasks[index].completion(.failure(CancellationError()))
+        tasks.remove(at: index)
+      }
+    }
+  }
   struct TranslationTask {
-    let id = UUID()
+    let id: UUID
     let text: String
-    let source: Locale.Language
-    let target: Locale.Language
     let completion: (Result<String, Error>) -> Void
   }
 }
@@ -110,13 +126,18 @@ class Translation {
 struct TranslationModifier: ViewModifier {
   func body(content: Content) -> some View {
     if #available(macOS 15.0, iOS 18.0, *) {
-      content.translationTask(Translation.main.configuration) { session in
+      let process = Translation.main.processes[safe: 0]
+      content.translationTask(process?.configuration) { session in
         print("Switching language to \(session.targetLanguage!.minimalIdentifier)")
-        Task {
-          try await Translation.main.run(session: session)
-        }
+        try? await process?.run(session: session)
       }
     }
+  }
+}
+extension Array {
+  subscript(safe index: Int) -> Element? {
+    guard index < count else { return nil }
+    return self[index]
   }
 }
 #endif
