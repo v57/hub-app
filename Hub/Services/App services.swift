@@ -73,8 +73,11 @@ extension HubService.Group {
     let quality: Double
   }
   static func encodeImage(request: EncodeImageRequest) async throws {
-    let data = try await data(from: request.from).image(format: request.type.rawValue, quality: request.quality, metadata: false)
-    try await upload(data: data, to: request.to)
+    try await Task.detached(name: "Image Encoding", priority: .userInitiated) {
+      let data = try await data(from: request.from)
+        .image(format: request.type.rawValue, quality: request.quality, metadata: false)
+      try await upload(data: data, to: request.to)
+    }.value
   }
   struct EncodeVideoRequest: Decodable, Sendable {
     let from: URL
