@@ -64,10 +64,9 @@ struct StatisticsView: View {
           }
         }.frame(minWidth: 56 * scale).frame(height: 56 * scale).background {
           Capsule().stroke(style: StrokeStyle(lineWidth: 4 * scale, lineCap: .round))
-            .rotation(.degrees(-90))
             .foregroundStyle(.tertiary)
           Capsule().trim(from: 0, to: visible ? 1 : 0).stroke(style: StrokeStyle(lineWidth: 4 * scale, lineCap: .round))
-            .rotation(.degrees(visible ? -90 : -270))
+            .rotation(.degrees(visible ? 0 : -270))
             .animation(visible ? .smooth(duration: 1) : nil, value: visible)
         }.foregroundStyle(.green).task {
           do {
@@ -171,7 +170,7 @@ struct StatisticsView: View {
 }
 
 #Preview {
-  Color.black.overlay {
+  Color.black.ignoresSafeArea().overlay {
     StatisticsView.Testing().colorScheme(.dark)
   }
 }
