@@ -554,28 +554,6 @@ struct HomeView: View {
       }
     }
   }
-  struct SupportView: View {
-    var body: some View {
-      HomeGrid {
-        Button("Discord") { }.lineLimit(1)
-        Button("Patreon") { }.lineLimit(1)
-        Button("Boosty") { }.lineLimit(1)
-        Button("GitHub") { }.lineLimit(1)
-        Button("Buy Me\na Coffee") { }.lineLimit(2)
-        Button("Ko-Fi") { }.lineLimit(1)
-        Button("USDT") { }.lineLimit(1)
-        Button("BTC") { }.lineLimit(1)
-      }.buttonStyle(LinkButtonStyle())
-    }
-  }
-  struct LinkButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-      configuration.label.multilineTextAlignment(.center)
-        .body()
-        .minimumScaleFactor(0.6)
-        .blockBackground()
-    }
-  }
 }
 extension View {
   func sectionTitle(padding: Bool = true) -> some View {
