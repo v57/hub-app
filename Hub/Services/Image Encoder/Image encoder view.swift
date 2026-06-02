@@ -12,6 +12,12 @@ import HubUI
 
 enum ImageType: String, Codable, CaseIterable {
   case heic, avif, jpeg, png
+  var hasQuality: Bool {
+    switch self {
+    case .heic, .avif, .jpeg: true
+    case .png: false
+    }
+  }
 }
 
 #if os(macOS) || os(iOS) || os(visionOS)
@@ -38,6 +44,7 @@ struct ImageEncoderView: View {
   @State private var metadata: Bool = false
   @State private var format: ImageType = .heic
   @State private var currentTask: AnyCancellable?
+  @State private var showsSlider = false
   var body: some View {
     Table(of: Operation.self, selection: $selected, sortOrder: $sortOrder) {
       TableColumn("Name", value: \Operation.name) { (file: Operation) in
@@ -69,19 +76,39 @@ struct ImageEncoderView: View {
       add(files: files)
       return true
     }.safeAreaInset(edge: .top) {
-      HStack {
-        Picker("Output Format", selection: $format) {
-          ForEach(ImageType.allCases, id: \.self) {
-            Text($0.rawValue).id($0)
+      VStack(alignment: .trailing) {
+        HStack {
+          Text("Convert to")
+          Menu(format.rawValue) {
+            ForEach(ImageType.allCases, id: \.self) { type in
+              Button(type.rawValue) {
+                withAnimation {
+                  format = type
+                }
+              }
+            }
+          }
+          Button(metadata ? "including metadata" : "removing metadata") {
+            withAnimation {
+              metadata.toggle()
+            }
+          }
+          if format.hasQuality {
+            Button("at \(Int(quality * 100))% quality") {
+              withAnimation {
+                showsSlider.toggle()
+              }
+            }.monospacedDigit().transition(.blurReplace)
           }
         }
-        Toggle("Keep metadata", isOn: $metadata)
-        HStack {
-          Text("Quality \(Int(quality * 100))%")
-          Slider(value: $quality, in: 0.1...0.9, step: 0.1)
-            .frame(maxWidth: 100)
+        if showsSlider && format.hasQuality {
+          Slider(value: $quality.animation(), in: 0.1...0.9, step: 0.1)
+            .frame(maxWidth: 200)
+            .transition(.blurReplace)
         }
-      }.frame(maxWidth: .infinity, alignment: .trailing).padding(.horizontal).secondary()
+      }.buttonStyle(TabButtonStyle(selected: true))
+        .frame(maxWidth: .infinity, alignment: .trailing)
+        .padding(.horizontal).secondary()
     }
   }
   struct ImageTransfer: Transferable {
