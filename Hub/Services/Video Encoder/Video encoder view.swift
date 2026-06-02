@@ -33,6 +33,7 @@ struct VideoEncoderView: View {
   @State private var sortOrder = [KeyPathComparator(\Operation.name, comparator: .localized)]
   @State private var isRunning = false
   @State private var quality: Float = 0.5
+  var result: [URL] { operations.compactMap { $0.result } }
   var body: some View {
     Table(of: Operation.self, selection: $selected, sortOrder: $sortOrder) {
       TableColumn("Name", value: \Operation.name) { (file: Operation) in
@@ -65,6 +66,12 @@ struct VideoEncoderView: View {
     }.animation(.smooth, value: operations.isEmpty).dropFiles { (files: [URL], point: CGPoint) -> Bool in
       add(files: files)
       return true
+    }.toolbar {
+      if !result.isEmpty {
+        ShareLink(items: result) {
+          Label("Export", systemImage: "square.and.arrow.up")
+        }
+      }
     }.safeAreaInset(edge: .top) {
       HStack {
         HStack {
