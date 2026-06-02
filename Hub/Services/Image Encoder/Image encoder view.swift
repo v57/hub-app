@@ -45,6 +45,12 @@ struct ImageEncoderView: View {
   @State private var format: ImageType = .heic
   @State private var currentTask: AnyCancellable?
   @State private var showsSlider = false
+  var result: [ImageResult] {
+    operations.compactMap { (operation: Operation) -> ImageResult? in
+      guard let data = operation.result else { return nil }
+      return ImageResult(data: data, name: operation.name)
+    }
+  }
   var body: some View {
     Table(of: Operation.self, selection: $selected, sortOrder: $sortOrder) {
       TableColumn("Name", value: \Operation.name) { (file: Operation) in
@@ -59,6 +65,14 @@ struct ImageEncoderView: View {
     } rows: {
       ForEach(operations) { file in
         TableRow(file).draggable(ImageTransfer(file: file))
+      }
+    }.toolbar {
+      if !result.isEmpty {
+        ShareLink(items: result) { item in
+          SharePreview(item.name, image: item)
+        } label: {
+          Label("Export", systemImage: "square.and.arrow.up")
+        }
       }
     }.opacity(operations.isEmpty ? 0 : 1).overlay {
       if operations.isEmpty {
@@ -190,6 +204,14 @@ struct ImageEncoderView: View {
     isRunning = false
     if completed > 0 {
       await run()
+    }
+  }
+  struct ImageResult: Transferable {
+    let data: Data
+    let name: String
+    static var transferRepresentation: some TransferRepresentation {
+      DataRepresentation(exportedContentType: .image) { $0.data }
+        .suggestedFileName { $0.name }
     }
   }
 }
