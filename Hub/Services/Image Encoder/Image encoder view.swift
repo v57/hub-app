@@ -109,6 +109,10 @@ struct ImageEncoderView: View {
       }.buttonStyle(TabButtonStyle(selected: true))
         .frame(maxWidth: .infinity, alignment: .trailing)
         .padding(.horizontal).secondary()
+    }.safeAreaInset(edge: .bottom) {
+      LibraryPickerButton(matching: .images) { url in
+        add(files: [url])
+      }.buttonStyle(ActionButtonStyle()).padding(.bottom, 4)
     }
   }
   struct ImageTransfer: Transferable {
@@ -179,11 +183,11 @@ struct ImageEncoderView: View {
           completed += 1
         } catch {
           operations[i].error = true
+          print(error)
         }
       }
     } catch { }
     isRunning = false
-    print(completed, isRunning)
     if completed > 0 {
       await run()
     }
