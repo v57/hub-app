@@ -61,6 +61,10 @@ struct SensitiveContentView: View {
         items.append(contentsOf: urls.map { Item(url: $0) })
       }
       return true
+    }.safeAreaInset(edge: .bottom) {
+      LibraryPickerButton(matching: .images) { url in
+        items.append(Item(url: url))
+      }.buttonStyle(ActionButtonStyle()).padding(.bottom, 4)
     }
   }
   @Observable class Item: Identifiable {
