@@ -63,18 +63,7 @@ struct VideoEncoderView: View {
         }
       }
     }.animation(.smooth, value: operations.isEmpty).dropFiles { (files: [URL], point: CGPoint) -> Bool in
-      var content = [URL]()
-      for file in files {
-        file.contents(array: &content)
-      }
-      for file in content {
-        if file.lastPathComponent.fileType == .video {
-          operations.append(Operation(file: file, size: Int(file.fileSize)))
-        }
-      }
-      if !isRunning {
-        Task { try await run() }
-      }
+      add(files: files)
       return true
     }.safeAreaInset(edge: .top) {
       HStack {
@@ -84,6 +73,24 @@ struct VideoEncoderView: View {
             .frame(maxWidth: 100)
         }
       }.frame(maxWidth: .infinity, alignment: .trailing).padding(.horizontal).secondary()
+    }.safeAreaInset(edge: .bottom) {
+      LibraryPickerButton(matching: .videos) { url in
+        add(files: [url])
+      }.buttonStyle(ActionButtonStyle()).padding(.bottom, 4)
+    }
+  }
+  func add(files: [URL]) {
+    var content = [URL]()
+    for file in files {
+      file.contents(array: &content)
+    }
+    for file in content {
+      if file.lastPathComponent.fileType == .video {
+        operations.append(Operation(file: file, size: Int(file.fileSize)))
+      }
+    }
+    if !isRunning {
+      Task { try await run() }
     }
   }
   struct VideoTransfer: Transferable {
