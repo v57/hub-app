@@ -140,12 +140,19 @@ extension Hub {
   static let main = EventDelayManager()
   var animate = true
   var isWaiting = false
+  var shouldDelay: Bool {
+    !ProcessInfo.isScreenshot
+  }
   var pending: [() -> ()] = []
   func execute(_ action: @escaping () -> ()) {
-    pending.append(action)
-    if !isWaiting {
-      isWaiting = true
-      Task { try await wait() }
+    if shouldDelay {
+      pending.append(action)
+      if !isWaiting {
+        isWaiting = true
+        Task { try await wait() }
+      }
+    } else {
+      action()
     }
   }
   func wait() async throws {

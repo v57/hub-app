@@ -14,7 +14,9 @@ struct HubApp: App {
 #endif
   var body: some Scene {
     WindowGroup {
-      if !ProcessInfo.isPreviews {
+      if ProcessInfo.isScreenshot {
+        ScreenshotsModeView()
+      } else if !ProcessInfo.isPreviews {
         NavigationStack {
           HomeView().page()
         }.modifier(TranslationModifier())
@@ -40,4 +42,5 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
 extension ProcessInfo {
   static let isPreviews: Bool = processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] != nil
+  static let isScreenshot: Bool = processInfo.environment["screenshot"] != nil
 }
