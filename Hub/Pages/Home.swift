@@ -389,16 +389,25 @@ struct HomeView: View {
     struct ShareServicesView: View {
       @Environment(Hub.self) var hub
       typealias Service = AppServices.Service
+      var services: [PublisherService] {
+        Service.allCases.compactMap { service in
+          guard let publisher = service.servicePublisher(hub: hub) else { return nil }
+          return PublisherService(service: service, publisher: publisher)
+        }
+      }
+      struct PublisherService {
+        let service: Service
+        let publisher: Published<Bool>.Publisher
+      }
       var body: some View {
-        VStack(alignment: .leading) {
-          LazyVGrid(columns: [.init(.adaptive(minimum: 48))]) {
-            ForEach(Service.allCases, id: \.self) { service in
-              if let publisher = service.servicePublisher(hub: hub) {
-                ServiceToggle(publisher: publisher, service: service)
-              }
+        GeometryReader { view in
+          let services = services
+          LazyVGrid(columns: [.init(.adaptive(minimum: 32))]) {
+            ForEach(services, id: \.service) { item in
+              ServiceToggle(publisher: item.publisher, service: item.service)
             }
           }
-        }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).blockBackground().bottomLabel {
+        }.blockBackground().bottomLabel {
           Label("Share With Hub", systemImage: "square.and.arrow.up")
         }
       }
@@ -414,18 +423,20 @@ struct HomeView: View {
             }
             service.setService(enabled: isEnabled, hub: hub)
           } label: {
-            ZStack {
-              Image(systemName: service.image).fontWeight(.bold)
-                .frame(height: 14)
-            }.frame(maxWidth: .infinity)
-              .padding(.vertical, 6)
-              .background {
+            Color.black.opacity(0.001).overlay {
+              if isEnabled {
                 RoundedRectangle(cornerRadius: 10)
                   .fill(.green.opacity(0.1))
-                  .strokeBorder(.green, lineWidth: isEnabled ? 1 : 0)
+                  .strokeBorder(.border)
+                  .transition(.scale)
               }
+            }.overlay {
+              Image(systemName: service.image).fontWeight(.bold)
+                .gradientBlur(radius: isEnabled ? 4 : 0)
+                .frame(height: 14)
+            }.aspectRatio(1, contentMode: .fit)
           }.onReceive(publisher) { isEnabled = $0 }
-            
+          
         }
       }
     }
