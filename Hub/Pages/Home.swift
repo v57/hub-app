@@ -271,37 +271,44 @@ struct HomeView: View {
         let status = status
         HStack(alignment: .top) {
           VStack(alignment: .leading) {
-            HStack(alignment: .lastTextBaseline) {
+            HStack {
               VStack(alignment: .leading) {
+                let running = status?.processes?.count ?? 0
                 ForEach(status?.processes?.suffix(7) ?? []) { process in
                   statusText(process: process)?.transition(.blurReplace)
                 }
                 if status?.manyRunning == true {
                   totalStatus()?.foregroundStyle(.primary)
                 }
-              }
-              if (status?.processes?.count ?? 0) > 0 {
-                if let date = status?.started {
-                  Spacer()
-                  VStack(alignment: .trailing) {
-#if !os(tvOS)
-                    if showsStepper {
-                      HStack(spacing: 4) {
-                        Text("\(targetInstances)").secondary()
-                        Stepper("Instances", value: $targetInstances, in: 1...1024)
-                          .labelsHidden()
-                          .task(id: targetInstances) { try? await updateInstances() }
-                      }.transition(.blurReplace)
-                    }
-#endif
-                    TimelineView(.everyMinute) { timeline in
-                      Text(date.shortRelative)
-                    }
+                if running > 0, let date = status?.started {
+                  TimelineView(.everyMinute) { timeline in
+                    Text(date.shortRelative)
                   }
                 }
-              } else {
-                Text(app.active ? "Not running" : "Stopped").transition(.blurReplace)
-              }
+                if running == 0 {
+                  Text(app.active ? "Not running" : "Launch").transition(.blurReplace)
+                }
+              }.monospacedDigit()
+              Spacer()
+              VStack(spacing: 10) {
+                AsyncButton(app.active ? "Stop" : "Start", systemImage: app.active ? "pause" : "play") {
+                  if app.active {
+                    try await hub.launcher.app(id: app.id).stop()
+                  } else {
+                    try await hub.launcher.app(id: app.id).start()
+                  }
+                }
+                if showsStepper && status?.started != nil {
+                  Button("Increase", systemImage: "chevron.up") {
+                    targetInstances += 1
+                  }.transition(.blurReplace)
+                  Button("Decrease", systemImage: "chevron.down") {
+                    targetInstances -= 1
+                  }.opacity(targetInstances > 1 ? 1 : 0)
+                    .task(id: targetInstances) { try? await updateInstances() }
+                    .transition(.blurReplace)
+                }
+              }.labelStyle(CircleLabelStyle())
             }.secondary()
             if canUpgrade {
               AsyncButton {
@@ -360,9 +367,9 @@ struct HomeView: View {
       func totalStatus() -> Text? {
         guard let mem = status?.totalMemory else { return nil }
         if let cpu = status?.totalCpu {
-          return Text("\(Int(cpu))% \(Int(mem))MB")
+          return Text("\(Int(cpu))% \(Int(mem))MB x\(instances)")
         } else {
-          return Text("\(Int(mem))MB")
+          return Text("\(Int(mem))MB x\(instances)")
         }
       }
       func statusText(process: Hub.Launcher.ProcessStatus) -> Text? {
@@ -384,6 +391,15 @@ struct HomeView: View {
           showsInstances = true
         }
         try await hub.client.send("launcher/app/cluster", LauncherView.AppView.SetInstances(name: app.name, count: targetInstances))
+      }
+      struct CircleLabelStyle: LabelStyle {
+        func makeBody(configuration: Configuration) -> some View {
+          configuration.icon
+            .symbolVariant(.circle.fill)
+            .foregroundStyle(.primary, .clear)
+            .font(.system(size: 34, weight: .medium))
+            .glassStyle(in: .circle)
+        }
       }
     }
     struct ShareServicesView: View {
