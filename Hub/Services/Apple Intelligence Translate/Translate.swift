@@ -5,10 +5,10 @@
 //  Created by Linux on 29.10.25.
 //
 
-#if os(macOS) || os(iOS)
-@preconcurrency import Translation
 import SwiftUI
 
+#if os(macOS) || os(iOS)
+@preconcurrency import Translation
 @available(macOS 15.0, iOS 18.0, *)
 @Observable
 @MainActor
@@ -138,6 +138,12 @@ extension Array {
   subscript(safe index: Int) -> Element? {
     guard index < count else { return nil }
     return self[index]
+  }
+}
+#else
+struct TranslationModifier: ViewModifier {
+  func body(content: Content) -> some View {
+    content
   }
 }
 #endif

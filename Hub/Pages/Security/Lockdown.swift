@@ -9,6 +9,21 @@ import SwiftUI
 import Combine
 import HubService
 
+extension View {
+  @ViewBuilder
+  func toggleSwitch() -> some View {
+#if os(tvOS)
+    if #available(tvOS 18.0, *) {
+      toggleStyle(.switch)
+    } else {
+      self
+    }
+#else
+    toggleStyle(.switch)
+#endif
+  }
+}
+
 struct LockdownView: View {
   @Environment(Hub.self) private var hub
   @HubState(\.users) private var users
@@ -47,7 +62,7 @@ struct LockdownView: View {
           Every untrusted service will not connect to your hub anymore
           """).multilineTextAlignment(.center)
         Toggle("Lockdown", isOn: $isEnabled.animation(.spring(response: 1, dampingFraction: 0.5)))
-          .toggleStyle(.switch).labelsHidden()
+          .toggleSwitch().labelsHidden()
       }.task(id: whitelist.enabled) {
         isEnabled = whitelist.enabled
       }.onChange(of: isEnabled) { toggle() }

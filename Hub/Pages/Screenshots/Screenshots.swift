@@ -17,13 +17,21 @@ struct ScreenshotsModeView: View {
           case .home:
             HomeView()
           case .image:
+            #if !os(tvOS)
             ImageEncoderView()
+            #endif
           case .video:
+#if !os(tvOS)
             VideoEncoderView()
+            #endif
           case .translate:
+#if !os(tvOS)
             TranslateView()
+#endif
           case .chat:
+#if !os(tvOS)
             ChatView()
+#endif
           case .pending:
             PendingListView()
           case .connections:

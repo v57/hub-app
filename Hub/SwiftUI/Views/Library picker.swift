@@ -8,6 +8,7 @@
 import PhotosUI
 import SwiftUI
 
+#if !os(tvOS)
 struct LibraryPickerButton: View {
   @State private var photos = [PhotosPickerItem]()
   let matching: PHPickerFilter
@@ -51,3 +52,4 @@ struct LibraryTransferable: Transferable {
     }
   }
 }
+#endif

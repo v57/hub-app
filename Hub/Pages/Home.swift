@@ -73,12 +73,14 @@ struct HomeView: View {
         Button(copied ? "Copied" : "My Key", systemImage: copied ? "checkmark.circle.fill" : "key") {
           copy()
         }.labelStyle(.appIcon)
+#if !os(tvOS)
         NavigationLink {
           FarmView()
             .transitionTarget(id: "farm", namespace: namespace)
         } label: {
           Label("Farm", systemImage: "tree")
         }.labelStyle(.appIcon).iconBadge(Farm.main.isRunning ? "Farming" : nil)
+#endif
       }
     }
     func copy() {
