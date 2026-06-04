@@ -22,6 +22,16 @@ extension View {
       environment(\.badge, nil)
     }
   }
+  func bottomLabel<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+    background {
+      let content = content()
+      GeometryReader { view in
+        content.app().offset(y: view.size.height - 4)
+          .multilineTextAlignment(.center)
+          .frame(maxWidth: .infinity)
+      }
+    }
+  }
 }
 
 private extension EnvironmentValues {
@@ -52,12 +62,8 @@ private struct AppIcon<Title: View, Icon: View>: View {
             .offset(y: -2)
             .transition(.blurReplace)
         }
-      }.background {
-        GeometryReader { view in
-          title.app().offset(y: view.size.height - 4)
-            .multilineTextAlignment(.center)
-            .frame(maxWidth: .infinity)
-        }
+      }.bottomLabel {
+        title
       }
   }
 }

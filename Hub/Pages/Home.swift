@@ -207,12 +207,6 @@ struct HomeView: View {
       @HubState(\.status) var status
       var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-          HStack {
-            Text("Services")
-            Spacer()
-            Image(systemName: "circle.hexagongrid.fill")
-          }.cellTitle()
-          Spacer()
           ForEach(status.services.sorted(by: { $0.requests > $1.requests }).prefix(3), id: \.name) { service in
             VStack(alignment: .leading) {
               Text(service.name).foregroundStyle(.primary).truncationMode(.middle)
@@ -231,14 +225,13 @@ struct HomeView: View {
                 }
               }.labelStyle(LabelStyle())
             }.lineLimit(1)
-            .frame(maxWidth: .infinity, alignment: .leading).background {
-              RoundedRectangle(cornerRadius: 4)
-                .fill(.regularMaterial)
-                .padding(.horizontal, -4).padding(.vertical, -2)
-            }.secondary()
+            .frame(maxWidth: .infinity, alignment: .leading).secondary()
           }
         }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
           .blockBackground()
+          .bottomLabel {
+            Text("Services")
+          }
       }
       struct LabelStyle: SwiftUI.LabelStyle {
         func makeBody(configuration: Configuration) -> some View {
@@ -278,12 +271,6 @@ struct HomeView: View {
         let status = status
         HStack(alignment: .top) {
           VStack(alignment: .leading) {
-            HStack(alignment: .firstTextBaseline) {
-              Text(app.id)
-              Spacer()
-              Image(systemName: "terminal")
-            }.cellTitle()
-            Spacer()
             HStack(alignment: .lastTextBaseline) {
               VStack(alignment: .leading) {
                 ForEach(status?.processes?.suffix(7) ?? []) { process in
@@ -333,7 +320,9 @@ struct HomeView: View {
           if let installationStatus {
             Text(installationStatus).badgeStyle()
           }
-        }.blockBackground().contextMenu {
+        }.blockBackground().bottomLabel {
+          Label(app.id, systemImage: "terminal")
+        }.contextMenu {
           if app.active {
             if app.instances == 1 {
               Button("Cluster", systemImage: "list.number") {
@@ -402,12 +391,6 @@ struct HomeView: View {
       typealias Service = AppServices.Service
       var body: some View {
         VStack(alignment: .leading) {
-          HStack {
-            Text("Share Services")
-            Spacer()
-            Image(systemName: "square.and.arrow.up")
-          }.cellTitle()
-          Spacer()
           LazyVGrid(columns: [.init(.adaptive(minimum: 48))]) {
             ForEach(Service.allCases, id: \.self) { service in
               if let publisher = service.servicePublisher(hub: hub) {
@@ -415,7 +398,9 @@ struct HomeView: View {
               }
             }
           }
-        }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).blockBackground()
+        }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).blockBackground().bottomLabel {
+          Label("Share With Hub", systemImage: "square.and.arrow.up")
+        }
       }
       struct ServiceToggle: View {
         @Environment(Hub.self) var hub
