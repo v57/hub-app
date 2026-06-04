@@ -71,16 +71,19 @@ struct HoverModifier: ViewModifier {
       .primary.opacity(isActive ? 0 : 0)
     ], center: UnitPoint(x: offset.x * 0.9 + 0.5, y: offset.y * 0.9 + 0.5), startRadius: 0, endRadius: isActive ? 32 : 200)
   }
+  var shape: RoundedRectangle {
+    RoundedRectangle(cornerRadius: 16)
+  }
   func body(content: Content) -> some View {
-    content.overlay {
-      RoundedRectangle(cornerRadius: 16).fill(gradient)
+    content
+      .overlay {
+      shape.fill(gradient)
         .strokeBorder(strokeGradient, lineWidth: 1)
         .allowsHitTesting(false)
     }
+    .glassStyle(in: shape)
     .rotation3DEffect(verticalAngle, axis: (x: 1, y: 0, z: 0), anchorZ: zIndex)
     .rotation3DEffect(horizontalAngle, axis: (x: 0, y: 1, z: 0), anchorZ: zIndex)
-    .compositingGroup()
-    .shadow(color: .black.opacity(scheme == .dark ? 0.2 : 0.1), radius: hovering ? 12 : 10)
     .offset(x: offset.x * offsetMultiplier, y: offset.y * offsetMultiplier)
     .background {
       GeometryReader { view in
@@ -214,26 +217,26 @@ struct SimultaneousGesture: UIGestureRecognizerRepresentable {
       Button {
         print("Button touched")
       } label: {
-        RoundedRectangle(cornerRadius: 16).fill(.background)
+        RoundedRectangle(cornerRadius: 16).fill(.clear)
           .frame(width: 64, height: 64)
           .overlay {
             Image(systemName: "greetingcard.fill")
               .font(.system(size: 36))
           }.modifier(HoverModifier())
       }
-      RoundedRectangle(cornerRadius: 16).fill(.background)
+      RoundedRectangle(cornerRadius: 16).fill(.clear)
         .frame(width: 64, height: 64)
         .overlay {
           Image(systemName: "square.and.arrow.up.circle.fill")
             .font(.system(size: 48))
         }.modifier(HoverModifier())
-      RoundedRectangle(cornerRadius: 16).fill(.background)
+      RoundedRectangle(cornerRadius: 16).fill(.clear)
         .frame(width: 64, height: 64)
         .overlay {
           Image(systemName: "waveform.path.ecg.text.clipboard")
             .font(.system(size: 36))
         }.modifier(HoverModifier())
-      RoundedRectangle(cornerRadius: 16).fill(.background)
+      RoundedRectangle(cornerRadius: 16).fill(.clear)
         .frame(width: 64, height: 64)
         .overlay {
           Image(systemName: "trash.circle.fill")

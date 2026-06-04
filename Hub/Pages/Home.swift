@@ -233,7 +233,8 @@ struct HomeView: View {
             }.lineLimit(1)
             .frame(maxWidth: .infinity, alignment: .leading).background {
               RoundedRectangle(cornerRadius: 4)
-                .fill(.background).padding(.horizontal, -4).padding(.vertical, -2)
+                .fill(.regularMaterial)
+                .padding(.horizontal, -4).padding(.vertical, -2)
             }.secondary()
           }
         }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -607,7 +608,7 @@ struct HomeGrid<Content: View>: View {
 struct BlockStyle: ViewModifier {
   let cornerRadius: CGFloat
   func body(content: Content) -> some View {
-    RoundedRectangle(cornerRadius: cornerRadius).fill(Background())
+    Color.clear
       .overlay { content.safeAreaPadding(8) }
       .hoverEffect()
       .padding(8)

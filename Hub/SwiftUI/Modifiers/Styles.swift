@@ -14,17 +14,11 @@ extension View {
       .padding(.horizontal, 6).padding(.vertical, 2)
       .background(.red, in: .capsule)
   }
-  @ViewBuilder
-  func glassProminentButton() -> some View {
-    #if os(visionOS)
-    buttonStyle(.borderedProminent)
-    #else
-    if #available(iOS 26.0, macOS 26.0, tvOS 26.0, watchOS 26.0, *) {
-      buttonStyle(.glassProminent)
-    } else {
-      buttonStyle(.borderedProminent)
+  func glassStyle<S: InsettableShape>(in shape: S) -> some View {
+    self.background {
+      shape.fill(.secondaryBackground).strokeBorder(.border)
+        .shadow(color: .black.opacity(0.08), radius: 16, y: 8)
     }
-    #endif
   }
   func modifier<Content: View>(@ViewBuilder _ modifiy: (Self) -> Content) -> Content {
     modifiy(self)
@@ -43,27 +37,6 @@ struct ActionButtonStyle: ButtonStyle {
       .scaleEffect(up ? 1.1 : 1.0)
       .animation(.spring(response: up ? 0.1 : 0.5, dampingFraction: up ? 1.0 : 0.5), value: up)
       .contentTransition(.numericText())
-  }
-}
-struct Background: ShapeStyle {
-  func resolve(in environment: EnvironmentValues) -> Color {
-    Color.main(dark: environment.colorScheme == .dark)
-  }
-  struct Screen: View {
-    @Environment(\.colorScheme) var colorScheme
-    var body: some View {
-      Color.main(dark: colorScheme == .dark).ignoresSafeArea()
-    }
-  }
-}
-
-extension Color {
-  static func main(dark: Bool) -> Color {
-    if dark {
-      Color(hue: 0.091, saturation: 0.186, brightness: 0.156)
-    } else {
-      Color.white
-    }
   }
 }
 
@@ -98,7 +71,6 @@ extension Text {
 extension View {
   func page() -> some View {
     body().fontDesign(.rounded)
-      .background(Background.Screen())
   }
   func test() -> some View {
     NavigationStack {
@@ -125,6 +97,69 @@ extension View {
   }
   func app() -> some View {
     font(.system(size: 10, design: .rounded))
+  }
+}
+
+struct SecondaryBackground: ShapeStyle {
+  func resolve(in environment: EnvironmentValues) -> Color {
+    let isDark = environment.colorScheme == .dark
+    if isDark {
+#if os(macOS)
+      return Color(red: 0.109, green: 0.111, blue: 0.144)
+#else
+      return Color(red: 0.082, green: 0.082, blue: 0.082)
+#endif
+    } else {
+      return Color(red: 0.98, green: 0.98, blue: 0.98)
+    }
+  }
+}
+
+extension ShapeStyle where Self == SecondaryBackground {
+  static var secondaryBackground: Self { SecondaryBackground() }
+}
+
+extension ShapeStyle where Self == BorderStyle {
+  static var border: BorderStyle {
+    BorderStyle()
+  }
+}
+
+struct BorderStyle: ShapeStyle {
+  func resolve(in environment: EnvironmentValues) -> LinearGradient {
+    let isDark = environment.colorScheme == .dark
+    return LinearGradient(colors: [
+      primaryColor(dark: isDark),
+      SecondaryBackground().resolve(in: environment),
+      primaryColor(dark: isDark),
+    ], startPoint: .topLeading, endPoint: .bottomTrailing)
+  }
+  func primaryColor(dark: Bool) -> Color {
+    if dark {
+      Color(red: 0.271, green: 0.279, blue: 0.369)
+    } else {
+      Color.white
+    }
+  }
+}
+
+extension ShapeStyle where Self == Color {
+  static var tertiaryBackground: Color {
+#if os(macOS) || os(iOS)
+    Color(.tertiarySystemFill)
+#else
+    Color.gray.opacity(0.4)
+#endif
+  }
+}
+
+extension Color {
+  static var tertiaryBackground: Color {
+#if os(macOS) || os(iOS)
+    Color(.tertiarySystemFill)
+#else
+    Color.gray.opacity(0.4)
+#endif
   }
 }
 

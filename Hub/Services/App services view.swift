@@ -167,13 +167,3 @@ extension AppServices {
     case available, iOS(Int), macOS(Int), unsupportedDevice
   }
 }
-
-extension Color {
-  static var tertiaryBackground: Color {
-#if os(macOS) || os(iOS)
-    Color(.tertiarySystemFill)
-#else
-    Color.gray.opacity(0.4)
-#endif
-  }
-}
