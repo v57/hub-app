@@ -32,7 +32,7 @@ struct HomeView: View {
             ForEach(AppServices.Service.allCases, id: \.self) { item in
               ServiceContent(item: item)
             }
-          }.labelStyle(.appIcon)
+          }.labelStyle(.appIcon).buttonStyle(.environment)
           Text("Support this Project").sectionTitle()
           SupportView()
         }.padding(.top).animation(.home, value: isFocusing)
@@ -72,7 +72,7 @@ struct HomeView: View {
         }
         Button(copied ? "Copied" : "My Key", systemImage: copied ? "checkmark.circle.fill" : "key") {
           copy()
-        }.labelStyle(.appIcon)
+        }.labelStyle(.appIcon).buttonStyle(.environment)
 #if !os(tvOS)
         NavigationLink {
           FarmView()
@@ -80,6 +80,7 @@ struct HomeView: View {
         } label: {
           Label("Farm", systemImage: "tree")
         }.labelStyle(.appIcon).iconBadge(Farm.main.isRunning ? "Farming" : nil)
+          .buttonStyle(.environment)
 #endif
       }
     }
@@ -121,7 +122,7 @@ struct HomeView: View {
           } label: {
             ServicesView()
               .transitionSource(id: Sheet.services, namespace: namespace)
-          }.gridSize(.x22)
+          }.gridSize(.x22).buttonStyle(.environment)
         }
         Group {
           if hub.require(permissions: "hub/connections") {
@@ -161,7 +162,7 @@ struct HomeView: View {
           ForEach(launcherInfo.apps) { app in
             AppView(app: app)
           }
-        }.labelStyle(.appIcon)
+        }.labelStyle(.appIcon).buttonStyle(.environment)
         ShareServicesView().gridSize(.x22)
         if let apps = statusBadges.apps, !apps.isEmpty {
           ForEach(apps) { app in
@@ -172,7 +173,7 @@ struct HomeView: View {
                 Text(String(app.name.first ?? "A"))
               }
             }.iconBadge(app.isOnline ? nil : "Offline")
-          }.labelStyle(.appIcon)
+          }.labelStyle(.appIcon).buttonStyle(.environment)
         }
       }
       .navigationDestination(for: AppHeader.self) { app in

@@ -50,6 +50,12 @@ struct SupportView: View {
         .body()
         .minimumScaleFactor(0.6)
         .blockBackground()
+        .environment(\.isPressed, configuration.isPressed)
+        .animation(.smooth(duration: 0.25), value: configuration.isPressed)
     }
   }
+}
+
+#Preview {
+  SupportView().test()
 }

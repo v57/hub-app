@@ -14,7 +14,9 @@ extension View {
 }
 
 struct HoverModifier: ViewModifier {
-  @Environment(\.colorScheme) var scheme
+  @Environment(\.colorScheme) private var scheme
+  @Environment(\.isPressed) private var isPressed
+  @Environment(\.displayScale) private var scale
   @State var hovering: Bool = false
   @State var dragging: Bool = false
   @State var offset: CGPoint = .zero
@@ -25,9 +27,9 @@ struct HoverModifier: ViewModifier {
   var isDark: Bool { scheme == .dark }
   var gradientOpacity: Double {
     if isDark {
-      isActive ? 0.2 : 0
+      isPressed ? 0.3 : isActive ? 0.2 : 0
     } else {
-      isActive ? 1 : 0
+      isPressed ? 0.5 : isActive ? 1 : 0
     }
   }
   var gradientEndOpacity: Double {
@@ -39,15 +41,14 @@ struct HoverModifier: ViewModifier {
   }
   var endRadius: Double {
     if isDark {
-      isActive ? 64 : 200
+      isPressed ? 200 : isActive ? 64 : 200
     } else {
-      isActive ? 32 : 200
+      isPressed ? 200 : isActive ? 32 : 200
     }
   }
   var zIndex: Double {
-    (dragging || hovering) && !isLowResolution ? -8 : 0
+    isPressed ? -10 : (dragging || hovering) && !isLowResolution ? -8 : 0
   }
-  @Environment(\.displayScale) var scale
   var verticalAngle: Angle {
     isLowResolution ? .degrees(0) : .degrees(-offset.y * rotation)
   }
@@ -69,7 +70,7 @@ struct HoverModifier: ViewModifier {
     RadialGradient(colors: [
       .primary.opacity(isActive ? 1 : 0),
       .primary.opacity(isActive ? 0 : 0)
-    ], center: UnitPoint(x: offset.x * 0.9 + 0.5, y: offset.y * 0.9 + 0.5), startRadius: 0, endRadius: isActive ? 32 : 200)
+    ], center: UnitPoint(x: offset.x * 0.9 + 0.5, y: offset.y * 0.9 + 0.5), startRadius: 0, endRadius: isPressed ? 64 : isActive ? 32 : 200)
   }
   var shape: RoundedRectangle {
     RoundedRectangle(cornerRadius: 16)
@@ -109,7 +110,7 @@ struct HoverModifier: ViewModifier {
           hover(phase: $0, size: size)
         }
       }
-#elseif os(macOS)
+#else
       content.onContinuousHover {
         hover(phase: $0, size: size)
       }
@@ -211,6 +212,26 @@ struct SimultaneousGesture: UIGestureRecognizerRepresentable {
 }
 #endif
 
+extension ButtonStyle where Self == EnvironmentButtonStyle {
+  static var environment: EnvironmentButtonStyle { EnvironmentButtonStyle() }
+}
+
+struct EnvironmentButtonStyle: ButtonStyle {
+  func makeBody(configuration: Configuration) -> some View {
+    configuration.label.environment(\.isPressed, configuration.isPressed)
+      .animation(.smooth(duration: 0.25), value: configuration.isPressed)
+  }
+}
+extension EnvironmentValues {
+  var isPressed: Bool {
+    get { self[IsPressed.self] }
+    set { self[IsPressed.self] = newValue }
+  }
+  private struct IsPressed: EnvironmentKey {
+    static var defaultValue: Bool { false }
+  }
+}
+
 #Preview {
   ScrollView {
     HStack(spacing: 24) {
@@ -242,7 +263,7 @@ struct SimultaneousGesture: UIGestureRecognizerRepresentable {
           Image(systemName: "trash.circle.fill")
             .font(.system(size: 48))
         }.modifier(HoverModifier())
-    }
+    }.buttonStyle(.environment)
     Color.clear.frame(height: 2000)
   }.buttonStyle(.plain)
 }
