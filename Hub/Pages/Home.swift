@@ -418,7 +418,7 @@ struct HomeView: View {
       var body: some View {
         GeometryReader { view in
           let services = services
-          LazyVGrid(columns: [.init(.adaptive(minimum: 32))]) {
+          LazyVGrid(columns: [.init(.adaptive(minimum: 36))]) {
             ForEach(services, id: \.service) { item in
               ServiceToggle(publisher: item.publisher, service: item.service)
             }
