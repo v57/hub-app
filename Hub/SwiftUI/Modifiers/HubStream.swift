@@ -141,7 +141,7 @@ extension Hub {
   var animate = true
   var isWaiting = false
   var shouldDelay: Bool {
-    !ProcessInfo.isScreenshot
+    !ProcessInfo.isScreenshot && !ProcessInfo.isPreviews
   }
   var pending: [() -> ()] = []
   func execute(_ action: @escaping () -> ()) {
