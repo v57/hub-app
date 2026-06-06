@@ -53,8 +53,16 @@ struct HomeView: View {
     @Namespace var namespace
     var body: some View {
       HomeGrid {
+        #if os(tvOS)
+        NavigationLink {
+          ConnectView()
+        } label: {
+          Label("Join", systemImage: "plus")
+        }.buttonStyle(.environment).labelStyle(AppIconLabelStyle())
+        #else
         JoinHubView(address: $address.animation(), focus: $focus)
           .gridSize(address.isEmpty ? .x21 : .x42)
+        #endif
         NavigationLink {
           InstallationGuide().transitionTarget(id: "guide", namespace: namespace)
         } label: {
@@ -65,7 +73,7 @@ struct HomeView: View {
               .secondary()
               .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
           }.blockBackground().transitionSource(id: "guide", namespace: namespace)
-        }.gridSize(.x21)
+        }.gridSize(.x21).buttonStyle(.environment)
         ForEach(Hubs.main.list) { hub in
           HubView(merging: $merging).hub(hub)
             .gridSize(.x21)
