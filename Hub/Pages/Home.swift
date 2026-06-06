@@ -27,6 +27,7 @@ struct HomeView: View {
           ForEach(Hubs.main.list) { hub in
             HubSection().hub(hub)
           }
+#if !os(tvOS)
           Text("My Apps").sectionTitle()
           HomeGrid {
             ForEach(AppServices.Service.allCases, id: \.self) { item in
@@ -35,6 +36,7 @@ struct HomeView: View {
           }.labelStyle(.appIcon).buttonStyle(.environment)
           Text("Support this Project").sectionTitle()
           SupportView()
+#endif
         }.padding(.top).animation(.home, value: isFocusing)
           .animation(.home, value: hubs.list.count)
       }.environment(\.homeGridSpacing, HomeGridLayout.spacing(width: view.size.width - 16))
