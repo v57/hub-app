@@ -121,7 +121,7 @@ struct LauncherView: View {
           Text(status.statusText).secondary()
           #endif
         }
-        Spacer()
+        Spacer(minLength: 0)
 #if PRO
         HStack {
           if updatesAvailable {
@@ -206,7 +206,7 @@ struct LauncherView: View {
             }
           }.secondary()
         }
-        Spacer()
+        Spacer(minLength: 0)
         if showsInstances || app.instances > 1 {
           HStack {
             Text("\(instances)").secondary()

@@ -298,7 +298,7 @@ struct HomeView: View {
                   Text(app.active ? "Not running" : "Launch").transition(.blurReplace)
                 }
               }.monospacedDigit()
-              Spacer()
+              Spacer(minLength: 0)
               VStack(spacing: 10) {
                 AsyncButton(app.active ? "Stop" : "Start", systemImage: app.active ? "pause" : "play") {
                   if app.active {
@@ -489,13 +489,13 @@ struct HomeView: View {
         VStack(alignment: .leading) {
           HStack(spacing: 4) {
             Text(hub.settings.name)
-            Spacer()
+            Spacer(minLength: 0)
             if #available(macOS 15.0, iOS 18.0, *) {
               Image(systemName: "wifi", variableValue: hub.isConnected ? 1 : 0)
                 .symbolEffect(.variableColor.iterative.dimInactiveLayers.reversing, options: .repeat(3), isActive: !hub.isConnected)
             }
           }.cellTitle()
-          Spacer()
+          Spacer(minLength: 0)
           if hub.isConnected {
             VStack(alignment: .leading) {
               Text("\(statusBadges.services) services")
@@ -507,7 +507,7 @@ struct HomeView: View {
             Text("Connecting...").secondary().transition(.blurReplace)
           }
           if let merging, merging.id != hub.id && canMerge {
-            Spacer()
+            Spacer(minLength: 0)
             if merging.isMerged(to: hub) {
               AsyncButton("Leave") {
                 try await merging.unmerge(other: hub)
@@ -539,7 +539,7 @@ struct HomeView: View {
       VStack(alignment: .leading) {
         HStack {
           Text(url?.absoluteString ?? "Join Hub").cellTitle()
-          Spacer()
+          Spacer(minLength: 0)
           if let url, let providedName {
             Button {
               hubs.insert(with: Hub.Settings(name: providedName, address: url))
@@ -552,7 +552,7 @@ struct HomeView: View {
             }.transition(.blurReplace)
           }
         }
-        Spacer()
+        Spacer(minLength: 0)
         TextField("Address", text: $address).focused(focus, equals: .joinHubAddress)
           .textFieldStyle(.plain)
           .keyboard(style: .url)

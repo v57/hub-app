@@ -168,7 +168,7 @@ struct StoreView: View {
           Text(item.name)
           Text(item.shortDescription).secondary()
         }
-        Spacer()
+        Spacer(minLength: 0)
         if let buttonTitle {
           AsyncButton(buttonTitle) {
             try await action()

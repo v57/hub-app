@@ -115,7 +115,7 @@ struct LockdownView: View {
             }.secondary()
           }
         }.lineLimit(1)
-        Spacer()
+        Spacer(minLength: 0)
         if let key = user.key {
           AsyncButton {
             if isTrusted {

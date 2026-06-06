@@ -44,7 +44,7 @@ struct FarmView: View {
             Text("Lower brightness")
             Text("Lowers brightness to minimum level until stops. Helps to save battery").secondary()
           }
-          Spacer()
+          Spacer(minLength: 0)
           Toggle("Lower brightness", isOn: $farm.lowerBrightness)
             .labelsHidden()
         }
@@ -53,7 +53,7 @@ struct FarmView: View {
             Text("Black overlay")
             Text("Adds black screen, increasing battery life on OLED and XDR displays").secondary()
           }
-          Spacer()
+          Spacer(minLength: 0)
           Toggle("Black overlay", isOn: $blackOverlay)
             .labelsHidden()
         }
@@ -63,7 +63,7 @@ struct FarmView: View {
             Text("Show Activity")
             Text("Will display requests when they happen").secondary()
           }
-          Spacer()
+          Spacer(minLength: 0)
           Toggle("Show Activity", isOn: $statistics)
             .labelsHidden()
         }

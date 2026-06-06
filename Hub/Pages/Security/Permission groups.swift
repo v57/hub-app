@@ -107,7 +107,7 @@ struct PermissionGroups: View {
                 }
               }
             }
-            Spacer()
+            Spacer(minLength: 0)
             AsyncButton(isEditing ? "Save" : "Edit") {
               if isEditing {
                 try await hub.client.send("hub/group/update", UpdateGroup(group: group.name, set: Array(group.permissions)))

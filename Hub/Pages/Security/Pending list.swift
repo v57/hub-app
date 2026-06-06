@@ -27,7 +27,7 @@ struct PendingListView: View {
             Text(item.name)
             Text(item.id).code()
           }.lineLimit(2)
-          Spacer()
+          Spacer(minLength: 0)
           if hub.host.canManage {
             AsyncButton("Allow") {
               try await hub.host.allow(key: item.id, paths: item.pending)

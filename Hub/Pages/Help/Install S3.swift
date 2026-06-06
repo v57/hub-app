@@ -89,7 +89,7 @@ struct InstallS3: View {
     }
     var body: some View {
       if step > 0 {
-        Spacer()
+        Spacer(minLength: 0)
       }
       switch step {
       case 0:
@@ -151,7 +151,7 @@ struct InstallS3: View {
         }
       }
       if step > 0 {
-        Spacer()
+        Spacer(minLength: 0)
       }
       HStack {
         if step > 0 {
