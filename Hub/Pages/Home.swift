@@ -405,7 +405,7 @@ struct HomeView: View {
             .symbolVariant(.circle.fill)
             .foregroundStyle(.primary, .clear)
             .font(.system(size: 34, weight: .medium))
-            .glassStyle(in: .circle)
+            .hoverEffect(in: .circle)
         }
       }
     }
