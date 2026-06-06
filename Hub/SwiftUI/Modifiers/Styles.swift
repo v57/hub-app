@@ -12,7 +12,7 @@ extension View {
   func badgeStyle() -> some View {
     note().foregroundStyle(.red)
       .padding(.horizontal, 6).padding(.vertical, 2)
-      .background(.red, in: .capsule)
+      .background(.red.opacity(0.2), in: .capsule)
   }
   func glassStyle<S: InsettableShape>(in shape: S) -> some View {
     self.background {
