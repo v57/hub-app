@@ -476,39 +476,7 @@ struct HomeView: View {
     }
     var body: some View {
       let canMerge = hub.require(permissions: "hub/merge/add")
-      VStack(alignment: .leading) {
-        HStack(spacing: 4) {
-          Text(hub.settings.name)
-          Spacer()
-          if #available(macOS 15.0, iOS 18.0, *) {
-            Image(systemName: "wifi", variableValue: hub.isConnected ? 1 : 0)
-              .symbolEffect(.variableColor.iterative.dimInactiveLayers.reversing, options: .repeat(3), isActive: !hub.isConnected)
-          }
-        }.cellTitle()
-        Spacer()
-        if hub.isConnected {
-          VStack(alignment: .leading) {
-            Text("\(statusBadges.services) services")
-            if let security = statusBadges.security, security > 0 {
-              Text("\(security) service requests").foregroundStyle(.green)
-            }
-          }.secondary().transition(.blurReplace)
-        } else {
-          Text("Connecting...").secondary().transition(.blurReplace)
-        }
-        if let merging, merging.id != hub.id && canMerge {
-          Spacer()
-          if merging.isMerged(to: hub) {
-            AsyncButton("Leave") {
-              try await merging.unmerge(other: hub)
-            }
-          } else if canBeMerged {
-            AsyncButton("Join") {
-              try await merging.merge(other: hub)
-            }
-          }
-        }
-      }.animation(.smooth, value: hub.isConnected).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).blockBackground().contextMenu {
+      Menu {
         if canMerge && merging == nil {
           Button("Merge") {
             merging = hub
@@ -517,7 +485,41 @@ struct HomeView: View {
         Button("Remove") {
           Hubs.main.remove(with: hub.settings)
         }
-      }
+      } label: {
+        VStack(alignment: .leading) {
+          HStack(spacing: 4) {
+            Text(hub.settings.name)
+            Spacer()
+            if #available(macOS 15.0, iOS 18.0, *) {
+              Image(systemName: "wifi", variableValue: hub.isConnected ? 1 : 0)
+                .symbolEffect(.variableColor.iterative.dimInactiveLayers.reversing, options: .repeat(3), isActive: !hub.isConnected)
+            }
+          }.cellTitle()
+          Spacer()
+          if hub.isConnected {
+            VStack(alignment: .leading) {
+              Text("\(statusBadges.services) services")
+              if let security = statusBadges.security, security > 0 {
+                Text("\(security) service requests").foregroundStyle(.green)
+              }
+            }.secondary().transition(.blurReplace)
+          } else {
+            Text("Connecting...").secondary().transition(.blurReplace)
+          }
+          if let merging, merging.id != hub.id && canMerge {
+            Spacer()
+            if merging.isMerged(to: hub) {
+              AsyncButton("Leave") {
+                try await merging.unmerge(other: hub)
+              }
+            } else if canBeMerged {
+              AsyncButton("Join") {
+                try await merging.merge(other: hub)
+              }
+            }
+          }
+        }.animation(.smooth, value: hub.isConnected).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading).blockBackground()
+      }.buttonStyle(.environment)
     }
   }
   struct JoinHubView: View {
