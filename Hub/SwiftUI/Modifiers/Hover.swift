@@ -28,12 +28,13 @@ struct HoverModifier<S: InsettableShape>: ViewModifier {
   @State private var dragging: Bool = false
   @State private var offset: CGPoint = .zero
   @State private var size: CGSize = CGSize(width: 1, height: 1)
+  @State private var innerActive = false
   private var rotation: Double { 8 }
   private var offsetMultiplier: Double { innerHover ? 2 : 8 }
   private var isActive: Bool { hovering || dragging }
   private var isDark: Bool { scheme == .dark }
   private var gradientOpacity: Double {
-    if innerHover {
+    if innerActive {
       return 0
     } else if isDark {
       return isPressed ? 0.3 : isActive ? 0.2 : 0
@@ -42,7 +43,7 @@ struct HoverModifier<S: InsettableShape>: ViewModifier {
     }
   }
   private var gradientEndOpacity: Double {
-    if innerHover {
+    if innerActive {
       return 0
     } else if isDark {
       return isActive ? 0.02 : 0
@@ -58,10 +59,10 @@ struct HoverModifier<S: InsettableShape>: ViewModifier {
     }
   }
   private var hoverZIndex: Double {
-    isLowResolution ? 0 : innerHover ? -2 : -8
+    isLowResolution ? 0 : innerHover ? -4 : -8
   }
   private var touchZIndex: Double {
-    innerHover ? -4 : -10
+    innerHover ? -5 : -10
   }
   private var zIndex: Double { isPressed ? touchZIndex : isActive ? hoverZIndex : 0 }
   private var verticalAngle: Angle { isLowResolution ? .degrees(0) : .degrees(-offset.y * rotation) }
@@ -82,7 +83,11 @@ struct HoverModifier<S: InsettableShape>: ViewModifier {
     ], center: UnitPoint(x: offset.x * 0.9 + 0.5, y: offset.y * 0.9 + 0.5), startRadius: 0, endRadius: isPressed ? 64 : isActive ? 32 : 200)
   }
   func body(content: Content) -> some View {
-    content.environment(\.innerHover, true).overlay {
+    content.environment(\.innerHover, true).onPreferenceChange(InnerPreference.self) { isActive in
+      withAnimation(.spring(response: 0.25, dampingFraction: 1)) {
+        self.innerActive = isActive
+      }
+    }.overlay {
       shape.fill(gradient)
         .strokeBorder(strokeGradient, lineWidth: 1)
         .allowsHitTesting(false)
@@ -97,7 +102,17 @@ struct HoverModifier<S: InsettableShape>: ViewModifier {
           size = view.size
         }
       }
-    }.modifier(HoverEvents(hovering: $hovering, dragging: $dragging, offset: $offset, size: size))
+    }.preference(key: InnerPreference.self, value: isActive)
+      .modifier(HoverEvents(hovering: $hovering, dragging: $dragging, offset: $offset, size: size))
+  }
+  private struct InnerPreference: PreferenceKey {
+    static var defaultValue: Bool { false }
+    static func reduce(value: inout Value, nextValue: () -> Value) {
+      guard !value else { return }
+      if nextValue() {
+        value = true
+      }
+    }
   }
   struct HoverEvents: ViewModifier {
     @Binding var hovering: Bool

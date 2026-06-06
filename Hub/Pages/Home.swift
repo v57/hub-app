@@ -629,8 +629,8 @@ struct HomeGrid<Content: View>: View {
 struct BlockStyle: ViewModifier {
   let cornerRadius: CGFloat
   func body(content: Content) -> some View {
-    Color.clear
-      .overlay { content.safeAreaPadding(8) }
+    content.safeAreaPadding(8)
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
       .hoverEffect()
       .padding(8)
       .modifier {
