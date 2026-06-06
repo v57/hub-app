@@ -278,61 +278,59 @@ struct HomeView: View {
         let showsStepper = showsInstances || instances > 1
         let canUpgrade = app.id == "Hub" || app.id == "Hub Lite"
         let status = status
-        HStack(alignment: .top) {
-          VStack(alignment: .leading) {
-            HStack {
-              VStack(alignment: .leading) {
-                let running = status?.processes?.count ?? 0
-                ForEach(status?.processes?.suffix(7) ?? []) { process in
-                  statusText(process: process)?.transition(.blurReplace)
-                }
-                if status?.manyRunning == true {
-                  totalStatus()?.foregroundStyle(.primary)
-                }
-                if running > 0, let date = status?.started {
-                  TimelineView(.everyMinute) { timeline in
-                    Text(date.shortRelative)
-                  }
-                }
-                if running == 0 {
-                  Text(app.active ? "Not running" : "Launch").transition(.blurReplace)
-                }
-              }.monospacedDigit()
-              Spacer(minLength: 0)
-              VStack(spacing: 10) {
-                AsyncButton(app.active ? "Stop" : "Start", systemImage: app.active ? "pause" : "play") {
-                  if app.active {
-                    try await hub.launcher.app(id: app.id).stop()
-                  } else {
-                    try await hub.launcher.app(id: app.id).start()
-                  }
-                }
-                if showsStepper && status?.started != nil {
-                  Button("Increase", systemImage: "chevron.up") {
-                    targetInstances += 1
-                  }.transition(.blurReplace)
-                  Button("Decrease", systemImage: "chevron.down") {
-                    targetInstances -= 1
-                  }.opacity(targetInstances > 1 ? 1 : 0)
-                    .task(id: targetInstances) { try? await updateInstances() }
-                    .transition(.blurReplace)
-                }
-              }.labelStyle(CircleLabelStyle())
-            }.secondary()
-            if canUpgrade {
-              AsyncButton {
-                try await hub.launcher.pro(KeyChain.main.publicKey())
-              } label: {
-                Text("Upgrade to Pro")
-                  .frame(maxWidth: .infinity)
-                  .padding(.horizontal, 12)
-                  .padding(.vertical, 6)
-                  .background(.background, in: .capsule)
-                  
+        VStack(alignment: .leading) {
+          HStack(spacing: 4) {
+            VStack(alignment: .leading) {
+              let running = status?.processes?.count ?? 0
+              ForEach(status?.processes?.suffix(7) ?? []) { process in
+                statusText(process: process)?.transition(.blurReplace)
               }
+              if status?.manyRunning == true {
+                totalStatus()?.foregroundStyle(.primary)
+              }
+              if running > 0, let date = status?.started {
+                TimelineView(.everyMinute) { timeline in
+                  Text(date.shortRelative)
+                }
+              }
+              if running == 0 {
+                Text(app.active ? "Not running" : "Launch").transition(.blurReplace)
+              }
+            }.monospacedDigit()
+            Spacer(minLength: 0)
+            VStack(spacing: 10) {
+              AsyncButton(app.active ? "Stop" : "Start", systemImage: app.active ? "pause" : "play") {
+                if app.active {
+                  try await hub.launcher.app(id: app.id).stop()
+                } else {
+                  try await hub.launcher.app(id: app.id).start()
+                }
+              }
+              if showsStepper && status?.started != nil {
+                Button("Increase", systemImage: "chevron.up") {
+                  targetInstances += 1
+                }.transition(.blurReplace)
+                Button("Decrease", systemImage: "chevron.down") {
+                  targetInstances -= 1
+                }.opacity(targetInstances > 1 ? 1 : 0)
+                  .task(id: targetInstances) { try? await updateInstances() }
+                  .transition(.blurReplace)
+              }
+            }.labelStyle(CircleLabelStyle())
+          }.secondary()
+          if canUpgrade {
+            AsyncButton {
+              try await hub.launcher.pro(KeyChain.main.publicKey())
+            } label: {
+              Text("Upgrade to Pro")
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(.background, in: .capsule)
+              
             }
           }
-        }.frame(maxWidth: .infinity, alignment: .leading).overlay(alignment: .topTrailing) {
+        }.overlay(alignment: .topTrailing) {
           if let installationStatus {
             Text(installationStatus).badgeStyle()
           }
