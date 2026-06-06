@@ -8,56 +8,54 @@
 import SwiftUI
 
 extension View {
+  func hoverEffect<S: InsettableShape>(in shape: S) -> some View {
+    modifier(HoverModifier(shape: shape))
+  }
   func hoverEffect() -> some View {
-    modifier(HoverModifier())
+    modifier(HoverModifier(shape: RoundedRectangle(cornerRadius: 16)))
   }
 }
 
-struct HoverModifier: ViewModifier {
+struct HoverModifier<S: InsettableShape>: ViewModifier {
   @Environment(\.colorScheme) private var scheme
   @Environment(\.isPressed) private var isPressed
   @Environment(\.displayScale) private var scale
-  @State var hovering: Bool = false
-  @State var dragging: Bool = false
-  @State var offset: CGPoint = .zero
-  @State var size: CGSize = CGSize(width: 1, height: 1)
-  var rotation: Double { 8 }
-  var offsetMultiplier: Double { 8 }
-  var isActive: Bool { hovering || dragging }
-  var isDark: Bool { scheme == .dark }
-  var gradientOpacity: Double {
+  
+  let shape: S
+  
+  @State private var hovering: Bool = false
+  @State private var dragging: Bool = false
+  @State private var offset: CGPoint = .zero
+  @State private var size: CGSize = CGSize(width: 1, height: 1)
+  private var rotation: Double { 8 }
+  private var offsetMultiplier: Double { 8 }
+  private var isActive: Bool { hovering || dragging }
+  private var isDark: Bool { scheme == .dark }
+  private var gradientOpacity: Double {
     if isDark {
       isPressed ? 0.3 : isActive ? 0.2 : 0
     } else {
       isPressed ? 0.5 : isActive ? 1 : 0
     }
   }
-  var gradientEndOpacity: Double {
+  private var gradientEndOpacity: Double {
     if isDark {
       isActive ? 0.02 : 0
     } else {
       isActive ? 0 : 0
     }
   }
-  var endRadius: Double {
+  private var endRadius: Double {
     if isDark {
       isPressed ? 200 : isActive ? 64 : 200
     } else {
       isPressed ? 200 : isActive ? 32 : 200
     }
   }
-  var zIndex: Double {
-    isPressed ? -10 : (dragging || hovering) && !isLowResolution ? -8 : 0
-  }
-  var verticalAngle: Angle {
-    isLowResolution ? .degrees(0) : .degrees(-offset.y * rotation)
-  }
-  var horizontalAngle: Angle {
-    isLowResolution ? .degrees(0) : .degrees(offset.x * rotation)
-  }
-  var isLowResolution: Bool {
-    scale < 1.5
-  }
+  private var zIndex: Double { isPressed ? -10 : (dragging || hovering) && !isLowResolution ? -8 : 0 }
+  private var verticalAngle: Angle { isLowResolution ? .degrees(0) : .degrees(-offset.y * rotation) }
+  private var horizontalAngle: Angle { isLowResolution ? .degrees(0) : .degrees(offset.x * rotation) }
+  private var isLowResolution: Bool { scale < 1.5 }
   
   
   var gradient: RadialGradient {
@@ -72,12 +70,8 @@ struct HoverModifier: ViewModifier {
       .primary.opacity(isActive ? 0 : 0)
     ], center: UnitPoint(x: offset.x * 0.9 + 0.5, y: offset.y * 0.9 + 0.5), startRadius: 0, endRadius: isPressed ? 64 : isActive ? 32 : 200)
   }
-  var shape: RoundedRectangle {
-    RoundedRectangle(cornerRadius: 16)
-  }
   func body(content: Content) -> some View {
-    content
-      .overlay {
+    content.overlay {
       shape.fill(gradient)
         .strokeBorder(strokeGradient, lineWidth: 1)
         .allowsHitTesting(false)
@@ -243,26 +237,26 @@ extension EnvironmentValues {
           .overlay {
             Image(systemName: "greetingcard.fill")
               .font(.system(size: 36))
-          }.modifier(HoverModifier())
+          }.hoverEffect()
       }
       RoundedRectangle(cornerRadius: 16).fill(.clear)
         .frame(width: 64, height: 64)
         .overlay {
           Image(systemName: "square.and.arrow.up.circle.fill")
             .font(.system(size: 48))
-        }.modifier(HoverModifier())
+        }.hoverEffect()
       RoundedRectangle(cornerRadius: 16).fill(.clear)
         .frame(width: 64, height: 64)
         .overlay {
           Image(systemName: "waveform.path.ecg.text.clipboard")
             .font(.system(size: 36))
-        }.modifier(HoverModifier())
+        }.hoverEffect()
       RoundedRectangle(cornerRadius: 16).fill(.clear)
         .frame(width: 64, height: 64)
         .overlay {
           Image(systemName: "trash.circle.fill")
             .font(.system(size: 48))
-        }.modifier(HoverModifier())
+        }.hoverEffect()
     }.buttonStyle(.environment)
     Color.clear.frame(height: 2000)
   }.buttonStyle(.plain)
