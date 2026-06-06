@@ -19,6 +19,7 @@ extension View {
 struct HoverModifier<S: InsettableShape>: ViewModifier {
   @Environment(\.colorScheme) private var scheme
   @Environment(\.isPressed) private var isPressed
+  @Environment(\.innerHover) private var innerHover
   @Environment(\.displayScale) private var scale
   
   let shape: S
@@ -28,21 +29,25 @@ struct HoverModifier<S: InsettableShape>: ViewModifier {
   @State private var offset: CGPoint = .zero
   @State private var size: CGSize = CGSize(width: 1, height: 1)
   private var rotation: Double { 8 }
-  private var offsetMultiplier: Double { 8 }
+  private var offsetMultiplier: Double { innerHover ? 2 : 8 }
   private var isActive: Bool { hovering || dragging }
   private var isDark: Bool { scheme == .dark }
   private var gradientOpacity: Double {
-    if isDark {
-      isPressed ? 0.3 : isActive ? 0.2 : 0
+    if innerHover {
+      return 0
+    } else if isDark {
+      return isPressed ? 0.3 : isActive ? 0.2 : 0
     } else {
-      isPressed ? 0.5 : isActive ? 1 : 0
+      return isPressed ? 0.5 : isActive ? 1 : 0
     }
   }
   private var gradientEndOpacity: Double {
-    if isDark {
-      isActive ? 0.02 : 0
+    if innerHover {
+      return 0
+    } else if isDark {
+      return isActive ? 0.02 : 0
     } else {
-      isActive ? 0 : 0
+      return isActive ? 0 : 0
     }
   }
   private var endRadius: Double {
@@ -52,7 +57,13 @@ struct HoverModifier<S: InsettableShape>: ViewModifier {
       isPressed ? 200 : isActive ? 32 : 200
     }
   }
-  private var zIndex: Double { isPressed ? -10 : (dragging || hovering) && !isLowResolution ? -8 : 0 }
+  private var hoverZIndex: Double {
+    isLowResolution ? 0 : innerHover ? -2 : -8
+  }
+  private var touchZIndex: Double {
+    innerHover ? -4 : -10
+  }
+  private var zIndex: Double { isPressed ? touchZIndex : isActive ? hoverZIndex : 0 }
   private var verticalAngle: Angle { isLowResolution ? .degrees(0) : .degrees(-offset.y * rotation) }
   private var horizontalAngle: Angle { isLowResolution ? .degrees(0) : .degrees(offset.x * rotation) }
   private var isLowResolution: Bool { scale < 1.5 }
@@ -71,7 +82,7 @@ struct HoverModifier<S: InsettableShape>: ViewModifier {
     ], center: UnitPoint(x: offset.x * 0.9 + 0.5, y: offset.y * 0.9 + 0.5), startRadius: 0, endRadius: isPressed ? 64 : isActive ? 32 : 200)
   }
   func body(content: Content) -> some View {
-    content.overlay {
+    content.environment(\.innerHover, true).overlay {
       shape.fill(gradient)
         .strokeBorder(strokeGradient, lineWidth: 1)
         .allowsHitTesting(false)
@@ -221,7 +232,14 @@ extension EnvironmentValues {
     get { self[IsPressed.self] }
     set { self[IsPressed.self] = newValue }
   }
+  var innerHover: Bool {
+    get { self[InnerHover.self] }
+    set { self[InnerHover.self] = newValue }
+  }
   private struct IsPressed: EnvironmentKey {
+    static var defaultValue: Bool { false }
+  }
+  private struct InnerHover: EnvironmentKey {
     static var defaultValue: Bool { false }
   }
 }
