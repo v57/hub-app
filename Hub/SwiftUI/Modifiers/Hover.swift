@@ -14,6 +14,9 @@ extension View {
   func hoverEffect() -> some View {
     modifier(HoverModifier(shape: RoundedRectangle(cornerRadius: 16)))
   }
+  func disableHoverScale() -> some View {
+    preference(key: DisableScalePreference.self, value: true)
+  }
 }
 
 struct HoverModifier<S: InsettableShape>: ViewModifier {
@@ -29,6 +32,7 @@ struct HoverModifier<S: InsettableShape>: ViewModifier {
   @State private var offset: CGPoint = .zero
   @State private var size: CGSize = CGSize(width: 1, height: 1)
   @State private var innerActive = false
+  @State private var hoverScale = true
   private var rotation: Double { 8 }
   private var offsetMultiplier: Double { innerHover ? 2 : 8 }
   private var isActive: Bool { hovering || dragging }
@@ -64,9 +68,19 @@ struct HoverModifier<S: InsettableShape>: ViewModifier {
   private var touchZIndex: Double {
     innerHover ? -5 : -10
   }
-  private var zIndex: Double { isPressed ? touchZIndex : isActive ? hoverZIndex : 0 }
-  private var verticalAngle: Angle { isLowResolution ? .degrees(0) : .degrees(-offset.y * rotation) }
-  private var horizontalAngle: Angle { isLowResolution ? .degrees(0) : .degrees(offset.x * rotation) }
+  private var zIndex: Double {
+    if isLowResolution || !hoverScale {
+      return 0
+    } else if isPressed {
+      return touchZIndex
+    } else if isActive {
+      return hoverZIndex
+    } else {
+      return 0
+    }
+  }
+  private var verticalAngle: Angle { isLowResolution || !hoverScale ? .degrees(0) : .degrees(-offset.y * rotation) }
+  private var horizontalAngle: Angle { isLowResolution || !hoverScale ? .degrees(0) : .degrees(offset.x * rotation) }
   private var isLowResolution: Bool { scale < 1.5 }
   
   
@@ -104,6 +118,7 @@ struct HoverModifier<S: InsettableShape>: ViewModifier {
       }
     }.preference(key: InnerPreference.self, value: isActive)
       .modifier(HoverEvents(hovering: $hovering, dragging: $dragging, offset: $offset, size: size))
+      .onPreferenceChange(DisableScalePreference.self) { hoverScale = !$0 }
   }
   private struct InnerPreference: PreferenceKey {
     static var defaultValue: Bool { false }
@@ -176,6 +191,15 @@ struct HoverModifier<S: InsettableShape>: ViewModifier {
       let x = position.x / size.width - 0.5
       let y = position.y / size.height - 0.5
       offset = CGPoint(x: max(min(x, 0.5), -0.5), y: max(min(y, 0.5), -0.5))
+    }
+  }
+}
+struct DisableScalePreference: PreferenceKey {
+  static var defaultValue: Bool { false }
+  static func reduce(value: inout Value, nextValue: () -> Value) {
+    guard !value else { return }
+    if nextValue() {
+      value = true
     }
   }
 }

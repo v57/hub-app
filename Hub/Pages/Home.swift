@@ -558,6 +558,7 @@ struct HomeView: View {
           .keyboard(style: .url)
           .padding(.horizontal, 8).padding(.vertical, 4)
           .background(.black.opacity(0.05), in: RoundedRectangle(cornerRadius: 8))
+          .disableHoverScale()
         if !address.isEmpty {
           TextField(url?.name ?? "Name", text: $name).focused(focus, equals: .joinHubAddress)
             .textFieldStyle(.plain)
