@@ -52,15 +52,17 @@ struct TranslateView: View {
         }
       }.disabled(isRefreshing)
     }.safeAreaInset(edge: .bottom) {
-      VStack(alignment: .leading) {
+      VStack(alignment: .center, spacing: 16) {
         HStack {
-          Picker("Source", selection: $task.source) {
+          Menu {
             ForEach(languages, id: \.self) { language in
-              Label(language.languageName, systemImage: icon(status: installed?.contains(language)))
-                .symbolVariant(.circle.fill)
-                .tag(language)
+              Button(language.languageName, systemImage: icon(status: installed?.contains(language))) {
+                task.source = language
+              }
             }
-          }.frame(maxWidth: .infinity)
+          } label: {
+            Label(task.source.languageName, systemImage: icon(status: installed?.contains(task.source))).frame(maxWidth: 400)
+          }.symbolVariant(.circle.fill)
           Button("Switch", systemImage: "arrow.left.arrow.right") {
             let source = task.source
             withAnimation {
@@ -68,14 +70,17 @@ struct TranslateView: View {
               task.target = source
               task.text = result
             }
-          }.labelStyle(.iconOnly).buttonStyle(ActionButtonStyle())
-          Picker("Target", selection: $task.target) {
+          }.labelStyle(.iconOnly)
+          Menu {
             ForEach(languages, id: \.self) { language in
-              Label(language.languageName, systemImage: icon(status: installed?.contains(language)))
-                .symbolVariant(.circle.fill).tag(language)
+              Button(language.languageName, systemImage: icon(status: installed?.contains(language))) {
+                task.target = language
+              }
             }
-          }.frame(maxWidth: .infinity)
-        }.frame(maxWidth: 400)
+          } label: {
+            Label(task.target.languageName, systemImage: icon(status: installed?.contains(task.target))).frame(maxWidth: 400)
+          }.symbolVariant(.circle.fill)
+        }.buttonStyle(ActionButtonStyle()).lineLimit(1)
 #if os(visionOS)
         TextField("Text to translate", text: $task.text, axis: .vertical)
           .padding(.horizontal).padding(.vertical, 6)
