@@ -26,6 +26,8 @@ extension View {
 }
 
 struct ActionButtonStyle: ButtonStyle {
+  @Environment(\.isFocused) private var isFocused: Bool
+  var focus: Double { isFocused ? 0.2 : 0.0 }
   func makeBody(configuration: Configuration) -> some View {
     let up = configuration.isPressed
     configuration.label.body()
@@ -33,9 +35,10 @@ struct ActionButtonStyle: ButtonStyle {
       .padding(.horizontal, 12).padding(.vertical, 4)
       .frame(minWidth: 60)
       .background(.black.opacity(0.001))
-      .background(.red.opacity(0.1), in: .capsule)
-      .scaleEffect(up ? 1.1 : 1.0)
+      .background(.red.opacity(0.1 + focus), in: .capsule)
+      .scaleEffect((up ? 1.1 : 1.0) + focus)
       .animation(.spring(response: up ? 0.1 : 0.5, dampingFraction: up ? 1.0 : 0.5), value: up)
+      .animation(.spring, value: isFocused)
       .contentTransition(.numericText())
   }
 }
