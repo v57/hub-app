@@ -7,6 +7,8 @@
 		<string>analysis</string>
 	</array>
 	<key>keychain-access-groups</key>
-	<array/>
+	<array>
+		<string>$(AppIdentifierPrefix)dev.v57.Hub</string>
+	</array>
 </dict>
 </plist>

@@ -11,7 +11,7 @@ import Combine
 import SwiftUI
 
 extension KeyChain {
-  static let main = KeyChain(keyChain: "dev.v57.hub")
+  static let main = KeyChain(keyChain: "dev.v57.Hub")
 }
 
 @MainActor
