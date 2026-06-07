@@ -22,6 +22,18 @@ struct PendingListView: View {
           """) { }
       }
       ForEach(hostPending.list) { item in
+#if os(tvOS)
+        AsyncButton {
+          try await hub.host.allow(key: item.id, paths: item.pending)
+        } label: {
+          HStack {
+            Text(item.name)
+            Text(item.id).code()
+            Spacer(minLength: 0)
+            Text("Allow")
+          }
+        }.disabled(!hub.host.canManage)
+#else
         HStack {
           VStack(alignment: .leading) {
             Text(item.name)
@@ -34,6 +46,7 @@ struct PendingListView: View {
             }
           }
         }
+#endif
       }
     }
   }
