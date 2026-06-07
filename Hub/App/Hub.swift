@@ -103,6 +103,10 @@ class Hubs {
     return list.first(where: { $0.id == selected })
   }
   init() {
+    if ProcessInfo.screenshotType != nil {
+      list.append(.test)
+      return
+    }
     guard let data = UserDefaults.standard.data(forKey: "hubs") else { return }
     do {
       list = []
