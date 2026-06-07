@@ -125,7 +125,7 @@ struct LockdownView: View {
             }
           } label: {
             Text(isTrusted ? "Trusted" : "Trust")
-              .foregroundStyle(isTrusted ? .secondary : .primary)
+              .foregroundStyle(isTrusted ? Color.secondary : Color.white)
               .padding(.horizontal, 12)
               .padding(.vertical, 4)
               .background(isTrusted ? Color.tertiaryBackground : Color.blue, in: .capsule)
