@@ -11,6 +11,13 @@ extension View {
   func keyboard(style: KeyboardStyle) -> some View {
     modifier(style)
   }
+  func scrollDismissesKeyboardImmediately() -> some View {
+#if !os(visionOS)
+    scrollDismissesKeyboard(.immediately)
+#else
+    self
+#endif
+  }
 }
 enum KeyboardStyle: ViewModifier {
   case url, code

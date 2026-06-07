@@ -41,7 +41,7 @@ struct HomeView: View {
           .animation(.home, value: hubs.list.count)
       }.environment(\.homeGridSpacing, HomeGridLayout.spacing(width: view.size.width - 16))
     }.buttonStyle(.plain).navigationTitle("Home")
-      .scrollDismissesKeyboard(.immediately)
+      .scrollDismissesKeyboardImmediately()
       .scrollBounceBehavior(.basedOnSize)
       .toolbarTitleDisplayMode(.inline)
       .contentTransition(.numericText())
@@ -55,16 +55,16 @@ struct HomeView: View {
     @Namespace var namespace
     var body: some View {
       HomeGrid {
-        #if os(tvOS)
+#if os(tvOS)
         NavigationLink {
           ConnectView()
         } label: {
           Label("Join", systemImage: "plus")
         }.buttonStyle(.environment).labelStyle(AppIconLabelStyle())
-        #else
+#else
         JoinHubView(address: $address.animation(), focus: $focus)
           .gridSize(address.isEmpty ? .x21 : .x42)
-        #endif
+#endif
         NavigationLink {
           InstallationGuide().transitionTarget(id: "guide", namespace: namespace)
         } label: {
@@ -84,6 +84,7 @@ struct HomeView: View {
         Button(copied ? "Copied" : "My Key", systemImage: copied ? "checkmark.circle.fill" : "key") {
           copy()
         }.labelStyle(.appIcon).buttonStyle(.environment)
+#if !os(visionOS)
         NavigationLink {
           FarmView()
             .transitionTarget(id: "farm", namespace: namespace)
@@ -91,6 +92,7 @@ struct HomeView: View {
           Label("Farm", systemImage: "tree")
         }.labelStyle(.appIcon).iconBadge(Farm.main.isRunning ? "Farming" : nil)
           .buttonStyle(.environment)
+#endif
 #endif
       }
     }
@@ -632,9 +634,9 @@ struct HomeGrid<Content: View>: View {
 struct BlockStyle: ViewModifier {
   let cornerRadius: CGFloat
   func body(content: Content) -> some View {
-    content.safeAreaPadding(8)
-      .frame(maxWidth: .infinity, maxHeight: .infinity)
-      .hoverEffect()
+    Color.clear.overlay {
+      content.safeAreaPadding(8)
+    }.hoverEffect()
       .padding(8)
       .modifier {
         #if os(macOS)

@@ -10,9 +10,9 @@ import HubUI
 
 extension View {
   func badgeStyle() -> some View {
-    note().foregroundStyle(.red)
+    note().foregroundStyle(.hubTint)
       .padding(.horizontal, 6).padding(.vertical, 2)
-      .background(.red.opacity(0.2), in: .capsule)
+      .background(.hubTint.opacity(0.2), in: .capsule)
   }
   func glassStyle<S: InsettableShape>(in shape: S) -> some View {
     self.background {
@@ -31,11 +31,11 @@ struct ActionButtonStyle: ButtonStyle {
   func makeBody(configuration: Configuration) -> some View {
     let up = configuration.isPressed
     configuration.label.body()
-      .foregroundStyle(.red)
+      .foregroundStyle(Color.hubTint)
       .padding(.horizontal, 12).padding(.vertical, 4)
       .frame(minWidth: 60)
       .background(.black.opacity(0.001))
-      .background(.red.opacity(0.1 + focus), in: .capsule)
+      .background(Color.hubTint.opacity(0.1 + focus), in: .capsule)
       .scaleEffect((up ? 1.1 : 1.0) + focus)
       .animation(.spring(response: up ? 0.1 : 0.5, dampingFraction: up ? 1.0 : 0.5), value: up)
       .animation(.spring, value: isFocused)
@@ -109,11 +109,17 @@ struct SecondaryBackground: ShapeStyle {
     if isDark {
 #if os(macOS)
       return Color(red: 0.109, green: 0.111, blue: 0.144)
+#elseif os(visionOS)
+      return Color.white.opacity(0.2)
 #else
       return Color(red: 0.082, green: 0.082, blue: 0.082)
 #endif
     } else {
+#if os(visionOS)
+      return Color.black.opacity(0.2)
+#else
       return Color(red: 0.98, green: 0.98, blue: 0.98)
+#endif
     }
   }
 }
@@ -139,7 +145,11 @@ struct BorderStyle: ShapeStyle {
   }
   func primaryColor(dark: Bool) -> Color {
     if dark {
+#if os(visionOS)
+      Color.white.opacity(0.5)
+#else
       Color(red: 0.271, green: 0.279, blue: 0.369)
+#endif
     } else {
       Color.white
     }

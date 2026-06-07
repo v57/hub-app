@@ -67,7 +67,7 @@ struct UserConnections: View {
           HStack(spacing: 4) {
             Group {
               if let group = user.group {
-                Text(group).foregroundStyle(.red)
+                Text(group).foregroundStyle(.hubTint)
                 separator
               }
               if let key = user.key {

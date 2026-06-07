@@ -145,6 +145,10 @@ struct HoverModifier<S: InsettableShape>: ViewModifier {
           hover(phase: $0, size: size)
         }
       }
+#elseif os(visionOS)
+      content.hoverEffect { view, isActive, size in
+        view.scaleEffect(isActive ? visionScale() : 1)
+      }
 #else
       content.onContinuousHover {
         hover(phase: $0, size: size)
@@ -173,6 +177,10 @@ struct HoverModifier<S: InsettableShape>: ViewModifier {
       }
     }
 #endif
+    func visionScale() -> CGFloat {
+      let value = max(size.width, size.height)
+      return (value + 8) / value
+    }
     func hover(phase: HoverPhase, size: CGSize) {
       switch phase {
       case .active(let point):

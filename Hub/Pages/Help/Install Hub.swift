@@ -106,7 +106,7 @@ struct InstallationGuide: View {
       HStack(spacing: 4) {
         Image(systemName: copied ? "checkmark.circle.fill" : systemImage)
         Text(copied ? "Copied to clipboard" : title)
-      }.app().foregroundStyle(.red.opacity(0.7))
+      }.app().foregroundStyle(.hubTint.opacity(0.7))
     }
     func copy() async throws {
       code.copyToClipboard()

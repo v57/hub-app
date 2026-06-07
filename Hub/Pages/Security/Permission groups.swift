@@ -34,7 +34,7 @@ struct PermissionGroups: View {
         if showsPlaceholder {
           Placeholder(image: "shield", title: "Permission Groups", description: "Secure your Hub") {
             Label("Add Owners", systemImage: "key")
-              .foregroundStyle(.red.gradient, .primary)
+              .foregroundStyle(.hubTint.gradient, .primary)
             Label("Create Groups", systemImage: "plus")
               .foregroundStyle(.blue, .primary)
           }
