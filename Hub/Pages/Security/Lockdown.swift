@@ -125,13 +125,22 @@ struct LockdownView: View {
             }
           } label: {
             Text(isTrusted ? "Trusted" : "Trust")
-              .foregroundStyle(isTrusted ? Color.secondary : Color.white)
-              .padding(.horizontal, 12)
-              .padding(.vertical, 4)
-              .background(isTrusted ? Color.tertiaryBackground : Color.blue, in: .capsule)
-          }.buttonStyle(.plain)
+          }.buttonStyle(ActionButtonStyle(enabled: isTrusted))
         }
       }
+    }
+  }
+  struct ActionButtonStyle: ButtonStyle {
+    @Environment(\.isFocused) private var isFocused
+    let enabled: Bool
+    func makeBody(configuration: Configuration) -> some View {
+      configuration.label
+        .foregroundStyle(enabled ? Color.secondary : Color.white)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 4)
+        .background(enabled ? Color.tertiaryBackground : Color.blue, in: .capsule)
+        .scaleEffect(configuration.isPressed ? 1.2 : isFocused ? 1.1 : 1.0)
+        .animation(.bouncy, value: isFocused).animation(.smooth(duration: 0.25), value: configuration.isPressed)
     }
   }
 }
