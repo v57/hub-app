@@ -16,7 +16,7 @@ extension KeyChain {
 
 @MainActor
 @Observable class Hub: @preconcurrency Identifiable {
-  static let test = Hub(settings: Settings(name: "Local", address: URL(string: "ws://localhost:1997")!))
+  static let test = Hub(settings: Settings(name: "My Hub", address: URL(string: "ws://localhost:1997")!))
   var id: Settings.ID { settings.id }
   var settings: Settings
   let key: String
