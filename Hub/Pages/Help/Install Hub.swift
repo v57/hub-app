@@ -84,6 +84,12 @@ struct InstallationGuide: View {
     }
     var body: some View {
       HStack {
+        #if os(tvOS)
+        VStack(alignment: .leading, spacing: 4) {
+          header
+          Text(code).code().textSelection()
+        }.padding(8).background(.background, in: RoundedRectangle(cornerRadius: 10))
+        #else
         AsyncButton {
           try await copy()
         } label: {
@@ -92,6 +98,7 @@ struct InstallationGuide: View {
             Text(code).code().textSelection()
           }.padding(8).background(.background, in: RoundedRectangle(cornerRadius: 10))
         }.buttonStyle(.plain)
+        #endif
       }.shadow(color: .black.opacity(0.2), radius: 10)
         .multilineTextAlignment(.leading)
     }
