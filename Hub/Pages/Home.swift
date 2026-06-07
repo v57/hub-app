@@ -80,10 +80,10 @@ struct HomeView: View {
           HubView(merging: $merging).hub(hub)
             .gridSize(.x21)
         }
+#if !os(tvOS)
         Button(copied ? "Copied" : "My Key", systemImage: copied ? "checkmark.circle.fill" : "key") {
           copy()
         }.labelStyle(.appIcon).buttonStyle(.environment)
-#if !os(tvOS)
         NavigationLink {
           FarmView()
             .transitionTarget(id: "farm", namespace: namespace)
