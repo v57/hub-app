@@ -56,7 +56,7 @@ private struct AppIcon<Title: View, Icon: View>: View {
         if let badge {
           badge.foregroundStyle(.white).app().padding(.horizontal, 6)
             .padding(.vertical, 2)
-            .background(.tint, in: .capsule)
+            .background(.blue, in: .capsule)
             .frame(maxWidth: .infinity, alignment: .trailing)
             .padding(.horizontal, -2)
             .offset(y: -2)
