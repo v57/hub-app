@@ -337,7 +337,7 @@ struct HomeView: View {
             Text(installationStatus).badgeStyle()
           }
         }.blockBackground().bottomLabel {
-          Label(app.id, systemImage: "terminal")
+          Text(app.id)
         }.contextMenu {
           if app.active {
             if app.instances == 1 {
