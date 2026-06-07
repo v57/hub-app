@@ -12,27 +12,31 @@ final class ScreenshotTests: XCTestCase {
     continueAfterFailure = false
   }
   
-  func test(page: ScreenshotPage) {
+  func test(page: ScreenshotPage, directory: URL) {
     let app = XCUIApplication()
     app.launchEnvironment = ["screenshot": "\(page)"]
     app.launch()
     defer { app.terminate() }
     Thread.sleep(forTimeInterval: 2)
     let index = (ScreenshotPage.allCases.firstIndex(where: { $0.rawValue == page.rawValue }) ?? 0) + 1
-    let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-    attachment.name = "\(index)-\(page.rawValue).png"
-    attachment.lifetime = .keepAlways
-    add(attachment)
+    try? FileManager.default.removeItem(at: directory.appendingPathComponent("\(index).png"))
+    try! XCUIScreen.main.screenshot().pngRepresentation.write(to: directory.appendingPathComponent("\(index).png"))
   }
 
   @MainActor
   func test() throws {
+    let env = ProcessInfo.processInfo.environment
+    let name = env["SIMULATOR_DEVICE_NAME"]!
+      .replacingOccurrences(of: "Clone 1 of ", with: "")
+    let home = env["SIMULATOR_HOST_HOME"]!
+    let directory = URL(fileURLWithPath: "\(home)/Screenshots/\(name)")
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     for page in ScreenshotPage.allCases {
-      test(page: page)
+      test(page: page, directory: directory)
     }
   }
 }
 
 enum ScreenshotPage: String, CaseIterable {
-  case home, image, video, translate, chat, pending, connections, lockdown
+  case home, connections, pending, lockdown, translate, chat, image, video
 }
