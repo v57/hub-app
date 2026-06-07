@@ -36,6 +36,8 @@ struct ScreenshotsModeView: View {
             PendingListView()
           case .connections:
             UserConnections()
+          case .lockdown:
+            LockdownView()
           }
         }
       }.test()
@@ -52,5 +54,5 @@ extension ProcessInfo {
   }()
 }
 enum ScreenshotPage: String, CaseIterable {
-  case home, image, video, translate, chat, pending, connections
+  case home, image, video, translate, chat, pending, connections, lockdown
 }

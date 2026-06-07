@@ -34,5 +34,5 @@ final class ScreenshotTests: XCTestCase {
 }
 
 enum ScreenshotPage: String, CaseIterable {
-  case home, image, video, translate, chat, pending, connections
+  case home, image, video, translate, chat, pending, connections, lockdown
 }
