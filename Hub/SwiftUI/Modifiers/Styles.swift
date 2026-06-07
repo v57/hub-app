@@ -111,12 +111,16 @@ struct SecondaryBackground: ShapeStyle {
       return Color(red: 0.109, green: 0.111, blue: 0.144)
 #elseif os(visionOS)
       return Color.white.opacity(0.2)
+#elseif os(tvOS)
+      return Color.black.opacity(0.1)
 #else
       return Color(red: 0.082, green: 0.082, blue: 0.082)
 #endif
     } else {
 #if os(visionOS)
       return Color.black.opacity(0.2)
+#elseif os(tvOS)
+      return Color.white.opacity(0.1)
 #else
       return Color(red: 0.98, green: 0.98, blue: 0.98)
 #endif
@@ -147,6 +151,8 @@ struct BorderStyle: ShapeStyle {
     if dark {
 #if os(visionOS)
       Color.white.opacity(0.5)
+#elseif os(tvOS)
+      Color.white.opacity(0.2)
 #else
       Color(red: 0.271, green: 0.279, blue: 0.369)
 #endif
