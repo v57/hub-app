@@ -22,6 +22,9 @@ struct ConnectView: View {
   var providedName: String? { name.isEmpty ? url?.name : name }
   var body: some View {
     VStack(alignment: .leading) {
+      if let url {
+        Text(url.absoluteString)
+      }
       TextField("Address", text: $address).keyboard(style: .url)
       if !address.isEmpty {
         TextField(url?.name ?? "Name", text: $name).transition(.blurReplace)
