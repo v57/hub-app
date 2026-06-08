@@ -217,7 +217,7 @@ struct LauncherView: View {
 #endif
           }
         }
-        if app.id == "Hub Lite" {
+        if app.id == "Hub Lite" || app.id == "Hub" {
           AsyncButton("Upgrade to Pro") {
             try await hub.launcher.pro(KeyChain.main.publicKey())
           }.buttonStyle(.borderedProminent)

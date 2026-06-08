@@ -323,16 +323,7 @@ struct HomeView: View {
             }.labelStyle(CircleLabelStyle())
           }.secondary()
           if canUpgrade {
-            AsyncButton {
-              try await hub.launcher.pro(KeyChain.main.publicKey())
-            } label: {
-              Text("Upgrade to Pro")
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(.background, in: .capsule)
-              
-            }
+            UpgradeToPro()
           }
         }.overlay(alignment: .topTrailing) {
           if let installationStatus {
@@ -410,6 +401,26 @@ struct HomeView: View {
             .foregroundStyle(.primary, .clear)
             .font(.system(size: 34, weight: .medium))
             .hoverEffect(in: .circle)
+        }
+      }
+      struct UpgradeToPro: View {
+        @Environment(Hub.self) var hub
+        @HubState(\.hostPending) private var pending
+        @State private var status: Status = .upgrade
+        enum Status { case upgrade, upgrading }
+        var body: some View {
+          AsyncButton {
+            withAnimation {
+              status = .upgrading
+            }
+            try await hub.launcher.pro(KeyChain.main.publicKey())
+          } label: {
+            Text(status == .upgrade ? "Upgrade to Pro" : "Upgrading").frame(maxWidth: .infinity).padding(.vertical, 4)
+              .hoverEffect(in: .capsule)
+          }.contentTransition(.numericText()).buttonStyle(.environment)
+        }
+        var item: PendingList.Item? {
+          pending.list.last(where: { $0.pending.first?.starts(with: "launcher") ?? false } )
         }
       }
     }
