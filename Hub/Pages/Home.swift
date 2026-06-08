@@ -277,6 +277,7 @@ struct HomeView: View {
       @State private var targetInstances: Int = 0
       @State private var showsInstances = false
       @State private var editing: Hub.Launcher.AppInfo?
+      var isHub: Bool { app.id == "Hub" || app.id == "Hub Pro" || app.id == "Hub Lite" }
       var instances: Int { app.instances }
       var body: some View {
         let showsStepper = showsInstances || instances > 1
@@ -302,25 +303,27 @@ struct HomeView: View {
               }
             }.monospacedDigit()
             Spacer(minLength: 0)
-            VStack(spacing: 10) {
-              AsyncButton(app.active ? "Stop" : "Start", systemImage: app.active ? "pause" : "play") {
-                if app.active {
-                  try await hub.launcher.app(id: app.id).stop()
-                } else {
-                  try await hub.launcher.app(id: app.id).start()
+            if !isHub {
+              VStack(spacing: 10) {
+                AsyncButton(app.active ? "Stop" : "Start", systemImage: app.active ? "pause" : "play") {
+                  if app.active {
+                    try await hub.launcher.app(id: app.id).stop()
+                  } else {
+                    try await hub.launcher.app(id: app.id).start()
+                  }
                 }
-              }
-              if showsStepper && status?.started != nil {
-                Button("Increase", systemImage: "chevron.up") {
-                  targetInstances += 1
-                }.transition(.blurReplace)
-                Button("Decrease", systemImage: "chevron.down") {
-                  targetInstances -= 1
-                }.opacity(targetInstances > 1 ? 1 : 0)
-                  .task(id: targetInstances) { try? await updateInstances() }
-                  .transition(.blurReplace)
-              }
-            }.labelStyle(CircleLabelStyle())
+                if showsStepper && status?.started != nil {
+                  Button("Increase", systemImage: "chevron.up") {
+                    targetInstances += 1
+                  }.transition(.blurReplace)
+                  Button("Decrease", systemImage: "chevron.down") {
+                    targetInstances -= 1
+                  }.opacity(targetInstances > 1 ? 1 : 0)
+                    .task(id: targetInstances) { try? await updateInstances() }
+                    .transition(.blurReplace)
+                }
+              }.labelStyle(CircleLabelStyle())
+            }
           }.secondary()
           if canUpgrade {
             UpgradeToPro()
@@ -333,7 +336,7 @@ struct HomeView: View {
           Text(app.id)
         }.contextMenu {
           if app.active {
-            if app.instances == 1 {
+            if app.instances == 1 && !isHub {
               Button("Cluster", systemImage: "list.number") {
                 withAnimation {
                   showsInstances.toggle()
