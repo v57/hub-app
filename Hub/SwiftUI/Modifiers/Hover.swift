@@ -39,7 +39,7 @@ struct HoverModifier<S: InsettableShape>: ViewModifier {
   private var isDark: Bool { scheme == .dark }
   private var gradientOpacity: Double {
     if innerActive {
-      return 0
+      return 0.05
     } else if isDark {
       return isPressed ? 0.3 : isActive ? 0.2 : 0
     } else {
@@ -48,7 +48,7 @@ struct HoverModifier<S: InsettableShape>: ViewModifier {
   }
   private var gradientEndOpacity: Double {
     if innerActive {
-      return 0
+      return 0.01
     } else if isDark {
       return isActive ? 0.02 : 0
     } else {
@@ -56,10 +56,14 @@ struct HoverModifier<S: InsettableShape>: ViewModifier {
     }
   }
   private var endRadius: Double {
-    if isDark {
-      isPressed ? 200 : isActive ? 64 : 200
+    if innerActive {
+      return 32
+    } else if isPressed || !isActive {
+      return 200
+    } else if isDark {
+      return 64
     } else {
-      isPressed ? 200 : isActive ? 32 : 200
+      return 32
     }
   }
   private var hoverZIndex: Double {
@@ -97,7 +101,7 @@ struct HoverModifier<S: InsettableShape>: ViewModifier {
     ], center: UnitPoint(x: offset.x * 0.9 + 0.5, y: offset.y * 0.9 + 0.5), startRadius: 0, endRadius: isPressed ? 64 : isActive ? 32 : 200)
   }
   func body(content: Content) -> some View {
-    content.environment(\.innerHover, true).onPreferenceChange(InnerPreference.self) { isActive in
+    content.environment(\.innerHover, true).onPreferenceChange(HoverInnerPreference.self) { isActive in
       withAnimation(.spring(response: 0.25, dampingFraction: 1)) {
         self.innerActive = isActive
       }
@@ -116,18 +120,9 @@ struct HoverModifier<S: InsettableShape>: ViewModifier {
           size = view.size
         }
       }
-    }.preference(key: InnerPreference.self, value: isActive)
+    }.preference(key: HoverInnerPreference.self, value: isActive)
       .modifier(HoverEvents(hovering: $hovering, dragging: $dragging, offset: $offset, size: size))
       .onPreferenceChange(DisableScalePreference.self) { hoverScale = !$0 }
-  }
-  private struct InnerPreference: PreferenceKey {
-    static var defaultValue: Bool { false }
-    static func reduce(value: inout Value, nextValue: () -> Value) {
-      guard !value else { return }
-      if nextValue() {
-        value = true
-      }
-    }
   }
   struct HoverEvents: ViewModifier {
     @Binding var hovering: Bool
@@ -200,6 +195,12 @@ struct HoverModifier<S: InsettableShape>: ViewModifier {
       let y = position.y / size.height - 0.5
       offset = CGPoint(x: max(min(x, 0.5), -0.5), y: max(min(y, 0.5), -0.5))
     }
+  }
+}
+struct HoverInnerPreference: PreferenceKey {
+  static var defaultValue: Bool { false }
+  static func reduce(value: inout Value, nextValue: () -> Value) {
+    value = value || nextValue()
   }
 }
 struct DisableScalePreference: PreferenceKey {
