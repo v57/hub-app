@@ -8,6 +8,7 @@
 import Foundation
 import Combine
 import SwiftUI
+import Observation
 import HubService
 
 @MainActor
@@ -37,18 +38,88 @@ struct HubStateStorage {
         return subscription
       } else {
         let path = path
-        let subscription = Task { [weak self] in
+        let subscription = withObservationActive { hub.api.contains(path) } action: { [weak self] in
+          guard self != nil else { return }
           do {
             for try await value: T in hub.client.values(path) {
+              guard self != nil else { return }
               EventDelayManager.main.execute {
                 self?.value = value
               }
             }
-          } catch { }
-        }.cancellable()
+          } catch {
+            print(error)
+          }
+        }
         self.subscription = subscription
         return subscription
       }
+    }
+  }
+}
+
+@MainActor
+func withObservationActive(apply: @escaping @MainActor () -> Bool, action: @escaping @MainActor () async throws -> Void) -> AnyCancellable {
+  let subscription = ObservationActive(apply: apply, action: action)
+  subscription.update()
+  return AnyCancellable {
+    Task { @MainActor in
+      subscription.cancel()
+    }
+  }
+}
+
+@MainActor
+private final class ObservationActive {
+  private let apply: @MainActor () -> Bool
+  private let action: @MainActor () async throws -> Void
+  private var task: Task<Void, Never>?
+  private var taskId = 0
+  private var updateId = 0
+  private var isCancelled = false
+
+  init(apply: @escaping @MainActor () -> Bool, action: @escaping @MainActor () async throws -> Void) {
+    self.apply = apply
+    self.action = action
+  }
+
+  func update() {
+    guard !isCancelled else { return }
+    updateId += 1
+    let generation = updateId
+    let isActive = withObservationTracking {
+      apply()
+    } onChange: { [weak self] in
+      Task { @MainActor in
+        guard let self, self.updateId == generation else { return }
+        self.update()
+      }
+    }
+    update(isActive: isActive)
+  }
+
+  func cancel() {
+    isCancelled = true
+    updateId += 1
+    task?.cancel()
+    task = nil
+  }
+
+  private func update(isActive: Bool) {
+    if isActive {
+      guard task == nil else { return }
+      taskId += 1
+      let t = taskId
+      task = Task { [weak self] in
+        guard let self else { return }
+        try? await action()
+        guard self.taskId == t else { return }
+        task = nil
+      }
+    } else {
+      taskId += 1
+      task?.cancel()
+      task = nil
     }
   }
 }
