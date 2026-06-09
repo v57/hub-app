@@ -283,10 +283,11 @@ struct HomeView: View {
         let showsStepper = showsInstances || instances > 1
         let canUpgrade = app.id == "Hub" || app.id == "Hub Lite"
         let status = status
+        let running = status?.processes?.count ?? 0
+        let isRunning = app.active || running > 0
         VStack(alignment: .leading) {
           HStack(spacing: 4) {
             VStack(alignment: .leading) {
-              let running = status?.processes?.count ?? 0
               ForEach(status?.processes?.suffix(7) ?? []) { process in
                 statusText(process: process)?.transition(.blurReplace)
               }
@@ -305,13 +306,13 @@ struct HomeView: View {
             Spacer(minLength: 0)
             if !isHub {
               VStack(spacing: 10) {
-                AsyncButton(app.active ? "Stop" : "Start", systemImage: app.active ? "pause" : "play") {
-                  if app.active {
+                AsyncButton(isRunning ? "Stop" : "Start", systemImage: isRunning ? "pause" : "play") {
+                  if isRunning {
                     try await hub.launcher.app(id: app.id).stop()
                   } else {
                     try await hub.launcher.app(id: app.id).start()
                   }
-                }
+                }.contentTransition(.symbolEffect)
                 if showsStepper && status?.started != nil {
                   Button("Increase", systemImage: "chevron.up") {
                     targetInstances += 1
@@ -335,7 +336,7 @@ struct HomeView: View {
         }.blockBackground().bottomLabel {
           Text(app.id)
         }.contextMenu {
-          if app.active {
+          if isRunning {
             if app.instances == 1 && !isHub {
               Button("Cluster", systemImage: "list.number") {
                 withAnimation {
