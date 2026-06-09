@@ -41,7 +41,7 @@ struct HoverModifier<S: InsettableShape>: ViewModifier {
     if innerActive {
       return 0.05
     } else if isDark {
-      return isPressed ? 0.3 : isActive ? 0.2 : 0
+      return isPressed ? 0.2 : isActive ? 0.1 : 0
     } else {
       return isPressed ? 0.5 : isActive ? 1 : 0
     }
