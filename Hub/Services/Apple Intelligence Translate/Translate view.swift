@@ -99,7 +99,7 @@ struct TranslateView: View {
       }.padding().task(id: task) { translate() }
     }.task {
       installed = await Set(LanguageAvailability().installed().map { $0.minimalIdentifier })
-    }.frame(maxWidth: .infinity).modifier(TranslationModifier()).environment(translation)
+    }.frame(maxWidth: .infinity).environment(translation)
   }
   func translate() {
     var task = task
