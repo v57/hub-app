@@ -25,7 +25,10 @@ class Translation {
     }
   }
   func cleanup() {
-    processes.removeAll(where: { $0.isEmpty })
+    while processes.count > 1 {
+      guard processes[0].isEmpty else { return }
+      processes.removeFirst()
+    }
   }
   
   @ObservationIgnored
@@ -64,9 +67,7 @@ class Translation {
   @MainActor
   class LanguageProcess {
     let languages: LanguagePair
-    var isEmpty: Bool {
-      translating == 0 && tasks.isEmpty
-    }
+    var isEmpty: Bool { translating == 0 && tasks.isEmpty }
     var configuration: TranslationSession.Configuration {
       TranslationSession.Configuration(source: languages.source, target: languages.target)
     }
