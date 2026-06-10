@@ -44,6 +44,7 @@ extension URL {
 }
 
 struct StoreView: View {
+  @AppStorage("store") private var allowed: Bool = false
   @State var allItems: [StoreItem] = []
   @State var filter: ServiceType?
   var items: [StoreItem] {
@@ -67,7 +68,20 @@ struct StoreView: View {
         ItemView(item: item).transition(.blurReplace)
       }
     }.overlay {
-      if allItems.isEmpty {
+      if !allowed && url == URL.hubStore {
+        VStack(spacing: 16) {
+          VStack(spacing: 4) {
+            Text("App needs to download the list of services from GitHub")
+              .body()
+            Text("This is the only network request app makes on it's own\nso for transparency and security i'm asking you")
+              .secondary()
+            Link(url.description, destination: url).note()
+          }
+          Button("Allow") {
+            allowed = true
+          }
+        }.multilineTextAlignment(.center)
+      } else if allItems.isEmpty {
         if fetchStatus == .loading {
           ProgressView().progressViewStyle(.circular)
             .transition(.blurReplace)
@@ -87,7 +101,8 @@ struct StoreView: View {
         ForEach(ServiceType.allCases, id: \.rawValue) { type in
           Text(type.name).tag(type)
         }
-      }.pickerStyle(.main).labelsHidden().task(id: attempt) {
+      }.pickerStyle(.main).labelsHidden().task(id: attempt + (allowed ? 1 : 0)) {
+        guard allowed else { return }
         guard self.allItems.isEmpty else { return }
         do {
           fetchStatus = .loading
