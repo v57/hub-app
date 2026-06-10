@@ -34,7 +34,7 @@ struct HomeView: View {
               ServiceContent(item: item)
             }
           }.labelStyle(.appIcon).buttonStyle(.environment)
-          Text("Support this Project").sectionTitle()
+          Text("Join our Community").sectionTitle()
           SupportView()
 #endif
         }.padding(.top).animation(.home, value: isFocusing)
