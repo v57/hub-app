@@ -136,8 +136,8 @@ struct LockdownView: View {
     func makeBody(configuration: Configuration) -> some View {
       configuration.label
         .foregroundStyle(enabled ? Color.secondary : Color.white)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 4)
+        .padding(.horizontal, 12 * interfaceScale)
+        .padding(.vertical, 4 * interfaceScale)
         .background(enabled ? Color.tertiaryBackground : Color.blue, in: .capsule)
         .scaleEffect(configuration.isPressed ? 1.2 : isFocused ? 1.1 : 1.0)
         .animation(.bouncy, value: isFocused).animation(.smooth(duration: 0.25), value: configuration.isPressed)
