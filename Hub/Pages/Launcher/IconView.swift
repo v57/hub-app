@@ -61,7 +61,7 @@ struct IconView: View {
   @Environment(\.colorScheme) private var colorScheme
   var body: some View {
     icon.body(dark: colorScheme == .dark)
-      .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+      .clipShape(RoundedRectangle(cornerRadius: cornerRadius * interfaceScale))
   }
 }
 

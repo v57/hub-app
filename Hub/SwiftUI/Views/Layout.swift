@@ -20,13 +20,13 @@ extension EnvironmentValues {
 struct HomeGridLayout: Layout {
   static var minSpacing: Int { 0 }
   static var size: Int {
-    80
+    80 * Int(interfaceScale)
   }
   static func spacing(width: CGFloat) -> CGFloat {
     widthAndSpacing(proposal: ProposedViewSize(width: width, height: nil)).1
   }
   static func widthAndSpacing(proposal: ProposedViewSize) -> (Int, CGFloat) {
-    let width = max(proposal.width ?? 148, 148)
+    let width = max(proposal.width ?? 148, 148 * interfaceScale)
     let intWidth = max(Int(width) / (size + minSpacing), 4) / 2 * 2
     let w = CGFloat(intWidth)
     let spacing = (width - w * CGFloat(size)) / (w + 1)

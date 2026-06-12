@@ -53,7 +53,7 @@ struct InstallationGuide: View {
       }.transition(.blurReplace)
     }.multilineTextAlignment(.center).frame(maxWidth: .infinity, maxHeight: .infinity)
       .safeAreaInset(edge: .bottom) {
-        HStack(spacing: 4) {
+        HStack(spacing: 4 * interfaceScale) {
           button(os: .macOS)
           button(os: .docker)
           button(os: .iOS)

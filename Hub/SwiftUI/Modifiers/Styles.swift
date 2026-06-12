@@ -11,13 +11,17 @@ import HubUI
 extension View {
   func badgeStyle() -> some View {
     note().foregroundStyle(.hubTint)
-      .padding(.horizontal, 6).padding(.vertical, 2)
+      .padding(.horizontal, 6 * interfaceScale).padding(.vertical, 2 * interfaceScale)
       .background(.hubTint.opacity(0.2), in: .capsule)
   }
   func glassStyle<S: InsettableShape>(in shape: S) -> some View {
     self.background {
+      #if os(tvOS) // shadows bad for performance :(
       shape.fill(.secondaryBackground).strokeBorder(.border)
-        .shadow(color: .black.opacity(0.08), radius: 16, y: 8)
+      #else
+      shape.fill(.secondaryBackground).strokeBorder(.border)
+        .shadow(color: .black.opacity(0.08), radius: 16 * interfaceScale, y: 8 * interfaceScale)
+      #endif
     }
   }
   func modifier<Content: View>(@ViewBuilder _ modifiy: (Self) -> Content) -> Content {
@@ -32,8 +36,8 @@ struct ActionButtonStyle: ButtonStyle {
     let up = configuration.isPressed
     configuration.label.body()
       .foregroundStyle(Color.hubTint)
-      .padding(.horizontal, 12).padding(.vertical, 4)
-      .frame(minWidth: 60)
+      .padding(.horizontal, 12 * interfaceScale).padding(.vertical, 4 * interfaceScale)
+      .frame(minWidth: 60 * interfaceScale)
       .background(.black.opacity(0.001))
       .background(Color.hubTint.opacity(0.1 + focus), in: .capsule)
       .scaleEffect((up ? 1.1 : 1.0) + focus)
@@ -43,23 +47,31 @@ struct ActionButtonStyle: ButtonStyle {
   }
 }
 
+var interfaceScale: Double {
+#if os(tvOS)
+  2
+#else
+  1
+#endif
+}
+
 extension Text {
   func largeTitle() -> Text {
-    font(.system(size: 20, weight: .semibold, design: .rounded))
+    font(.system(size: 20 * interfaceScale, weight: .semibold, design: .rounded))
   }
   func title() -> Text {
-    font(.system(size: 16, weight: .medium, design: .rounded))
+    font(.system(size: 16 * interfaceScale, weight: .medium, design: .rounded))
   }
   func code() -> Text {
-    font(.system(size: 12, weight: .medium))
+    font(.system(size: 12 * interfaceScale, weight: .medium))
       .fontDesign(.monospaced)
       .foregroundStyle(.secondary)
   }
   func body() -> Text {
-    font(.system(size: 14, weight: .medium, design: .rounded))
+    font(.system(size: 14 * interfaceScale, weight: .medium, design: .rounded))
   }
   func note() -> Text {
-    font(.system(size: 12, weight: .medium, design: .rounded))
+    font(.system(size: 12 * interfaceScale, weight: .medium, design: .rounded))
   }
   func secondary() -> Text {
     note().foregroundStyle(.secondary)
@@ -68,7 +80,7 @@ extension Text {
     note().foregroundStyle(.red)
   }
   func app() -> Text {
-    font(.system(size: 10, design: .rounded))
+    font(.system(size: 10 * interfaceScale, design: .rounded))
   }
 }
 extension View {
@@ -81,13 +93,13 @@ extension View {
     }.frame(minHeight: 600)
   }
   func title() -> some View {
-    font(.system(size: 16, weight: .medium, design: .rounded))
+    font(.system(size: 16 * interfaceScale, weight: .medium, design: .rounded))
   }
   func body() -> some View {
-    font(.system(size: 14, weight: .medium, design: .rounded))
+    font(.system(size: 14 * interfaceScale, weight: .medium, design: .rounded))
   }
   func note() -> some View {
-    font(.system(size: 12, weight: .medium, design: .rounded))
+    font(.system(size: 12 * interfaceScale, weight: .medium, design: .rounded))
   }
   func secondary() -> some View {
     note().foregroundStyle(.secondary)
@@ -96,10 +108,10 @@ extension View {
     note().foregroundStyle(.red)
   }
   func icon() -> some View {
-    font(.system(size: 32, weight: .semibold, design: .rounded))
+    font(.system(size: 32 * interfaceScale, weight: .semibold, design: .rounded))
   }
   func app() -> some View {
-    font(.system(size: 10, design: .rounded))
+    font(.system(size: 10 * interfaceScale, design: .rounded))
   }
 }
 

@@ -12,7 +12,7 @@ extension View {
     modifier(HoverModifier(shape: shape))
   }
   func hoverEffect() -> some View {
-    modifier(HoverModifier(shape: RoundedRectangle(cornerRadius: 16)))
+    modifier(HoverModifier(shape: RoundedRectangle(cornerRadius: 16 * interfaceScale)))
   }
   func disableHoverScale() -> some View {
     preference(key: DisableScalePreference.self, value: true)
@@ -92,13 +92,13 @@ struct HoverModifier<S: InsettableShape>: ViewModifier {
     RadialGradient(colors: [
       .white.opacity(gradientOpacity),
       .white.opacity(gradientEndOpacity)
-    ], center: UnitPoint(x: offset.x * 0.9 + 0.5, y: offset.y * 0.9 + 0.5), startRadius: 0, endRadius: endRadius)
+    ], center: UnitPoint(x: offset.x * 0.9 + 0.5, y: offset.y * 0.9 + 0.5), startRadius: 0, endRadius: endRadius * interfaceScale)
   }
   var strokeGradient: RadialGradient {
     RadialGradient(colors: [
       .primary.opacity(isActive ? 1 : 0),
       .primary.opacity(isActive ? 0 : 0)
-    ], center: UnitPoint(x: offset.x * 0.9 + 0.5, y: offset.y * 0.9 + 0.5), startRadius: 0, endRadius: isPressed ? 64 : isActive ? 32 : 200)
+    ], center: UnitPoint(x: offset.x * 0.9 + 0.5, y: offset.y * 0.9 + 0.5), startRadius: 0, endRadius: (isPressed ? 64 : isActive ? 32 : 200) * interfaceScale)
   }
   func body(content: Content) -> some View {
     content.environment(\.innerHover, true).onPreferenceChange(HoverInnerPreference.self) { isActive in

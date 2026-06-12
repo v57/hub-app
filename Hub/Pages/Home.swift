@@ -403,7 +403,7 @@ struct HomeView: View {
           configuration.icon
             .symbolVariant(.circle.fill)
             .foregroundStyle(.primary, .clear)
-            .font(.system(size: 34, weight: .medium))
+            .font(.system(size: 34 * interfaceScale, weight: .medium))
             .hoverEffect(in: .circle)
         }
       }
@@ -444,7 +444,7 @@ struct HomeView: View {
       var body: some View {
         GeometryReader { view in
           let services = services
-          LazyVGrid(columns: [.init(.adaptive(minimum: 36))]) {
+          LazyVGrid(columns: [.init(.adaptive(minimum: 36 * interfaceScale))]) {
             ForEach(services, id: \.service) { item in
               ServiceToggle(publisher: item.publisher, service: item.service)
             }
@@ -650,9 +650,9 @@ struct BlockStyle: ViewModifier {
   let cornerRadius: CGFloat
   func body(content: Content) -> some View {
     Color.clear.overlay {
-      content.safeAreaPadding(8)
+      content.safeAreaPadding(8 * interfaceScale)
     }.hoverEffect()
-      .padding(8)
+      .padding(8 * interfaceScale)
       .modifier {
         #if os(macOS)
         $0

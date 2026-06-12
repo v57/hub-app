@@ -56,15 +56,15 @@ struct UserConnections: View {
     let isMe: Bool
     var separator: Text { Text("•").foregroundStyle(.tertiary) }
     var body: some View {
-      HStack {
-        IconView(icon: user.icon).frame(width: 44, height: 44)
+      HStack(spacing: 12 * interfaceScale) {
+        IconView(icon: user.icon).frame(width: 44 * interfaceScale, height: 44 * interfaceScale)
         VStack(alignment: .leading) {
           HStack(alignment: .firstTextBaseline, spacing: 4) {
             if !user.name.isEmpty {
               Text(user.name)
             }
           }
-          HStack(spacing: 4) {
+          HStack(spacing: 4 * interfaceScale) {
             Group {
               if let group = user.group {
                 Text(group).foregroundStyle(.hubTint)
