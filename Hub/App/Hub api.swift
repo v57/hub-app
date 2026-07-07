@@ -25,7 +25,7 @@ struct HubStateStorage {
   let whitelist = Sync("hub/whitelist/status", WhitelistStatus())
   
   @MainActor @Observable
-  class Sync<T: Decodable> {
+  class Sync<T: Decodable & Sendable> {
     @ObservationIgnored let path: String
     @ObservationIgnored weak var subscription: AnyCancellable?
     var value: T
@@ -126,7 +126,7 @@ private final class ObservationActive {
 
 @MainActor
 @propertyWrapper
-struct HubState<T: Decodable>: DynamicProperty {
+struct HubState<T: Decodable & Sendable>: DynamicProperty {
   @Environment(Hub.self) var hub
   typealias Path = KeyPath<HubStateStorage, HubStateStorage.Sync<T>>
   @State private var storage = Storage()

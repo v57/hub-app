@@ -158,7 +158,7 @@ extension Image {
 }
 
 @Observable
-class Farm {
+@MainActor class Farm {
   static let main = Farm()
   var battery: BatteryStatus? {
     didSet {

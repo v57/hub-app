@@ -7,7 +7,7 @@
 
 #if os(macOS) || os(iOS)
 import SwiftUI
-import Translation
+@preconcurrency import Translation
 
 @available(macOS 15.0, iOS 18.0, *)
 struct TranslateView: View {
@@ -21,7 +21,7 @@ struct TranslateView: View {
   var body: some View {
     GeometryReader { view in
       ScrollView {
-        Text(result).foregroundStyle(translating ? Color.primary.opacity(0.8) : Color.primary)
+        Text(result).foregroundStyle(.primary.opacity(translating ? 0.8 : 1))
           .textSelection().contentTransition(.numericText())
           .animation(.smooth(duration: 0.4), value: translating)
           .task {

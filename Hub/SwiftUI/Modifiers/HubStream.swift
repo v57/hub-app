@@ -11,31 +11,31 @@ import HubUI
 
 extension View {
   // MARK: Without body
-  func hubStream<T: Decodable>(_ path: String, initial: T? = nil, delayed: Bool = true, action: @MainActor @escaping (T) -> Void) -> some View {
+  func hubStream<T: Decodable & Sendable>(_ path: String, initial: T? = nil, delayed: Bool = true, action: @MainActor @escaping (T) -> Void) -> some View {
     modifier(HubStreamModifier(path: path, initial: initial, delayed: delayed, action: action))
   }
-  func hubStream<T: Decodable>(_ path: String, initial: T? = nil, to: Binding<T>, delayed: Bool = true) -> some View {
+  func hubStream<T: Decodable & Sendable>(_ path: String, initial: T? = nil, to: Binding<T>, delayed: Bool = true) -> some View {
     hubStream(path, initial: initial, delayed: delayed) { (value: T) in
       to.wrappedValue = value
     }
   }
-  func hubStream<T: Decodable>(_ path: String, initial: T?, to: Binding<T?>, delayed: Bool = true) -> some View {
+  func hubStream<T: Decodable & Sendable>(_ path: String, initial: T?, to: Binding<T?>, delayed: Bool = true) -> some View {
     hubStream(path, initial: initial, delayed: delayed) { (value: T) in
       to.wrappedValue = value
     }
   }
   // MARK: With body
-  func hubStream<T: Decodable, Body>(_ path: String, _ body: Body, initial: T? = nil, delayed: Bool = true, action: @MainActor @escaping (T) -> Void) -> some View
+  func hubStream<T: Decodable & Sendable, Body>(_ path: String, _ body: Body, initial: T? = nil, delayed: Bool = true, action: @MainActor @escaping (T) -> Void) -> some View
   where Body: Encodable & Sendable & Hashable {
     modifier(HubStreamBodyModifier(path: path, body: body, initial: initial, delayed: delayed, action: action))
   }
-  func hubStream<T: Decodable, Body>(_ path: String, _ body: Body, initial: T? = nil, to: Binding<T>, delayed: Bool = true) -> some View
+  func hubStream<T: Decodable & Sendable, Body>(_ path: String, _ body: Body, initial: T? = nil, to: Binding<T>, delayed: Bool = true) -> some View
   where Body: Encodable & Sendable & Hashable {
     hubStream(path, body, initial: initial, delayed: delayed) { (value: T) in
       to.wrappedValue = value
     }
   }
-  func hubStream<T: Decodable, Body>(_ path: String, _ body: Body, initial: T?, to: Binding<T?>, delayed: Bool = true) -> some View
+  func hubStream<T: Decodable & Sendable, Body>(_ path: String, _ body: Body, initial: T?, to: Binding<T?>, delayed: Bool = true) -> some View
   where Body: Encodable & Sendable & Hashable {
     hubStream(path, body, initial: initial, delayed: delayed) { (value: T) in
       to.wrappedValue = value
@@ -51,7 +51,7 @@ extension ServiceProvider {
   }
 }
 
-private struct HubStreamModifier<T: Decodable>: ViewModifier {
+private struct HubStreamModifier<T: Decodable & Sendable>: ViewModifier {
   let path: String
   let initial: T?
   let delayed: Bool
@@ -82,7 +82,7 @@ private struct HubStreamModifier<T: Decodable>: ViewModifier {
     }
   }
 }
-private struct HubStreamBodyModifier<T: Decodable, Body: Encodable & Hashable & Sendable>: ViewModifier {
+private struct HubStreamBodyModifier<T: Decodable & Sendable, Body: Encodable & Hashable & Sendable>: ViewModifier {
   let path: String
   let body: Body
   let initial: T?
