@@ -31,8 +31,7 @@ class Translation {
     }
   }
   
-  @ObservationIgnored
-  @Published var pairs: LanguageAvailability.Pairs?
+  var pairs: LanguageAvailability.Pairs?
   
   private init() {
     Task { await updateLanguages() }

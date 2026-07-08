@@ -135,7 +135,7 @@ struct TranslateView: View {
 
 @available(macOS 15.0, iOS 18.0, *)
 extension LanguageAvailability {
-  struct Pairs {
+  struct Pairs: Sendable, Hashable {
     var available = Set<LanguagePair>()
     var unavailable = Set<LanguagePair>()
   }
@@ -188,7 +188,7 @@ extension LanguageAvailability {
     return installed
   }
 }
-struct LanguagePair: Hashable, Identifiable {
+struct LanguagePair: Hashable, Identifiable, Sendable {
   var id: String { sourceId + targetId }
   let source: Locale.Language
   let target: Locale.Language

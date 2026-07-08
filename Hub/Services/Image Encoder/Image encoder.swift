@@ -5,6 +5,7 @@
 //  Created by Linux on 27.09.25.
 //
 
+#if canImport(ImageIO)
 import Foundation
 import ImageIO
 import CoreGraphics
@@ -42,3 +43,4 @@ extension Data {
     return result as Data
   }
 }
+#endif

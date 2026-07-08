@@ -53,7 +53,6 @@ extension AppServices {
   }
   struct HubButton: View {
     let hub: Hub
-    let publisher: Published<Bool>.Publisher
     let service: Service
     @State var isEnabled: Bool = false
     var body: some View {
@@ -61,11 +60,10 @@ extension AppServices {
         withAnimation {
           isEnabled.toggle()
         }
-        service.setService(enabled: isEnabled, hub: hub)
+        service.set(enabled: isEnabled, hub: hub)
       } label: {
         ServiceContent(item: service, isSharing: isEnabled)
-      }.onReceive(publisher) { isEnabled = $0 }
-        .buttonStyle(.plain)
+      }.buttonStyle(.plain)
     }
   }
   struct ServiceContent: View {
@@ -95,6 +93,25 @@ extension AppServices {
   }
   enum Service: Int, CaseIterable {
     case imageEncoder, videoEncoder, translate, chat, sensitiveContent
+    var id: String {
+      switch self {
+      case .imageEncoder: return "image/encode"
+      case .videoEncoder: return "video/encode"
+      case .translate: return "text/translate"
+      case .chat: return "text/llm"
+      case .sensitiveContent: return "image/sensitive"
+      }
+    }
+    init?(id: String) {
+      switch id {
+      case "image/encode": self = .imageEncoder
+      case "video/encode": self = .videoEncoder
+      case "text/translate": self = .translate
+      case "text/llm": self = .chat
+      case "image/sensitive": self = .sensitiveContent
+      default: return nil
+      }
+    }
     var title: LocalizedStringKey {
       switch self {
       case .imageEncoder: return "Image encoder"
@@ -123,43 +140,33 @@ extension AppServices {
       }
     }
     @MainActor
-    func servicePublisher(hub: Hub) -> Published<Bool>.Publisher? {
+    func isEnabled(hub: Hub) -> Bool? {
       switch self {
-      case .imageEncoder: hub.appServices.image.$isEnabled
-      case .videoEncoder: hub.appServices.video.$isEnabled
-      case .translate:
-#if os(macOS) || os(iOS)
-        hub.appServices.$translationEnabled
-#else
-        nil
-#endif
-      case .chat: hub.appServices.chat?.$isEnabled
-      case .sensitiveContent:
-#if os(macOS) || os(iOS)
-        hub.appServices.sensitiveContent.$isEnabled
-#else
-        nil
-#endif
+      case .imageEncoder: hub.appServices.image?.isEnabled
+      case .videoEncoder: hub.appServices.video?.isEnabled
+      case .translate: hub.appServices.translation?.isEnabled
+      case .chat: hub.appServices.chat?.isEnabled
+      case .sensitiveContent: hub.appServices.sensitiveContent?.isEnabled
       }
     }
     @MainActor
-    func setService(enabled: Bool, hub: Hub) {
+    func set(enabled: Bool, hub: Hub) {
       switch self {
-      case .imageEncoder: hub.appServices.image.isEnabled = enabled
-      case .videoEncoder: hub.appServices.video.isEnabled = enabled
-      case .translate:
-#if os(macOS) || os(iOS)
-        hub.appServices.translationEnabled = enabled
-#else
-        break
-#endif
+      case .imageEncoder: hub.appServices.image?.isEnabled = enabled
+      case .videoEncoder: hub.appServices.video?.isEnabled = enabled
+      case .translate: hub.appServices.translation?.isEnabled = enabled
       case .chat: hub.appServices.chat?.isEnabled = enabled
-      case .sensitiveContent:
-#if os(macOS) || os(iOS)
-        hub.appServices.sensitiveContent.isEnabled = enabled
-#else
-        break
-#endif
+      case .sensitiveContent: hub.appServices.sensitiveContent?.isEnabled = enabled
+      }
+    }
+    @MainActor
+    func toggle(hub: Hub) {
+      switch self {
+      case .imageEncoder: hub.appServices.image?.isEnabled.toggle()
+      case .videoEncoder: hub.appServices.video?.isEnabled.toggle()
+      case .translate: hub.appServices.translation?.isEnabled.toggle()
+      case .chat: hub.appServices.chat?.isEnabled.toggle()
+      case .sensitiveContent: hub.appServices.sensitiveContent?.isEnabled.toggle()
       }
     }
   }

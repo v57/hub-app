@@ -24,35 +24,47 @@ extension HubService.Group {
     }
   }
 }
-struct TranslationGroups {
+class TranslationGroups {
   var groups: [String: HubService.Group] = [:]
-  var groupsSubscription: AnyCancellable?
 }
+
+@available(macOS 15.0, iOS 18.0, *)
 extension AppServices {
-  @available(macOS 15.0, iOS 18.0, *)
-  func translationGroups(enabled: Published<Bool>.Publisher) {
-    translation.groupsSubscription = Translation.main.$pairs.compactMap { $0 }.combineLatest(enabled).sink { [weak self] pairs, isEnabled in
-      guard let self else { return }
-      if isEnabled {
-        if translation.groups.isEmpty {
-          for pair in pairs.available {
-            translation.groups[pair.id] = self.hub.service.group(enabled: true).translate(pair)
-          }
-          for pair in pairs.unavailable {
-            translation.groups[pair.id] = self.hub.service.group(enabled: false).translate(pair)
-          }
-          self.hub.service.sendServiceUpdates()
-        } else {
-          for pair in pairs.available {
-            translation.groups[pair.id]?.isEnabled = true
-          }
-          for pair in pairs.unavailable {
-            translation.groups[pair.id]?.isEnabled = false
-          }
-        }
-      } else {
-        translation.groups.values.forEach { $0.isEnabled = false }
+  func translationGroups() {
+    observe()
+  }
+  private func observe() {
+    guard let translation else { return }
+    withObservationTracking {
+      if let pairs = Translation.main.pairs {
+        update(pairs: pairs, isEnabled: translation.isEnabled, translation: translation.item)
       }
+    } onChange: { [weak self] in
+      Task { @MainActor [weak self] in
+        self?.observe()
+      }
+    }
+  }
+  private func update(pairs: LanguageAvailability.Pairs, isEnabled: Bool, translation: TranslationGroups) {
+    if isEnabled {
+      if translation.groups.isEmpty {
+        for pair in pairs.available {
+          translation.groups[pair.id] = self.hub.service.group(enabled: true).translate(pair)
+        }
+        for pair in pairs.unavailable {
+          translation.groups[pair.id] = self.hub.service.group(enabled: false).translate(pair)
+        }
+        self.hub.service.sendServiceUpdates()
+      } else {
+        for pair in pairs.available {
+          translation.groups[pair.id]?.isEnabled = true
+        }
+        for pair in pairs.unavailable {
+          translation.groups[pair.id]?.isEnabled = false
+        }
+      }
+    } else {
+      translation.groups.values.forEach { $0.isEnabled = false }
     }
   }
 }

@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import Combine
 import HubService
 
 extension View {
@@ -53,7 +52,7 @@ struct LockdownView: View {
     @Environment(Hub.self) private var hub
     @HubState(\.whitelist) private var whitelist
     @State private var isEnabled = false
-    @State private var toggleTask: AnyCancellable?
+    @State private var toggleTask: Task<Void, Error>?
     var body: some View {
       Placeholder(image: "key.shield.fill", title: "Lockdown Mode", description: "Maximum Security", isEnabled: isEnabled) {
         Text("""
@@ -68,10 +67,10 @@ struct LockdownView: View {
       }.onChange(of: isEnabled) { toggle() }
     }
     func toggle() {
-      let task = Task {
+      toggleTask?.cancel()
+      toggleTask = Task {
         try await hub.lockdown(SetLockdown(enabled: isEnabled))
       }
-      toggleTask = AnyCancellable { task.cancel() }
     }
   }
   struct UserView: View {

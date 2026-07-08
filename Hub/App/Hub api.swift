@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import Combine
 import SwiftUI
 import Observation
 import HubService
@@ -27,13 +26,13 @@ struct HubStateStorage {
   @MainActor @Observable
   class Sync<T: Decodable & Sendable> {
     @ObservationIgnored let path: String
-    @ObservationIgnored weak var subscription: AnyCancellable?
+    @ObservationIgnored weak var subscription: ObservationActive?
     var value: T
     init(_ path: String, _ defaultValue: T) {
       self.value = defaultValue
       self.path = path
     }
-    func subscribe(hub: Hub) -> AnyCancellable {
+    func subscribe(hub: Hub) -> ObservationActive {
       if let subscription {
         return subscription
       } else {
@@ -59,18 +58,14 @@ struct HubStateStorage {
 }
 
 @MainActor
-func withObservationActive(apply: @escaping @MainActor () -> Bool, action: @escaping @MainActor () async throws -> Void) -> AnyCancellable {
+func withObservationActive(apply: @escaping @MainActor () -> Bool, action: @escaping @MainActor () async throws -> Void) -> ObservationActive {
   let subscription = ObservationActive(apply: apply, action: action)
   subscription.update()
-  return AnyCancellable {
-    Task { @MainActor in
-      subscription.cancel()
-    }
-  }
+  return subscription
 }
 
 @MainActor
-private final class ObservationActive {
+final class ObservationActive {
   private let apply: @MainActor () -> Bool
   private let action: @MainActor () async throws -> Void
   private var task: Task<Void, Never>?
@@ -103,6 +98,10 @@ private final class ObservationActive {
     updateId += 1
     task?.cancel()
     task = nil
+  }
+  
+  @MainActor deinit {
+    cancel()
   }
 
   private func update(isActive: Bool) {
@@ -147,7 +146,7 @@ struct HubState<T: Decodable & Sendable>: DynamicProperty {
   }
   class Storage {
     var hub: Hub?
-    var subscription: AnyCancellable?
+    var subscription: ObservationActive?
     @MainActor
     func subscribeIfNeeded(hub: Hub, path: Path) {
       guard self.hub?.id != hub.id else { return }

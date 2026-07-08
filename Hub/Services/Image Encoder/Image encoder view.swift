@@ -6,8 +6,6 @@
 //
 
 import SwiftUI
-import UniformTypeIdentifiers
-import Combine
 import HubUI
 
 enum ImageType: String, Codable, CaseIterable {
@@ -20,7 +18,9 @@ enum ImageType: String, Codable, CaseIterable {
   }
 }
 
+#if canImport(ImageIO)
 #if os(macOS) || os(iOS) || os(visionOS)
+import UniformTypeIdentifiers
 
 struct ImageEncoderView: View {
   struct Operation: Identifiable {
@@ -43,7 +43,7 @@ struct ImageEncoderView: View {
   @State private var quality: CGFloat = 0.6
   @State private var metadata: Bool = false
   @State private var format: ImageType = .heic
-  @State private var currentTask: AnyCancellable?
+  @State private var currentTask: Task<Void, Never>?
   @State private var showsSlider = false
   var result: [ImageResult] {
     operations.compactMap { (operation: Operation) -> ImageResult? in
@@ -176,9 +176,10 @@ struct ImageEncoderView: View {
       }
     }
     if !isRunning {
+      currentTask?.cancel()
       currentTask = Task {
         await run()
-      }.cancellable()
+      }
     }
   }
   func run() async {
@@ -228,3 +229,4 @@ extension URL {
     }.value
   }
 }
+#endif

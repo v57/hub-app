@@ -431,22 +431,20 @@ struct HomeView: View {
     struct ShareServicesView: View {
       @Environment(Hub.self) var hub
       typealias Service = AppServices.Service
-      var services: [PublisherService] {
-        Service.allCases.compactMap { service in
-          guard let publisher = service.servicePublisher(hub: hub) else { return nil }
-          return PublisherService(service: service, publisher: publisher)
+      var services: [Service] {
+        Service.allCases.filter { service in
+          service.isEnabled(hub: hub) != nil
         }
       }
       struct PublisherService {
         let service: Service
-        let publisher: Published<Bool>.Publisher
       }
       var body: some View {
         GeometryReader { view in
           let services = services
           LazyVGrid(columns: [.init(.adaptive(minimum: 36 * interfaceScale))]) {
-            ForEach(services, id: \.service) { item in
-              ServiceToggle(publisher: item.publisher, service: item.service)
+            ForEach(services, id: \.rawValue) { service in
+              ServiceToggle(service: service)
             }
           }
         }.blockBackground().bottomLabel {
@@ -455,15 +453,13 @@ struct HomeView: View {
       }
       struct ServiceToggle: View {
         @Environment(Hub.self) var hub
-        let publisher: Published<Bool>.Publisher
         let service: Service
-        @State var isEnabled: Bool = false
+        var isEnabled: Bool { service.isEnabled(hub: hub) ?? false }
         var body: some View {
           Button {
             withAnimation(.smooth) {
-              isEnabled.toggle()
+              service.toggle(hub: hub)
             }
-            service.setService(enabled: isEnabled, hub: hub)
           } label: {
             Color.black.opacity(0.001).overlay {
               if isEnabled {
@@ -477,8 +473,7 @@ struct HomeView: View {
                 .gradientBlur(radius: isEnabled ? 4 : 0)
                 .frame(height: 14)
             }.aspectRatio(1, contentMode: .fit)
-          }.onReceive(publisher) { isEnabled = $0 }
-          
+          }
         }
       }
     }

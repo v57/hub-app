@@ -7,11 +7,10 @@
 
 import Foundation
 import HubService
-import Combine
 import SwiftUI
 
 extension KeyChain {
-  static let main = KeyChain(keyChain: "dev.v57.Hub")
+  static let main = KeyChain.keychain("dev.v57.Hub")
 }
 
 @MainActor
@@ -27,16 +26,16 @@ extension KeyChain {
   var hasLauncher: Bool { require(permissions: "launcher/info") }
   
   @ObservationIgnored var appServices: AppServices!
-  @ObservationIgnored var connectionTask: AnyCancellable?
-  @ObservationIgnored var apiTask: AnyCancellable?
+  @ObservationIgnored var apiTask: Task<Void, Error>?
   @ObservationIgnored var state = HubStateStorage()
   
   init(settings: Settings) {
     self.settings = settings
     key = KeyChain.main.publicKey()
     self.client = HubClient(settings.address, keyChain: .main)
-    connectionTask = client.isConnected.sink { [unowned self] isConnected in
-      self.isConnected = isConnected
+    isConnected = client.isConnected
+    client.isConnectedChanged = { [weak self] in
+      self?.isConnected = $0
     }
     apiTask = Task {
       for try await api: Set<String> in client.values("hub/api") {
@@ -44,8 +43,11 @@ extension KeyChain {
           self.api = api
         }
       }
-    }.cancellable()
+    }
     appServices = AppServices(hub: self)
+  }
+  deinit {
+    apiTask?.cancel()
   }
   struct Settings: Codable, Identifiable, Hashable {
     var id: URL { address }
@@ -146,14 +148,6 @@ class Hubs {
       let data = try JSONEncoder().encode(list.map(\.settings))
       UserDefaults.standard.set(data, forKey: "hubs")
     } catch { }
-  }
-}
-
-extension Task {
-  func cancellable() -> AnyCancellable {
-    AnyCancellable {
-      self.cancel()
-    }
   }
 }
 

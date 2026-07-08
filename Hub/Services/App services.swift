@@ -6,11 +6,13 @@
 //
 
 import Foundation
+#if canImport(AVFoundation)
 import AVFoundation
+#endif
 import HubService
-import Combine
 
 extension HubService.Group {
+#if canImport(AVFoundation)
   func videoService() -> Self {
     app(App(header: .init(type: .app, name: "Video Encoder", path: "video/encode/ui"), body: [
       .text(.init(value: "This service will convert your videos to h265 (hevc) format", secondary: true)),
@@ -32,6 +34,8 @@ extension HubService.Group {
       }
     }
   }
+#endif
+#if canImport(ImageIO)
   func imageService() -> Self {
     app(App(header: .init(type: .app, name: "Image Encoder", path: "image/encode/ui"), body: [
       .fileOperation(.init(title: nil, format: "$type", action: .init(path: "image/encode", body: .multiple(["type": "type", "quality": "quality"])))),
@@ -55,6 +59,7 @@ extension HubService.Group {
       }
     }
   }
+#endif
 #if os(macOS) || os(iOS) || os(visionOS)
   func sensitiveContentService() -> Self {
     post("image/sensitive", options: .init(limit: 20)) { (url: URL) -> Bool in
@@ -66,6 +71,7 @@ extension HubService.Group {
     }
   }
 #endif
+#if canImport(ImageIO)
   struct EncodeImageRequest: Decodable, Sendable {
     let from: URL
     let to: URL
@@ -79,6 +85,8 @@ extension HubService.Group {
       try await upload(data: data, to: request.to)
     }.value
   }
+#endif
+#if canImport(AVFoundation)
   struct EncodeVideoRequest: Decodable, Sendable {
     let from: URL
     let to: URL
@@ -93,6 +101,7 @@ extension HubService.Group {
     try await VideoEncoder().encode(from: asset, to: target, settings: .hevc(quality: request.quality, size: nil, frameReordering: true)) { _, _ in }
     try await upload(file: target, to: request.to)
   }
+#endif
   static func download(from: URL) async throws -> URL {
     let (tempDownload, _) = try await URLSession.shared.download(from: from)
     defer { tempDownload.delete() }
@@ -117,69 +126,88 @@ extension HubService.Group {
 }
 
 @MainActor
+@Observable
 class AppServices {
   let hub: Hub
-  var chat: HubService.Group?
-  let video: HubService.Group
-  let image: HubService.Group
-#if os(macOS) || os(iOS) || os(visionOS)
-  let sensitiveContent: HubService.Group
-#endif
-#if os(macOS) || os(iOS)
-  var translation = TranslationGroups()
-  @Published var translationEnabled = false
-#endif
-  private var enabled: Set<String> = [] {
+  var chat: Status<HubService.Group>?
+  var video: Status<HubService.Group>?
+  var image: Status<HubService.Group>?
+  var sensitiveContent: Status<HubService.Group>?
+  var translation: Status<TranslationGroups>?
+  private var enabled: Set<Service> = [] {
     didSet {
       guard enabled != oldValue else { return }
       let list = enabled
       saveTask = Task {
         try await Task.sleep(for: .seconds(1))
-        UserDefaults.standard.setValue(Array(list).sorted(), forKey: "services/\(hub.id)")
+        UserDefaults.standard.setValue(list.map(\.id).sorted(), forKey: "services/\(hub.id)")
       }
     }
   }
   private var saveTask: Task<Void, Error>? {
     didSet { oldValue?.cancel() }
   }
-  private var tasks = Set<AnyCancellable>()
   init(hub: Hub) {
     self.hub = hub
-    enabled = Set(UserDefaults.standard.array(forKey: "services/\(hub.id)") as? [String] ?? [])
+    enabled = Set((UserDefaults.standard.array(forKey: "services/\(hub.id)") as? [String] ?? []).compactMap { Service(id: $0) })
 #if os(macOS) || os(iOS) || os(visionOS)
     if #available(macOS 26.0, iOS 26.0, visionOS 26.0, *) {
-      chat = hub.service.group(enabled: enabled.contains("text/llm")).chat()
+      chat = Status(services: self, service: .chat) {
+        hub.service.group(enabled: $0).chat()
+      } update: { $0.isEnabled = $1 }
     }
 #endif
-    video = hub.service.group(enabled: enabled.contains("video/encode")).videoService()
-    image = hub.service.group(enabled: enabled.contains("image/encode")).imageService()
+#if canImport(AVFoundation)
+    video = Status(services: self, service: .videoEncoder) {
+      hub.service.group(enabled: $0).videoService()
+    } update: { $0.isEnabled = $1 }
+#endif
+#if canImport(ImageIO)
+    image = Status(services: self, service: .imageEncoder) {
+      hub.service.group(enabled: $0).imageService()
+    } update: { $0.isEnabled = $1 }
+#endif
 #if os(macOS) || os(iOS) || os(visionOS)
-    sensitiveContent = hub.service.group(enabled: enabled.contains("image/sensitive")).sensitiveContentService()
+    sensitiveContent = Status(services: self, service: .sensitiveContent) {
+      hub.service.group(enabled: $0).sensitiveContentService()
+    } update: { $0.isEnabled = $1 }
 #endif
 #if os(macOS) || os(iOS)
     if #available(macOS 15.0, iOS 18.0, *) {
-      translationEnabled = enabled.contains("text/translate")
-      translationGroups(enabled: $translationEnabled)
+      translation = Status(services: self, service: .translate) { _ in
+        TranslationGroups()
+      } update: { groups, isEnabled in
+        groups.groups.values.forEach { $0.isEnabled = isEnabled }
+      }
+      translationGroups()
     }
 #endif
-    assign(chat?.$isEnabled, to: "text/llm")
-    assign(video.$isEnabled, to: "video/encode")
-    assign(image.$isEnabled, to: "image/encode")
-#if os(macOS) || os(iOS)
-    assign(sensitiveContent.$isEnabled, to: "image/sensitive")
-    assign($translationEnabled, to: "text/translate")
-#endif
   }
-  private func save() {
-    enabled = Set(UserDefaults.standard.array(forKey: "services/\(hub.id)") as? [String] ?? [])
-  }
-  private func assign(_ publisher: Published<Bool>.Publisher?, to key: String) {
-    publisher?.sink { [unowned self] isEnabled in
-      if isEnabled {
-        enabled.insert(key)
-      } else {
-        enabled.remove(key)
+  @MainActor
+  @Observable
+  class Status<Item> {
+    unowned var services: AppServices
+    let service: Service
+    var isEnabled: Bool {
+      didSet {
+        guard isEnabled != oldValue else { return }
+        if isEnabled {
+          services.enabled.insert(service)
+        } else {
+          services.enabled.remove(service)
+        }
+        update(item, isEnabled)
       }
-    }.store(in: &tasks)
+    }
+    let item: Item
+    let update: (Item, Bool) -> Void
+    init(services: AppServices, service: Service, create: (Bool) -> Item, update: @escaping (Item, Bool) -> Void) {
+      let isEnabled = services.enabled.contains(service)
+      self.services = services
+      self.service = service
+      self.isEnabled = isEnabled
+      self.update = update
+      self.item = create(isEnabled)
+    }
   }
 }
