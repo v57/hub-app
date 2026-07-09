@@ -5,11 +5,15 @@
 //  Created by Dmitry Kozlov on 6/7/25.
 //
 
+#if canImport(SwiftCrossUI)
+import SwiftCrossUI
+#else
 import SwiftUI
+#endif
 import HubService
 
 extension Icon {
-  func body(dark: Bool) -> some View {
+  @MainActor func body(dark: Bool) -> some View {
     ZStack {
       if let symbol {
         symbol.body(dark: dark)
@@ -21,7 +25,7 @@ extension Icon {
 }
 
 extension Icon.Symbol {
-  fileprivate func body(dark: Bool) -> some View {
+  @MainActor fileprivate func body(dark: Bool) -> some View {
     GeometryReader { view in
       if let color = colors?.background(dark: dark)?.color {
         Color.white
@@ -37,7 +41,7 @@ extension Icon.Symbol {
 }
 
 extension Icon.Text {
-  fileprivate func body(dark: Bool) -> some View {
+  @MainActor fileprivate func body(dark: Bool) -> some View {
     GeometryReader { view in
       if let color = colors?.background(dark: dark)?.color {
         Color.white

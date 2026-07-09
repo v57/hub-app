@@ -6,7 +6,11 @@
 //
 
 #if os(macOS) || os(iOS)
+#if canImport(SwiftCrossUI)
+import SwiftCrossUI
+#else
 import SwiftUI
+#endif
 #if os(macOS)
 import IOKit.ps
 import IOKit.pwr_mgt

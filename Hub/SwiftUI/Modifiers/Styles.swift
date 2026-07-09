@@ -5,7 +5,11 @@
 //  Created by Dmitry Kozlov on 12/6/25.
 //
 
+#if canImport(SwiftCrossUI)
+import SwiftCrossUI
+#else
 import SwiftUI
+#endif
 import HubUI
 
 extension View {
@@ -176,7 +180,7 @@ struct BorderStyle: ShapeStyle {
 
 extension ShapeStyle where Self == Color {
   static var tertiaryBackground: Color {
-#if os(macOS) || os(iOS)
+#if !canImport(SwiftCrossUI) && os(macOS) || os(iOS)
     Color(.tertiarySystemFill)
 #else
     Color.gray.opacity(0.4)
@@ -186,7 +190,7 @@ extension ShapeStyle where Self == Color {
 
 extension Color {
   static var tertiaryBackground: Color {
-#if os(macOS) || os(iOS)
+#if !canImport(SwiftCrossUI) && os(macOS) || os(iOS)
     Color(.tertiarySystemFill)
 #else
     Color.gray.opacity(0.4)

@@ -5,7 +5,11 @@
 //  Created by Linux on 04.03.26.
 //
 
+#if canImport(SwiftCrossUI)
+import SwiftCrossUI
+#else
 import SwiftUI
+#endif
 
 struct Placeholder<Content: View>: View {
   let image: String
@@ -26,10 +30,10 @@ struct Placeholder<Content: View>: View {
       }
       VStack(alignment: .center, spacing: 4) {
         content
-      }.labelStyle(LabelStyle()).symbolVariant(.fill).note()
+      }.labelStyle(ItemLabelStyle()).symbolVariant(.fill).note()
     }.frame(maxWidth: .infinity).transition(.blurReplace)
   }
-  struct LabelStyle: SwiftUI.LabelStyle {
+  struct ItemLabelStyle: LabelStyle {
     func makeBody(configuration: Configuration) -> some View {
       HStack(spacing: 4) {
         configuration.icon.body()

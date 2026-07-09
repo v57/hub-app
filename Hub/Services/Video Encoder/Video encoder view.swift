@@ -7,7 +7,11 @@
 
 
 #if os(macOS) || os(iOS) || os(visionOS)
+#if canImport(SwiftCrossUI)
+import SwiftCrossUI
+#else
 import SwiftUI
+#endif
 import AVFoundation
 
 struct VideoEncoderView: View {

@@ -5,7 +5,11 @@
 //  Created by Linux on 05.03.26.
 //
 
+#if canImport(SwiftCrossUI)
+import SwiftCrossUI
+#else
 import SwiftUI
+#endif
 
 extension View {
   func iconBadge(_ value: Int?) -> some View {

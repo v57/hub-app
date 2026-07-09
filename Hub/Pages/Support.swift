@@ -5,7 +5,11 @@
 //  Created by Linux on 27.05.26.
 //
 
+#if canImport(SwiftCrossUI)
+import SwiftCrossUI
+#else
 import SwiftUI
+#endif
 
 struct SupportView: View {
 //  @State private var btc = Copyable(title: "BTC", value: "1AdcE6nUa4xKC2ZsW5FcffQryUH25KuVjK")

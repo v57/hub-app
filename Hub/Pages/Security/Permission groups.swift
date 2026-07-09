@@ -5,7 +5,11 @@
 //  Created by Linux on 16.11.25.
 //
 
+#if canImport(SwiftCrossUI)
+import SwiftCrossUI
+#else
 import SwiftUI
+#endif
 import HubUI
 
 struct PermissionGroups: View {
@@ -69,6 +73,7 @@ struct PermissionGroups: View {
       }
     }
   }
+  @MainActor
   var groupsView: some View {
     ForEach($groups.groups) { $group in
       let isEditing = group.name == editing

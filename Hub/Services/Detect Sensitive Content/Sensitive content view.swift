@@ -6,7 +6,11 @@
 //
 
 #if canImport(SensitiveContentAnalysis)
+#if canImport(SwiftCrossUI)
+import SwiftCrossUI
+#else
 import SwiftUI
+#endif
 import SensitiveContentAnalysis
 import AVKit
 import HubUI

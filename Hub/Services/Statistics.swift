@@ -5,7 +5,11 @@
 //  Created by Linux on 14.05.26.
 //
 
+#if canImport(SwiftCrossUI)
+import SwiftCrossUI
+#else
 import SwiftUI
+#endif
 
 struct StatisticsView: View {
   @State private var stats = Statistics.main

@@ -5,7 +5,11 @@
 //  Created by Linux on 24.02.26.
 //
 
+#if canImport(SwiftCrossUI)
+import SwiftCrossUI
+#else
 import SwiftUI
+#endif
 
 extension View {
   func keyboard(style: KeyboardStyle) -> some View {
@@ -22,6 +26,9 @@ extension View {
 enum KeyboardStyle: ViewModifier {
   case url, code
   func body(content: Content) -> some View {
+#if canImport(SwiftCrossUI)
+    content
+#else
     switch self {
     case .url:
 #if os(macOS)
@@ -46,5 +53,6 @@ enum KeyboardStyle: ViewModifier {
         .keyboardType(.asciiCapable)
 #endif
     }
+#endif
   }
 }

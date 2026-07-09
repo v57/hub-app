@@ -6,7 +6,11 @@
 //
 
 #if os(macOS) || os(iOS)
+#if canImport(SwiftCrossUI)
+import SwiftCrossUI
+#else
 import SwiftUI
+#endif
 @preconcurrency import Translation
 
 @available(macOS 15.0, iOS 18.0, *)

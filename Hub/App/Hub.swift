@@ -7,7 +7,11 @@
 
 import Foundation
 import HubService
+#if canImport(SwiftCrossUI)
+import SwiftCrossUI
+#else
 import SwiftUI
+#endif
 
 extension KeyChain {
   static let main = KeyChain.keychain("dev.v57.Hub")

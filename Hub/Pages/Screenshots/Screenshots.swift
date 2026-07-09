@@ -5,7 +5,11 @@
 //  Created by Linux on 04.06.26.
 //
 
+#if canImport(SwiftCrossUI)
+import SwiftCrossUI
+#else
 import SwiftUI
+#endif
 
 struct ScreenshotsModeView: View {
   @State private var type = ""

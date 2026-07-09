@@ -5,7 +5,11 @@
 //  Created by Linux on 29.10.25.
 //
 
+#if canImport(SwiftCrossUI)
+import SwiftCrossUI
+#else
 import SwiftUI
+#endif
 
 #if os(macOS) || os(iOS)
 @preconcurrency import Translation

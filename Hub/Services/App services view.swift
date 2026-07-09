@@ -5,7 +5,11 @@
 //  Created by Linux on 17.10.25.
 //
 
+#if canImport(SwiftCrossUI)
+import SwiftCrossUI
+#else
 import SwiftUI
+#endif
 
 extension AppServices {
   struct Page: View {

@@ -5,7 +5,11 @@
 //  Created by Linux on 09.05.26.
 //
 
+#if canImport(SwiftCrossUI)
+import SwiftCrossUI
+#else
 import SwiftUI
+#endif
 
 extension View {
   func hoverEffect<S: InsettableShape>(in shape: S) -> some View {

@@ -5,7 +5,11 @@
 //  Created by Linux on 02.03.26.
 //
 
+#if canImport(SwiftCrossUI)
+import SwiftCrossUI
+#else
 import SwiftUI
+#endif
 
 extension View {
   func transitionSource<ID: Hashable>(id: ID, namespace: Namespace.ID) -> Self {

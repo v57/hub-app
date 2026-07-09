@@ -5,7 +5,11 @@
 //  Created by Linux on 23.01.26.
 //
 
+#if canImport(SwiftCrossUI)
+import SwiftCrossUI
+#else
 import SwiftUI
+#endif
 import HubService
 
 struct UserConnections: View {

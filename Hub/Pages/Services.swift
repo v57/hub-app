@@ -5,20 +5,12 @@
 //  Created by Dmitry Kozlov on 16/2/25.
 //
 
+#if canImport(SwiftCrossUI)
+import SwiftCrossUI
+#else
 import SwiftUI
+#endif
 import HubService
-
-extension String {
-  func copyToClipboard() {
-    #if os(macOS)
-    let pasteboard = NSPasteboard.general
-    pasteboard.clearContents()
-    pasteboard.setString(self, forType: .string)
-    #elseif os(iOS) || os(watchOS)
-    UIPasteboard.general.string = self
-    #endif
-  }
-}
 
 struct Services: View {
   @Environment(Hub.self) var hub

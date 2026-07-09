@@ -5,7 +5,11 @@
 //  Created by Dmitry Kozlov on 22/2/25.
 //
 
+#if canImport(SwiftCrossUI)
+import SwiftCrossUI
+#else
 import SwiftUI
+#endif
 
 struct CreateApp: View {
   typealias Create = Hub.Launcher.Create

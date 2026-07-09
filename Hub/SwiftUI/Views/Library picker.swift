@@ -5,10 +5,9 @@
 //  Created by Linux on 02.06.26.
 //
 
+#if !os(tvOS) && !canImport(SwiftCrossUI)
 import PhotosUI
 import SwiftUI
-
-#if !os(tvOS)
 struct LibraryPickerButton: View {
   @State private var photos = [PhotosPickerItem]()
   let matching: PHPickerFilter

@@ -5,7 +5,11 @@
 //  Created by Dmitry Kozlov on 19/2/25.
 //
 
+#if canImport(SwiftCrossUI)
+import SwiftCrossUI
+#else
 import SwiftUI
+#endif
 import HubService
 
 struct LauncherView: View {
