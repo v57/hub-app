@@ -11,7 +11,7 @@ import SwiftCrossUI
 import SwiftUI
 #endif
 
-#if os(macOS) || os(iOS)
+#if !canImport(SwiftCrossUI) && os(macOS) || os(iOS)
 @preconcurrency import Translation
 @available(macOS 15.0, iOS 18.0, *)
 @Observable

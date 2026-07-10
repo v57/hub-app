@@ -14,7 +14,11 @@ import SwiftUI
 #endif
 
 extension KeyChain {
+#if canImport(SwiftCrossUI)
+  static let main = KeyChain.home
+#else
   static let main = KeyChain.keychain("dev.v57.Hub")
+#endif
 }
 
 @MainActor
@@ -109,10 +113,12 @@ class Hubs {
     return list.first(where: { $0.id == selected })
   }
   init() {
+#if !canImport(SwiftCrossUI)
     if ProcessInfo.screenshotType != nil {
       list.append(.test)
       return
     }
+#endif
     guard let data = UserDefaults.standard.data(forKey: "hubs") else { return }
     do {
       list = []

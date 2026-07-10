@@ -5,6 +5,7 @@
 //  Created by Linux on 19.07.25.
 //
 
+#if canImport(AVFoundation)
 import Foundation
 @preconcurrency import AVFoundation
 import AudioToolbox
@@ -596,3 +597,4 @@ public enum H264 {
     }
   }
 }
+#endif

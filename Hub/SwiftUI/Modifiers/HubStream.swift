@@ -125,13 +125,11 @@ extension Hub {
   func taskId<Body: Hashable>(path: String, body: Body, context: HubContext?) -> TaskBodyId<Body> {
     TaskBodyId(id: id, isConnected: isConnected && api.contains(path), body: body, service: context?.service)
   }
-  @MainActor
   struct TaskId: Hashable {
     var id: Hub.ID
     var isConnected: Bool
     var service: String?
   }
-  @MainActor
   struct TaskBodyId<Body: Hashable>: Hashable {
     var id: Hub.ID
     var isConnected: Bool
@@ -173,4 +171,3 @@ extension Hub {
     }
   }
 }
-

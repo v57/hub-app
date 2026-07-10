@@ -5,11 +5,8 @@
 //  Created by Linux on 04.06.26.
 //
 
-#if canImport(SwiftCrossUI)
-import SwiftCrossUI
-#else
+#if !canImport(SwiftCrossUI)
 import SwiftUI
-#endif
 
 struct ScreenshotsModeView: View {
   @State private var type = ""
@@ -29,11 +26,11 @@ struct ScreenshotsModeView: View {
             VideoEncoderView()
             #endif
           case .translate:
-#if !os(tvOS) && !os(visionOS)
+#if !canImport(SwiftCrossUI) && !os(tvOS) && !os(visionOS)
             TranslateView()
 #endif
           case .chat:
-#if !os(tvOS) && !os(visionOS)
+#if !canImport(SwiftCrossUI) && !os(tvOS) && !os(visionOS)
             ChatView()
 #endif
           case .pending:
@@ -60,3 +57,4 @@ extension ProcessInfo {
 enum ScreenshotPage: String, CaseIterable {
   case home, image, video, translate, chat, pending, connections, lockdown
 }
+#endif

@@ -88,7 +88,7 @@ struct HomeView: View {
         Button(copied ? "Copied" : "My Key", systemImage: copied ? "checkmark.circle.fill" : "key") {
           copy()
         }.labelStyle(.appIcon).buttonStyle(.environment)
-#if !os(visionOS)
+#if !os(visionOS) && !canImport(SwiftCrossUI)
         NavigationLink {
           FarmView()
             .transitionTarget(id: "farm", namespace: namespace)
@@ -240,7 +240,7 @@ struct HomeView: View {
                 if let pending = service.pending, pending > 0 {
                   Label("\(pending)", systemImage: "bolt.badge.clock.fill")
                 }
-              }.labelStyle(LabelStyle())
+              }.labelStyle(ItemLabelStyle())
             }.lineLimit(1)
             .frame(maxWidth: .infinity, alignment: .leading).secondary()
           }
@@ -250,7 +250,7 @@ struct HomeView: View {
             Text("Services")
           }
       }
-      struct LabelStyle: SwiftUI.LabelStyle {
+      struct ItemLabelStyle: LabelStyle {
         func makeBody(configuration: Configuration) -> some View {
           HStack(spacing: 4) {
             configuration.icon
@@ -646,19 +646,13 @@ struct HomeGrid<Content: View>: View {
 }
 
 struct BlockStyle: ViewModifier {
-  let cornerRadius: CGFloat
+  let cornerRadius: Double
   func body(content: Content) -> some View {
     Color.clear.overlay {
       content.safeAreaPadding(8 * interfaceScale)
     }.hoverEffect()
       .padding(8 * interfaceScale)
-      .modifier {
-        #if os(macOS)
-        $0
-        #else
-        $0.contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: cornerRadius))
-        #endif
-      }
+      .contextMenuShape(RoundedRectangle(cornerRadius: cornerRadius))
   }
 }
 

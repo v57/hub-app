@@ -100,7 +100,7 @@ struct InstallationGuide: View {
           VStack(alignment: .leading, spacing: 4) {
             header
             Text(code).code().textSelection()
-          }.padding(8).background(.background, in: RoundedRectangle(cornerRadius: 10))
+          }.padding(8).background(Color.hubTint.opacity(0.2), in: RoundedRectangle(cornerRadius: 10))
         }.buttonStyle(.plain)
         #endif
       }.shadow(color: .black.opacity(0.2), radius: 10)

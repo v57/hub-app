@@ -7,17 +7,27 @@
 
 #if canImport(SwiftCrossUI)
 import SwiftCrossUI
+import DefaultBackend
 #else
 import SwiftUI
 #endif
 
 @main
 struct HubApp: App {
+#if canImport(SwiftCrossUI)
+  let backend = DefaultBackend()
+#else
 #if os(macOS)
   @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 #endif
+#endif
   var body: some Scene {
     WindowGroup {
+#if canImport(SwiftCrossUI)
+      NavigationStack {
+        HomeView().page()
+      }
+#else
       if ProcessInfo.isScreenshot {
         ScreenshotsModeView()
       } else if !ProcessInfo.isPreviews {
@@ -25,6 +35,7 @@ struct HubApp: App {
           HomeView().page()
         }.modifier(TranslationModifier())
       }
+#endif
     }
   }
 }

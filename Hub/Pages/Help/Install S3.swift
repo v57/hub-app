@@ -429,7 +429,7 @@ like AWS, Azure, Google Cloud etc.
       }.opacity(settings == nil ? 0.5 : 1).disabled(settings == nil)
     }
   }
-  @Observable class Installer {
+  @Observable @MainActor class Installer {
     var hub: Hub?
     var listenTasks = [Task<Void, Error>]() {
       didSet { oldValue.forEach { $0.cancel() } }
@@ -479,19 +479,12 @@ like AWS, Azure, Google Cloud etc.
     }
   }
 }
-
-extension Data {
-  static func random(_ length: Int) -> Data {
-    var data = Data(repeating: 0, count: length)
-    _ = data.withUnsafeMutableBytes { (pointer: UnsafeMutableRawBufferPointer) in
-      SecRandomCopyBytes(kSecRandomDefault, length, pointer.baseAddress!)
-    }
-    return data
-  }
-}
 extension String {
   static func random() -> String {
-    Data.random(32).base64EncodedString().replacingOccurrences(of: "+", with: "")
+    var generator = SystemRandomNumberGenerator()
+    return [UInt64](arrayLiteral: generator.next(), generator.next(), generator.next(), generator.next())
+      .withUnsafeBytes { Data($0) }
+      .base64EncodedString().replacingOccurrences(of: "+", with: "")
       .replacingOccurrences(of: "/", with: "")
       .replacingOccurrences(of: "=", with: "")
   }

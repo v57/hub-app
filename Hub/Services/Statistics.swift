@@ -59,18 +59,19 @@ struct StatisticsView: View {
                       amount = stats.completed
                     }
                   }
-                }.contentTransition(.numericText()).transition(Transition())
+                }.contentTransition(.numericText()).transition(ItemTransition())
             } else {
               Image(systemName: stats.service.image)
                 .font(.system(size: 18 * scale, weight: .semibold))
-                .transition(Transition())
+                .transition(ItemTransition())
             }
           }
         }.frame(minWidth: 56 * scale).frame(height: 56 * scale).background {
-          Capsule().stroke(style: StrokeStyle(lineWidth: 4 * scale, lineCap: .round))
+          Capsule().stroke(.tint, style: StrokeStyle(lineWidth: 4 * scale, lineCap: .round))
             .foregroundStyle(.tertiary)
-          Capsule().trim(from: 0, to: visible ? 1 : 0).stroke(style: StrokeStyle(lineWidth: 4 * scale, lineCap: .round))
+          Capsule().trim(from: 0, to: visible ? 1 : 0)
             .rotation(.degrees(visible ? 0 : -270))
+            .stroke(.tint, style: StrokeStyle(lineWidth: 4 * scale, lineCap: .round))
             .animation(visible ? .smooth(duration: 1) : nil, value: visible)
         }.foregroundStyle(.green).task {
           do {
@@ -91,11 +92,11 @@ struct StatisticsView: View {
               try await Task.sleep(for: .seconds(3))
             }
           } catch { }
-        }.transition(Transition())
+        }.transition(ItemTransition())
       }
     }
   }
-  struct Transition: SwiftUI.Transition {
+  struct ItemTransition: Transition {
     func body(content: Content, phase: TransitionPhase) -> some View {
       content.scaleEffect(phase.isIdentity ? 1 : 0.5).opacity(phase.isIdentity ? 1 : 0)
         .blur(radius: phase == .didDisappear ? 8 : 0)
@@ -190,7 +191,7 @@ struct StatisticsView: View {
     list.contains(where: { $0.first != nil })
   }
   @MainActor
-  struct Item: Identifiable, Hashable {
+  struct Item: @MainActor Identifiable, Hashable {
     var id: AppServices.Service { service }
     let service: AppServices.Service
     var running = 0

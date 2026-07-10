@@ -17,7 +17,7 @@ extension AppServices {
     var body: some View {
       switch service {
       case .chat:
-#if os(macOS) || os(iOS)
+#if !canImport(SwiftCrossUI) && os(macOS) || os(iOS)
         if #available(macOS 26.0, iOS 26.0, *) {
           ChatView()
         } else {
@@ -39,7 +39,7 @@ extension AppServices {
         ContentUnavailableView("Service not available", systemImage: "photo.fill", description: Text("Video encoder interface is not available yet but you can still use it as a service"))
 #endif
       case .translate:
-#if os(macOS) || os(iOS)
+#if !canImport(SwiftCrossUI) && os(macOS) || os(iOS)
         if #available(macOS 15.0, iOS 18.0, *) {
           TranslateView()
         } else {

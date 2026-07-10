@@ -5,8 +5,12 @@
 //  Created by Linux on 30.10.25.
 //
 
-#if os(macOS) || os(iOS)
 import HubService
+class TranslationGroups {
+  var groups: [String: HubService.Group] = [:]
+}
+
+#if !canImport(SwiftCrossUI) && os(macOS) || os(iOS)
 import Translation
 import Combine
 
@@ -24,10 +28,6 @@ extension HubService.Group {
     }
   }
 }
-class TranslationGroups {
-  var groups: [String: HubService.Group] = [:]
-}
-
 @available(macOS 15.0, iOS 18.0, *)
 extension AppServices {
   func translationGroups() {

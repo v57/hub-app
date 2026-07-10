@@ -28,8 +28,22 @@ extension View {
       #endif
     }
   }
+  func contextMenuShape<S: Shape>(_ shape: S) -> some View {
+    modifier(ContextMenuShape(shape: shape))
+  }
   func modifier<Content: View>(@ViewBuilder _ modifiy: (Self) -> Content) -> Content {
     modifiy(self)
+  }
+}
+
+struct ContextMenuShape<S: Shape>: ViewModifier {
+  let shape: S
+  func body(content: Content) -> some View {
+#if canImport(SwiftCrossUI) || os(macOS)
+    content
+#else
+    content.contentShape(.contextMenuPreview, shape)
+#endif
   }
 }
 

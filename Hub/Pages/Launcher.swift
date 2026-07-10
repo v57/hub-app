@@ -203,11 +203,13 @@ struct LauncherView: View {
                 statusText(process: process)
               }
             }
+#if !canImport(SwiftCrossUI)
             if (status?.processes?.count ?? 0) > 0 {
               if let date = status?.started {
                 Text(date, style: .relative)
               }
             }
+#endif
           }.secondary()
         }
         Spacer(minLength: 0)

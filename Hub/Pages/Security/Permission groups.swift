@@ -217,7 +217,7 @@ struct GroupList: Decodable {
   }
 }
 
-extension Binding where Value: SetAlgebra & Sendable {
+extension Binding where Value: SetAlgebra & Sendable, Value.Element: Sendable {
   func toggle(_ key: Value.Element) -> Binding<Bool> {
     Binding<Bool> {
       wrappedValue.contains(key)

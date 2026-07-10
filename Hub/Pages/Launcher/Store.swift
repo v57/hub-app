@@ -11,6 +11,9 @@ import SwiftCrossUI
 import SwiftUI
 #endif
 import HubService
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 struct StoreItem: Identifiable, Codable {
   var id: String

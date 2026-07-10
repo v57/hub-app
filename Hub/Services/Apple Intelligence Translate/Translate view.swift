@@ -5,12 +5,8 @@
 //  Created by Linux on 05.10.25.
 //
 
-#if os(macOS) || os(iOS)
-#if canImport(SwiftCrossUI)
-import SwiftCrossUI
-#else
+#if !canImport(SwiftCrossUI) && os(macOS) || os(iOS)
 import SwiftUI
-#endif
 @preconcurrency import Translation
 
 @available(macOS 15.0, iOS 18.0, *)
@@ -25,7 +21,7 @@ struct TranslateView: View {
   var body: some View {
     GeometryReader { view in
       ScrollView {
-        Text(result).foregroundStyle(.primary.opacity(translating ? 0.8 : 1))
+        Text(result).foregroundStyle(Color.primary.opacity(translating ? 0.8 : 1))
           .textSelection().contentTransition(.numericText())
           .animation(.smooth(duration: 0.4), value: translating)
           .task {

@@ -6,10 +6,14 @@
 //
 
 import Foundation
+import Observation
 #if canImport(AVFoundation)
 import AVFoundation
 #endif
 import HubService
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 extension HubService.Group {
 #if canImport(AVFoundation)
@@ -140,7 +144,7 @@ class AppServices {
       let list = enabled
       saveTask = Task {
         try await Task.sleep(for: .seconds(1))
-        UserDefaults.standard.setValue(list.map(\.id).sorted(), forKey: "services/\(hub.id)")
+        UserDefaults.standard.set(list.map(\.id).sorted(), forKey: "services/\(hub.id)")
       }
     }
   }
@@ -172,7 +176,7 @@ class AppServices {
       hub.service.group(enabled: $0).sensitiveContentService()
     } update: { $0.isEnabled = $1 }
 #endif
-#if os(macOS) || os(iOS)
+#if !canImport(SwiftCrossUI) && os(macOS) || os(iOS)
     if #available(macOS 15.0, iOS 18.0, *) {
       translation = Status(services: self, service: .translate) { _ in
         TranslationGroups()

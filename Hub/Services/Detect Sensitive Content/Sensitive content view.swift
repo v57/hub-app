@@ -66,12 +66,14 @@ struct SensitiveContentView: View {
       }
       return true
     }.safeAreaInset(edge: .bottom) {
+#if !canImport(SwiftCrossUI)
       LibraryPickerButton(matching: .images) { url in
         items.append(Item(url: url))
       }.buttonStyle(ActionButtonStyle()).padding(.bottom, 4)
+#endif
     }
   }
-  @Observable class Item: Identifiable {
+  @Observable @MainActor class Item: Identifiable {
     let id = UUID()
     let url: URL
     var isSensitive: Bool?
@@ -88,7 +90,7 @@ struct SensitiveContentView: View {
     @State var image: Image?
     @Environment(\.displayScale) var imageScale
     var body: some View {
-      Color(.secondarySystemFill).overlay {
+      Color.tertiaryBackground.overlay {
         image?.resizable().scaledToFill()
           .transition(.scale)
       }.overlay {
@@ -107,22 +109,24 @@ struct SensitiveContentView: View {
           guard image == nil else { return }
           switch item.url.lastPathComponent.fileType {
           case .image:
-            #if os(macOS)
+#if !canImport(SwiftCrossUI) && os(macOS)
             if let image = NSImage(contentsOf: item.url) {
               self.image = Image(nsImage: image)
             }
-            #else
+#elseif canImport(UIKit)
             if let image = UIImage(contentsOfFile: item.url.absoluteString)?.cgImage?.resize(to: CGSize(width: 64 * imageScale, height: 64 * imageScale)) {
               self.image = Image(image, scale: 1, label: Text(""))
             }
-            #endif
+#endif
           case .video:
+#if !canImport(SwiftCrossUI)
             AVAssetImageGenerator(asset: AVURLAsset(url: item.url)).generateCGImageAsynchronously(for: .zero) { image, _, _ in
               guard let image = image?.resize(to: CGSize(width: 64 * imageScale, height: 64 * imageScale)) else { return }
               withAnimation {
                 self.image = Image(image, scale: 1, label: Text(""))
               }
             }
+#endif
           default: break
           }
         }.transition(.scale)

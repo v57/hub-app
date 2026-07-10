@@ -132,6 +132,7 @@ extension Status.BalancerType {
 
 enum OnlineStatus: Comparable {
   case online, unauthorized, offline
+  @MainActor
   var view: some View {
     Circle().fill(background.opacity(1)).frame(width: 6)
   }
