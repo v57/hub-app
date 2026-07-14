@@ -638,9 +638,7 @@ struct HomeGrid<Content: View>: View {
   @ViewBuilder var content: Content
   var body: some View {
     HomeGridLayout {
-      Group {
-        content
-      }.transition(.home)
+      content.transition(.home)
     }
   }
 }
