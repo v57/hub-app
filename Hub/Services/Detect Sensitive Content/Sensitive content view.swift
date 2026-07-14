@@ -120,12 +120,15 @@ struct SensitiveContentView: View {
 #endif
           case .video:
 #if !canImport(SwiftCrossUI)
-            AVAssetImageGenerator(asset: AVURLAsset(url: item.url)).generateCGImageAsynchronously(for: .zero) { image, _, _ in
-              guard let image = image?.resize(to: CGSize(width: 64 * imageScale, height: 64 * imageScale)) else { return }
-              withAnimation {
-                self.image = Image(image, scale: 1, label: Text(""))
+            AVAssetImageGenerator(asset: AVURLAsset(url: item.url))
+              .generateCGImageAsynchronously(for: .zero) { image, _, _ in
+                Task { @MainActor in
+                  guard let image = image?.resize(to: CGSize(width: 64 * imageScale, height: 64 * imageScale)) else { return }
+                  withAnimation {
+                    self.image = Image(image, scale: 1, label: Text(""))
+                  }
+                }
               }
-            }
 #endif
           default: break
           }
