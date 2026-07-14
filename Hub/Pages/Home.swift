@@ -648,9 +648,9 @@ struct BlockStyle: ViewModifier {
   func body(content: Content) -> some View {
     Color.clear.overlay {
       content.safeAreaPadding(8 * interfaceScale)
-    }.hoverEffect()
+    }.hoverEffect(in: .rounded(cornerRadius))
       .padding(8 * interfaceScale)
-      .contextMenuShape(RoundedRectangle(cornerRadius: cornerRadius))
+      .contextMenuShape(.rounded(cornerRadius))
   }
 }
 

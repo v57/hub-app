@@ -15,9 +15,6 @@ extension View {
   func hoverEffect<S: InsettableShape>(in shape: S) -> some View {
     modifier(HoverModifier(shape: shape))
   }
-  func hoverEffect() -> some View {
-    modifier(HoverModifier(shape: RoundedRectangle(cornerRadius: 16 * interfaceScale)))
-  }
   func disableHoverScale() -> some View {
     preference(key: DisableScalePreference.self, value: true)
   }
@@ -307,26 +304,26 @@ extension EnvironmentValues {
           .overlay {
             Image(systemName: "greetingcard.fill")
               .font(.system(size: 36))
-          }.hoverEffect()
+          }.hoverEffect(in: .rounded(16))
       }
       RoundedRectangle(cornerRadius: 16).fill(.clear)
         .frame(width: 64, height: 64)
         .overlay {
           Image(systemName: "square.and.arrow.up.circle.fill")
             .font(.system(size: 48))
-        }.hoverEffect()
+        }.hoverEffect(in: .rounded(16))
       RoundedRectangle(cornerRadius: 16).fill(.clear)
         .frame(width: 64, height: 64)
         .overlay {
           Image(systemName: "waveform.path.ecg.text.clipboard")
             .font(.system(size: 36))
-        }.hoverEffect()
+        }.hoverEffect(in: .rounded(16))
       RoundedRectangle(cornerRadius: 16).fill(.clear)
         .frame(width: 64, height: 64)
         .overlay {
           Image(systemName: "trash.circle.fill")
             .font(.system(size: 48))
-        }.hoverEffect()
+        }.hoverEffect(in: .rounded(16))
     }.buttonStyle(.environment)
     Color.clear.frame(height: 2000)
   }.buttonStyle(.plain)

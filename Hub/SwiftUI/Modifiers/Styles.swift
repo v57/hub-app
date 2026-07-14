@@ -202,6 +202,12 @@ extension ShapeStyle where Self == Color {
   }
 }
 
+extension Shape where Self == RoundedRectangle {
+  static func rounded(_ radius: CGFloat) -> Self {
+    RoundedRectangle(cornerRadius: radius * interfaceScale)
+  }
+}
+
 extension Color {
   static var tertiaryBackground: Color {
 #if !canImport(SwiftCrossUI) && os(macOS) || os(iOS)
