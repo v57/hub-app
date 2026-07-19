@@ -33,24 +33,30 @@ struct LockdownView: View {
   @HubState(\.groups) private var groups
   @HubState(\.whitelist) private var whitelist
   var body: some View {
-    List {
-      Section {
-        LockdownStatus()
-      }.listRowBackground(Color.clear)
-      ForEach(users) { user in
-        UserView(user: user, isMe: user.key == hub.key, whitelist: whitelist).contextMenu {
-          if let key = user.key {
-            Menu("Group") {
-              ForEach(groups.groups) { group in
-                AsyncButton(group.name) {
-                  try await hub.add(key: key, group: group.name)
+    ScrollView {
+      LazyVStack {
+        Section {
+          LockdownStatus()
+        }.listRowBackground(Color.clear)
+        
+        LazyVGrid(minWidth: 240) {
+          ForEach(users) { user in
+            UserView(user: user, isMe: user.key == hub.key, whitelist: whitelist).contextMenu {
+              if let key = user.key {
+                Menu("Group") {
+                  ForEach(groups.groups) { group in
+                    AsyncButton(group.name) {
+                      try await hub.add(key: key, group: group.name)
+                    }
+                  }
                 }
               }
             }
           }
         }
-      }
-    }.contentTransition(.numericText())
+      }.contentTransition(.numericText())
+        .padding(.horizontal, 4)
+    }
   }
   struct LockdownStatus: View {
     @Environment(Hub.self) private var hub
@@ -100,22 +106,24 @@ struct LockdownView: View {
             if !user.name.isEmpty {
               Text(user.name)
             }
+          }
+          HStack {
             if let key = user.key {
               Text(isMe ? "\(key.suffix(8)) (You)" : key.suffix(8)).secondary()
                 .textSelection()
             } else {
               Text("Unauthorized")
             }
-          }
-          if user.services > 0 || user.apps > 0 {
-            HStack {
-              if user.services > 0 {
-                Text("\(user.services) services")
-              }
-              if user.apps > 0 {
-                Text("\(user.apps) apps")
-              }
-            }.secondary()
+            if user.services > 0 || user.apps > 0 {
+              HStack {
+                if user.services > 0 {
+                  Text("\(user.services) services")
+                }
+                if user.apps > 0 {
+                  Text("\(user.apps) apps")
+                }
+              }.secondary()
+            }
           }
         }.lineLimit(1)
         Spacer(minLength: 0)
@@ -130,7 +138,9 @@ struct LockdownView: View {
             Text(isTrusted ? "Trusted" : "Trust")
           }.buttonStyle(ActionButtonStyle(enabled: isTrusted))
         }
-      }
+      }.padding(4)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.secondaryBackground, in: .rounded(12))
     }
   }
   struct ActionButtonStyle: ButtonStyle {
