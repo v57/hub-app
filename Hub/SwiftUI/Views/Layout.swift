@@ -11,6 +11,12 @@ import SwiftCrossUI
 import SwiftUI
 #endif
 
+extension LazyVGrid {
+  init(minWidth: Double, @ViewBuilder content: () -> Content) {
+    self.init(columns: [.init(.adaptive(minimum: minWidth))], content: content)
+  }
+}
+
 struct HomeGridSpacing: EnvironmentKey {
   static var defaultValue: CGFloat { 0 }
 }

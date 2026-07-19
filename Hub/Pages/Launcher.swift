@@ -23,24 +23,30 @@ struct LauncherView: View {
   @State var openStore = false
   var body: some View {
     let task = TaskId(hub: hub.id, isConnected: hub.isConnected && hasLauncher)
-    List {
-      Section {
-        Placeholder(image: "apple.terminal", title: "Launcher", description: """
+    ScrollView {
+      VStack {
+        Section {
+          Placeholder(image: "apple.terminal", title: "Launcher", description: """
           Installs apps
           Displays usage
           Updates apps
           Restarts on crash
           """) { }
-      }
-      LauncherCell()
-      if task.isConnected {
-        ListView(editing: $editing)
-        Button("Get More", systemImage: "arrow.down.circle.fill") {
-          withAnimation {
-            openStore = true
+        }
+#if PRO
+        LauncherCell()
+#endif
+        if task.isConnected {
+          LazyVGrid(minWidth: 240) {
+            ListView(editing: $editing)
           }
-        }.buttonStyle(ActionButtonStyle())
-      }
+          Button("Get More", systemImage: "arrow.down.circle.fill") {
+            withAnimation {
+              openStore = true
+            }
+          }.buttonStyle(ActionButtonStyle())
+        }
+      }.padding(4)
     }.toolbar {
       if task.isConnected {
         ToolbarView(creating: $creating)
@@ -189,46 +195,52 @@ struct LauncherView: View {
     @State var showsInstances = false
     var body: some View {
       let status = status
-      HStack(alignment: .top) {
-        VStack(alignment: .leading) {
-          HStack {
-            Text(app.id)
-            if let installationStatus {
-              Text(installationStatus).badgeStyle()
-            }
-          }
-          HStack(alignment: .firstTextBaseline) {
-            VStack(alignment: .leading) {
-              ForEach(status?.processes ?? []) { process in
-                statusText(process: process)
+      HStack {
+        HStack(alignment: .top) {
+          VStack(alignment: .leading) {
+            HStack {
+              Text(app.id)
+              if let installationStatus {
+                Text(installationStatus).badgeStyle()
               }
             }
+            HStack(alignment: .firstTextBaseline) {
+              VStack(alignment: .leading) {
+                ForEach(status?.processes ?? []) { process in
+                  statusText(process: process)
+                }
+              }
 #if !canImport(SwiftCrossUI)
-            if (status?.processes?.count ?? 0) > 0 {
-              if let date = status?.started {
-                Text(date, style: .relative)
+              if (status?.processes?.count ?? 0) > 0 {
+                if let date = status?.started {
+                  Text(date, style: .relative)
+                }
               }
-            }
 #endif
-          }.secondary()
-        }
-        Spacer(minLength: 0)
-        if showsInstances || app.instances > 1 {
-          HStack {
-            Text("\(instances)").secondary()
+              Text("")
+            }.secondary()
+          }
+          Spacer(minLength: 0)
+          if showsInstances || app.instances > 1 {
+            HStack {
+              Text("\(instances)").secondary()
 #if !os(tvOS)
-            Stepper("Instances", value: $instances)
-              .labelsHidden()
-              .task(id: instances) { try? await updateInstances() }
+              Stepper("Instances", value: $instances)
+                .labelsHidden()
+                .task(id: instances) { try? await updateInstances() }
 #endif
+            }
           }
         }
         if app.id == "Hub Lite" || app.id == "Hub" {
-          AsyncButton("Upgrade to Pro") {
+          AsyncButton("Get Pro") {
             try await hub.launcher.pro(KeyChain.main.publicKey())
-          }.buttonStyle(.borderedProminent)
+          }.buttonStyle(ActionButtonStyle())
         }
-      }.contextMenu {
+      }
+      .padding(.vertical, 4).padding(.horizontal, 12)
+      .background(.secondaryBackground, in: .rounded(12))
+      .contextMenu {
         if app.active {
           if app.instances == 1 {
             Button("Cluster", systemImage: "list.number") {
