@@ -15,36 +15,109 @@ import HubService
 struct Services: View {
   @Environment(Hub.self) var hub
   @HubState(\.status) var status
+  @State var selected: String?
+  var compressed: [CompressedService] {
+    var dictionary = [String: CompressedService]()
+    for service in status.services {
+      let id = String(service.name.split(separator: "/")[0])
+      var data = dictionary[id] ?? CompressedService(id: id)
+      data.add(service: service)
+      dictionary[id] = data
+    }
+    return dictionary.values.sorted(by: { $0.id < $1.id })
+  }
+  struct CompressedService: Identifiable {
+    var id: String
+    var services: Int = 0
+    var disabled: Int = 0
+    var requests: Int = 0
+    var pending: Int = 0
+    var running: Int = 0
+    mutating func add(service: Status.Service) {
+      services += service.services
+      disabled += service.disabled ?? 0
+      requests += service.requests
+      pending += service.pending ?? 0
+      running += service.running ?? 0
+    }
+  }
   var body: some View {
-    List {
-      Section {
+    ScrollView {
+      VStack {
         Placeholder(image: "hexagon", title: "Hub API", description: """
-          Api produced by Services of this Hub located here
-          You can change load balancer settings for each api here
-          See number of total, pending and currently processing requests
-          """) { }
-      }
-      ForEach(status.services, id: \.name) { service in
-        Service(service: service)
-      }
+        Api produced by Services of this Hub located here
+        You can change load balancer settings for each api here
+        See number of total, pending and currently processing requests
+        """) { }
+        if let selected {
+          Button(selected.dropLast(1), systemImage: "chevron.left") {
+            self.selected = nil
+          }.frame(maxWidth: .infinity, alignment: .leading)
+          LazyVGrid(columns: [.init(.adaptive(minimum: 120))]) {
+            ForEach(status.services.filter { $0.name.starts(with: selected) }, id: \.name) { service in
+              Service(service: service)
+            }
+          }
+        } else {
+          LazyVGrid(columns: [.init(.adaptive(minimum: 120))]) {
+            ForEach(compressed) { service in
+              Button {
+                selected = service.id + "/"
+              } label: {
+                CompressedServiceView(service: service)
+              }.buttonStyle(.environment)
+            }
+          }
+        }
+      }.padding(4)
     }.navigationTitle(hub.isConnected ? "\(status.requests) requests" : "Disconnected").toolbar {
       Button("Copy Key", systemImage: "key.fill") {
         KeyChain.main.publicKey().copyToClipboard()
       }
     }
   }
-  struct PermissionView: View {
-    let permission: String
+  struct CompressedServiceView: View {
+    typealias Balancer = Status.BalancerType
+    @Environment(Hub.self) private var hub
+    let service: CompressedService
+    var onlineStatus: OnlineStatus {
+      if service.services > 0 {
+        OnlineStatus.online
+      } else if service.disabled > 0 {
+        OnlineStatus.unauthorized
+      } else {
+        OnlineStatus.offline
+      }
+    }
     var body: some View {
-      switch permission {
-      case "owner":
-        Button {
-          
-        } label: {
-          Image(systemName: "macbook.badge.shield.checkmark")
-        }.accessibilityHint("Owner")
-      default:
-        Text(permission.prefix(8)).padding(.horizontal)
+      VStack(alignment: .leading, spacing: 2) {
+        HStack(spacing: 6) {
+          Text(service.id)
+          onlineStatus.view
+        }
+        HStack {
+          if service.requests > 0 {
+            Label("\(service.requests)", systemImage: "number")
+          } else {
+            Text("Never used")
+          }
+          if service.running > 0 {
+            Label("\(service.running)", systemImage: "clock.arrow.2.circlepath")
+          }
+          if service.pending > 0 {
+            Label("\(service.pending)", systemImage: "tray.full")
+          }
+        }.secondary().labelStyle(BadgeLabelStyle())
+      }.padding(.horizontal, 12).padding(.vertical, 4)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.secondaryBackground, in: .rounded(12))
+    }
+    struct BadgeLabelStyle: LabelStyle {
+      func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: 4) {
+          configuration.icon
+          configuration.title
+        }
       }
     }
   }
@@ -82,15 +155,18 @@ struct Service: View {
           Label("\(pending)", systemImage: "tray.full")
         }
       }.secondary().labelStyle(BadgeLabelStyle())
-    }.contextMenu {
-      Section("Load balancer") {
-        ForEach(Balancer.all, id: \.rawValue) { balancer in
-          AsyncButton(balancer.name, systemImage: balancer.icon) {
-            try await update(balancer: balancer)
+    }.padding(.horizontal, 12).padding(.vertical, 4)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .background(.secondaryBackground, in: .rounded(12))
+      .contextMenu {
+        Section("Load balancer") {
+          ForEach(Balancer.all, id: \.rawValue) { balancer in
+            AsyncButton(balancer.name, systemImage: balancer.icon) {
+              try await update(balancer: balancer)
+            }
           }
         }
       }
-    }
   }
   func update(balancer: Balancer) async throws {
     try await hub.client.send("hub/balancer/set", UpdateBalancer(path: service.name, type: balancer.rawValue))
