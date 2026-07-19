@@ -23,9 +23,12 @@ struct Placeholder<Content: View>: View {
         Image(systemName: image).font(.system(size: 88))
           .gradientBlur(radius: isEnabled == true ? 8 : isEnabled == false ? 1 : 4)
           .scaleEffect(isEnabled == false ? 0.8 : 1)
-        Text(title).largeTitle()
-        if let description {
-          Text(description).secondary().multilineTextAlignment(.center)
+          .frame(width: 120, height: 120)
+        VStack(spacing: 4) {
+          Text(title).largeTitle()
+          if let description {
+            Text(description).secondary().multilineTextAlignment(.center)
+          }
         }
       }
       VStack(alignment: .center, spacing: 4) {
