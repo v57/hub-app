@@ -67,13 +67,17 @@ struct StoreView: View {
   @State var customLink = false
   var body: some View {
     @State var isLoading = false
-    List {
-      if customLink {
-        CustomURL(url: $url, attempt: $attempt, allItems: $allItems)
-      }
-      ForEach(items) { item in
-        ItemView(item: item).transition(.blurReplace)
-      }
+    ScrollView {
+      VStack {
+        if customLink {
+          CustomURL(url: $url, attempt: $attempt, allItems: $allItems)
+        }
+        LazyVGrid(minWidth: 240) {
+          ForEach(items) { item in
+            ItemView(item: item).transition(.blurReplace)
+          }
+        }
+      }.padding(4)
     }.overlay {
       if !allowed && url == URL.hubStore {
         VStack(spacing: 16) {
@@ -200,7 +204,9 @@ struct StoreView: View {
         }
       }.task(id: isInstalled) {
         self.isInstalled = isInstalled
-      }
+      }.padding(4)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.secondaryBackground, in: .rounded(12))
     }
     var buttonTitle: LocalizedStringKey? {
       if isInstalling {
@@ -261,6 +267,6 @@ struct StoreView: View {
     StoreItem(icon: Icon(symbol: .init(name: "network")),
               name: "NginX config",
               shortDescription: "Setup your NginX", type: .app),
-  ]).test()
+  ]).test().frame(maxWidth: .infinity)
 }
 #endif
