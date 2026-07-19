@@ -17,33 +17,35 @@ struct UserConnections: View {
   @HubState(\.users) private var users
   @HubState(\.groups) private var groups
   var body: some View {
-    List {
-      Section {
+    ScrollView {
+      VStack(spacing: 16) {
         Placeholder(image: "wifi", title: "Connections", description: """
           See all services and other devices connected to this Hub
           Assign them to permission groups
           """) { }
-      }
-      ForEach($users) { $user in
-        UserView(user: user, isMe: user.key == hub.key).contextMenu {
-          if let key = user.key, hub.canManageGroups {
-            if !groups.groups.isEmpty {
-              Menu("Set Group", systemImage: "shield") {
-                ForEach(groups.groups) { group in
-                  AsyncButton(group.name) {
-                    try await toggle(user: $user, key: key, group: group.name)
+        LazyVGrid(minWidth: 240) {
+          ForEach($users) { $user in
+            UserView(user: user, isMe: user.key == hub.key).contextMenu {
+              if let key = user.key, hub.canManageGroups {
+                if !groups.groups.isEmpty {
+                  Menu("Set Group", systemImage: "shield") {
+                    ForEach(groups.groups) { group in
+                      AsyncButton(group.name) {
+                        try await toggle(user: $user, key: key, group: group.name)
+                      }
+                    }
+                  }
+                }
+                if let group = user.group {
+                  AsyncButton("Remove Group", systemImage: "xmark") {
+                    try await toggle(user: $user, key: key, group: group)
                   }
                 }
               }
-            }
-            if let group = user.group {
-              AsyncButton("Remove Group", systemImage: "xmark") {
-                try await toggle(user: $user, key: key, group: group)
-              }
-            }
+            }.animation(.smooth, value: user.group)
           }
-        }.animation(.smooth, value: user.group)
-      }
+        }
+      }.padding(.horizontal, 4)
     }
   }
   func toggle(user: Binding<Hub.User>, key: String, group: String) async throws {
@@ -91,7 +93,9 @@ struct UserConnections: View {
             }.transition(.blurReplace)
           }.secondary()
         }.lineLimit(1)
-      }
+      }.padding(4)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.secondaryBackground, in: .rounded(12))
     }
   }
 }
