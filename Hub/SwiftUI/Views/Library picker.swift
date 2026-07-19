@@ -6,7 +6,7 @@
 //
 
 #if !os(tvOS) && !canImport(SwiftCrossUI)
-import PhotosUI
+@preconcurrency import PhotosUI
 import SwiftUI
 struct LibraryPickerButton: View {
   @State private var photos = [PhotosPickerItem]()
