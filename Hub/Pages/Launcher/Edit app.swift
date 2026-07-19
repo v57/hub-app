@@ -22,17 +22,17 @@ struct EditApp: View {
     Env(),
   ]
   var body: some View {
-    List {
-      Section("Environment values") {
+    ScrollView {
+      VStack(alignment: .leading) {
+        Text("Environment values")
         ForEach($env) { $env in
           EnvView(env: $env)
         }
-      }
-      Section("Secret keys") {
+        Text("Secret Keys")
         ForEach($secrets) { $secret in
           SecretView(env: $secret)
         }
-      }
+      }.padding(4)
     }.toolbar {
       Button("Cancel", role: .cancel) {
         dismiss()
@@ -129,6 +129,6 @@ struct TestEditApp: View {
 }
 
 #Preview {
-  TestEditApp().test()
+  TestEditApp().test().frame(maxWidth: .infinity)
 }
 
