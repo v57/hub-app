@@ -15,7 +15,7 @@ import SwiftUI
 import AVFoundation
 
 struct VideoEncoderView: View {
-  @Observable class Operation: Identifiable {
+  @Observable class Operation: Identifiable, @unchecked Sendable {
     var id: URL { file }
     var file: URL
     var progress: Double = 0
