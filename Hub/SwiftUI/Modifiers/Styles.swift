@@ -138,7 +138,7 @@ struct SecondaryBackground: ShapeStyle {
     let isDark = environment.colorScheme == .dark
     if isDark {
 #if os(macOS)
-      return Color(red: 0.109, green: 0.111, blue: 0.144)
+      return Color.white.opacity(0.02)
 #elseif os(visionOS)
       return Color.white.opacity(0.2)
 #elseif os(tvOS)
@@ -152,7 +152,7 @@ struct SecondaryBackground: ShapeStyle {
 #elseif os(tvOS)
       return Color.white.opacity(0.1)
 #else
-      return Color(red: 0.98, green: 0.98, blue: 0.98)
+      return Color.black.opacity(0.02)
 #endif
     }
   }
@@ -173,11 +173,24 @@ struct BorderStyle: ShapeStyle {
     let isDark = environment.colorScheme == .dark
     return LinearGradient(colors: [
       primaryColor(dark: isDark),
-      SecondaryBackground().resolve(in: environment),
+      Color.clear,
       primaryColor(dark: isDark),
     ], startPoint: .topLeading, endPoint: .bottomTrailing)
   }
   func primaryColor(dark: Bool) -> Color {
+    if dark {
+#if os(visionOS)
+      Color.white.opacity(0.5)
+#elseif os(tvOS)
+      Color.white.opacity(0.2)
+#else
+      Color(red: 0.271, green: 0.279, blue: 0.369)
+#endif
+    } else {
+      Color.white
+    }
+  }
+  func secondaryColor(dark: Bool) -> Color {
     if dark {
 #if os(visionOS)
       Color.white.opacity(0.5)
