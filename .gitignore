@@ -3,3 +3,5 @@ xcuserdata/
 .swiftpm/
 .build/
 fastlane
+CLAUDE.md
+/.claude
