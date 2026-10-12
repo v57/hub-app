@@ -24,3 +24,11 @@ AGENTS.md
 .commandcode/
 .hermes/
 KANBAN*.md
+
+# Local runtime data (auth key), coverage output, xcodebuild caches written to the root
+/data/
+*.profraw
+/[0-9][0-9].[0-9]-*/
+
+# Agents
+graphify-out/
