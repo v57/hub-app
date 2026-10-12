@@ -116,13 +116,16 @@ final class Inviter {
       if expectedJoiner != nil { break }
       try? await Task.sleep(for: .milliseconds(100))
     }
-    guard let expectedJoiner, expectedJoiner == request.joinerServiceKey else {
+    // The node signals the joiner's session key: an Apple joiner names its
+    // service key, a Go joiner its WireGuard key.
+    guard let expectedJoiner,
+          expectedJoiner == request.joinerServiceKey || expectedJoiner == request.joinerWireGuardKey else {
       throw InviterError.invalidRequest("no bootstrap signal for invitation")
     }
     try DirectBootstrapRequestVerifier.verify(
       request,
       expectedReplayId: request.replayId,
-      expectedJoinerServiceKey: expectedJoiner,
+      expectedJoinerServiceKey: request.joinerServiceKey,
       now: now
     )
 
