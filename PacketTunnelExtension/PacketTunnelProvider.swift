@@ -572,7 +572,8 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     state: ExtensionNativeJoinState,
     error: NetworkError? = nil,
     hubProHost: String? = nil,
-    bootstrapAddresses: [String]? = nil
+    bootstrapAddresses: [String]? = nil,
+    admission: DirectBootstrapResponse? = nil
   ) -> ExtensionNativeJoinStatus {
     ExtensionNativeJoinStatus(
       version: 1, replayId: start.replayId,
@@ -581,6 +582,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
       key: start.key, wireGuardKey: start.wireGuardKey,
       expiresAt: start.expiresAt,
       hubProHost: hubProHost, bootstrapAddresses: bootstrapAddresses,
+      admission: admission,
       state: state, updatedAt: ISO8601DateFormatter.js.string(from: Date()),
       error: error
     )
@@ -699,7 +701,8 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
           bootstrapAddresses: [
             response.joinerAddress.ipv4,
             response.joinerAddress.ipv6,
-          ]
+          ],
+          admission: response
         )
       } catch is CancellationError {
         await self.removeBootstrapPeer(start.transactionId)

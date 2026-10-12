@@ -1,4 +1,5 @@
 import Foundation
+import HubService
 
 enum PacketTunnelNativeJoinCommand: String, Codable, Sendable {
   case start = "native-join-start"
@@ -95,6 +96,8 @@ struct PacketTunnelNativeJoinStatus: Codable, Hashable, Sendable {
   let expiresAt: String
   let hubProHost: String?
   let bootstrapAddresses: [String]?
+  /// Inviter-signed bootstrap response, sent with the first bind.
+  let admission: DirectBootstrapResponse?
   let state: PacketTunnelNativeJoinState
   let updatedAt: String
   let error: HubNetworkError?

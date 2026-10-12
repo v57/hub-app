@@ -171,6 +171,9 @@ struct ExtensionNativeJoinStatus: Encodable {
   let expiresAt: String
   let hubProHost: String?
   let bootstrapAddresses: [String]?
+  /// The inviter-signed bootstrap response; hub-pro requires it as the
+  /// admission on the joiner's first bind.
+  let admission: DirectBootstrapResponse?
   let state: ExtensionNativeJoinState
   let updatedAt: String
   let error: NetworkError?

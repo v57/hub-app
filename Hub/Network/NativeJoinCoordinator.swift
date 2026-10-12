@@ -185,7 +185,7 @@ struct NativeJoinCoordinator {
         let client = HubClient(hubURL, keyChain: identityKey)
         bindClient = client
         let binding = try await classified(.bind, invitation: invitation, record: record) {
-          try await performBind(client: client, record: record)
+          try await performBind(client: client, record: record, admission: status.admission)
         }
         enrollment = NativeJoinEnrollment(
           hubKey: binding.hubKey,
@@ -307,7 +307,8 @@ struct NativeJoinCoordinator {
 
   private static func performBind(
     client: HubClient,
-    record: NativeJoinRecord
+    record: NativeJoinRecord,
+    admission: DirectBootstrapResponse?
   ) async throws -> (hubKey: String, hubNetworkId: String, overlayAddresses: [String]) {
     let registration: HubNetworkAgentRegistrationResponse = try await client.send(
       "hub/net/bind",
@@ -316,7 +317,8 @@ struct NativeJoinCoordinator {
         wireGuardKey: record.wireGuardPublicKey,
         name: "Hub App",
         overlayAddresses: [],
-        connectedAt: ISO8601DateFormatter.js.string(from: Date())
+        connectedAt: ISO8601DateFormatter.js.string(from: Date()),
+        admission: admission
       )
     )
     // hub-pro returns profile.key in the canonical SPKI form (the auth
@@ -484,7 +486,7 @@ struct NativeJoinCoordinator {
     return URL(string: "\(secure ? "wss" : "ws")://\(bracketed):1997")
   }
 
-  private static var nativePlatform: String {
+  fileprivate nonisolated static var nativePlatform: String {
 #if os(macOS)
     "macos"
 #elseif os(iOS)
@@ -500,9 +502,11 @@ private struct HubNetworkAgentRegistration: Encodable {
   let bindingKind: HubNetworkLocalAgentBindingKind
   let wireGuardKey: String
   let name: String
-  let platform = "macOS"
+  let platform = NativeJoinCoordinator.nativePlatform
   let overlayAddresses: [String]
   let connectedAt: String
+  /// Inviter-signed bootstrap response; hub-pro admits a new key only with it.
+  let admission: DirectBootstrapResponse?
 }
 
 private struct HubNetworkAgentRegistrationResponse: Decodable {
