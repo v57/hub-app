@@ -146,31 +146,20 @@ final class Inviter {
     return try await allocateAndInstall(request, now: now)
   }
 
-  /// Extends the temporary peer for a joined joiner with its permanent overlay
-  /// addresses so adopted control traffic keeps flowing.
-  func updateJoinerAllowedIPs(joinerServiceKey: String, extraAddresses: [String]) async throws {
-    guard !extraAddresses.isEmpty else { return }
-    lock.lock()
-    let matches = active.values.filter { $0.joinerService == joinerServiceKey }
-    lock.unlock()
-    guard let peer = matches.first else {
-      throw InviterError.replay
-    }
-    var allowed = [peer.joinerV4 + "/32", peer.joinerV6 + "/128"]
-    allowed.append(contentsOf: extraAddresses)
-    try await installPeer(peer.joinerWireGuardKey, allowed, peer.joinerService)
-  }
-
   /// Closes every temporary peer whose response has expired.
   func sweep() async {
     let now = now()
+    // Never hold the lock across an await: the continuation can resume on
+    // another thread, and NSLock must be unlocked on the thread that locked.
     lock.lock()
     let expired = active.filter { !$0.value.expiresAt.isAfter(now) }
-    for (replayId, peer) in expired {
-      await removeActivePeer(peer)
+    for replayId in expired.keys {
       active.removeValue(forKey: replayId)
     }
     lock.unlock()
+    for peer in expired.values {
+      await removeActivePeer(peer)
+    }
   }
 
   /// Removes every temporary peer. Called on tunnel stop.

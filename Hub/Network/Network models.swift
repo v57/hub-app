@@ -57,6 +57,8 @@ struct HubNetworkAgent: Codable, Hashable, Identifiable, Sendable {
   let platform: String?
   let overlayAddresses: [String]
   let connectedAt: String
+  /// False for a known member that is not connected (member lists only).
+  let online: Bool?
 }
 
 enum HubNetworkLocalAgentBindingKind: String, Codable, Sendable {

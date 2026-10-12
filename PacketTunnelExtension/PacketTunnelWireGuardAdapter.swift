@@ -14,6 +14,9 @@ final class PacketTunnelWireGuardAdapter {
   private var isStarted = false
   private var baseConfiguration: TunnelConfiguration?
   private var bootstrapPeers: [String: PeerConfiguration] = [:]
+  /// Permanent peers for network members (hub host only), keyed by base64
+  /// WireGuard key. Merged with a member's bootstrap peer by key.
+  private var memberPeers: [String: [IPAddressRange]] = [:]
 
   init(provider: NEPacketTunnelProvider) {
     let logger = Logger(
@@ -505,6 +508,37 @@ final class PacketTunnelWireGuardAdapter {
     return routes
   }
 
+  /// Replaces the member peers (see `memberPeers`).
+  func setMemberPeers(_ peers: [(publicKey: String, allowedIPs: [String])]) async throws {
+    try await withCheckedThrowingContinuation {
+      (continuation: CheckedContinuation<Void, Error>) in
+      bootstrapQueue.async { [weak self] in
+        guard let self else {
+          continuation.resume(throwing: PacketTunnelWireGuardConfigurationError.invalidBootstrapPeer)
+          return
+        }
+        var next: [String: [IPAddressRange]] = [:]
+        for peer in peers {
+          guard let keyData = Data(base64Encoded: peer.publicKey),
+                PublicKey(rawValue: keyData) != nil,
+                let routes = try? Self.inviterAllowedRoutes(peer.allowedIPs) else {
+            continuation.resume(throwing: PacketTunnelWireGuardConfigurationError.invalidBootstrapPeer)
+            return
+          }
+          next[peer.publicKey] = routes
+        }
+        let previous = self.memberPeers
+        self.memberPeers = next
+        if let error = self.applyBootstrapPeers() {
+          self.memberPeers = previous
+          continuation.resume(throwing: error)
+        } else {
+          continuation.resume()
+        }
+      }
+    }
+  }
+
   private func applyBootstrapPeers() -> Error? {
     guard isStarted, let baseConfiguration else {
       return PacketTunnelWireGuardConfigurationError.invalidBootstrapPeer
@@ -513,20 +547,36 @@ final class PacketTunnelWireGuardAdapter {
     let baseRoutes = Set(
       baseConfiguration.peers.flatMap(\.allowedIPs).map(Self.routeIdentity)
     )
-    let bootstrapRoutes = bootstrapPeers.values.flatMap(\.allowedIPs)
-    guard bootstrapPeers.values.allSatisfy({ !baseKeys.contains($0.publicKey) }),
-          Set(bootstrapPeers.values.map(\.publicKey)).count == bootstrapPeers.count,
-          bootstrapRoutes.allSatisfy({ !baseRoutes.contains(Self.routeIdentity($0)) }),
-          Set(bootstrapRoutes.map(Self.routeIdentity)).count == bootstrapRoutes.count
+    // One entry per key: a member that is still inside its bootstrap window
+    // keeps the bootstrap peer's endpoint and addresses plus its own.
+    var merged: [String: PeerConfiguration] = [:]
+    for key in bootstrapPeers.keys.sorted() {
+      guard let peer = bootstrapPeers[key] else { continue }
+      let id = peer.publicKey.base64Key
+      guard merged[id] == nil else { return PacketTunnelWireGuardConfigurationError.peerConflict }
+      merged[id] = peer
+    }
+    for (key, routes) in memberPeers {
+      guard let keyData = Data(base64Encoded: key), let publicKey = PublicKey(rawValue: keyData),
+            !baseKeys.contains(publicKey) else { continue }
+      var peer = merged[key] ?? PeerConfiguration(publicKey: publicKey)
+      peer.allowedIPs += routes.filter { route in
+        !peer.allowedIPs.contains { Self.routeIdentity($0) == Self.routeIdentity(route) }
+      }
+      peer.persistentKeepAlive = peer.persistentKeepAlive ?? 25
+      merged[key] = peer
+    }
+    let extraRoutes = merged.values.flatMap(\.allowedIPs)
+    guard merged.values.allSatisfy({ !baseKeys.contains($0.publicKey) }),
+          extraRoutes.allSatisfy({ !baseRoutes.contains(Self.routeIdentity($0)) }),
+          Set(extraRoutes.map(Self.routeIdentity)).count == extraRoutes.count
     else {
       return PacketTunnelWireGuardConfigurationError.peerConflict
     }
     let configuration = TunnelConfiguration(
       name: baseConfiguration.name,
       interface: baseConfiguration.interface,
-      peers: baseConfiguration.peers + bootstrapPeers.keys.sorted().compactMap {
-        bootstrapPeers[$0]
-      }
+      peers: baseConfiguration.peers + merged.keys.sorted().compactMap { merged[$0] }
     )
     let semaphore = DispatchSemaphore(value: 0)
     var result: Error?

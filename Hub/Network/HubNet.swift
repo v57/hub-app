@@ -404,10 +404,10 @@ final class HubNet {
     await nets.refresh()
   }
 
-  /// While joined with the inviter enabled, watch `network/agents/list` for
-  /// new peers (joiners that bound at hub-pro through this inviter) and tell
-  /// the extension to extend their temporary bootstrap peers with the
-  /// permanent overlay addresses so adopted control traffic keeps flowing.
+  /// While serving as the hub's inviter, mirror every member from
+  /// `network/agents/list` into the extension as a WireGuard peer. Members
+  /// reach hub-pro and shared ports only through this host, after their
+  /// temporary bootstrap peer expires.
   private func startInviterAgentWatcher() {
     guard (try? PacketTunnelController()) != nil,
           (try? PacketTunnelController().installedConfiguration())?.inviterEnabled == true else {
@@ -418,19 +418,20 @@ final class HubNet {
       guard let self else { return }
       let hub = self.hub
       hub.state.networkAgents.subscribe(hub: hub)
-      var seenKeys = Set<String>()
-      var lastExtend: [String: [String]] = [:]
+      var sent: [HubNetworkPeer]?
       while !Task.isCancelled {
-        let agents = hub.state.networkAgents.value
-        for agent in agents where agent.key != hub.key && !agent.overlayAddresses.isEmpty {
-          guard !seenKeys.contains(agent.key) ||
-                lastExtend[agent.key] != agent.overlayAddresses else { continue }
-          seenKeys.insert(agent.key)
-          lastExtend[agent.key] = agent.overlayAddresses
-          try? await PacketTunnelController().inviterExtend(
-            serviceKey: agent.key,
-            overlayAddresses: agent.overlayAddresses
-          )
+        let peers = hub.state.networkAgents.value
+          .filter { $0.key != hub.key && !$0.wireGuardKey.isEmpty && !$0.overlayAddresses.isEmpty }
+          .map { agent in
+            HubNetworkPeer(
+              publicKey: agent.wireGuardKey,
+              endpoint: "",
+              allowedIPs: agent.overlayAddresses.map { $0.contains(":") ? "\($0)/128" : "\($0)/32" }
+            )
+          }
+          .sorted { $0.publicKey < $1.publicKey }
+        if peers != sent, (try? await PacketTunnelController().setMemberPeers(peers)) != nil {
+          sent = peers
         }
         try? await Task.sleep(for: .seconds(2))
       }

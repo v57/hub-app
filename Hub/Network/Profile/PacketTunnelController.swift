@@ -233,10 +233,10 @@ final class PacketTunnelController: PacketTunnelControlling {
     return try JSONDecoder().decode(PacketTunnelInviterStatus.self, from: response)
   }
 
-  /// Tells the extension to extend an active inviter bootstrap peer with a
-  /// joined joiner's permanent overlay addresses so post-bind control traffic
-  /// keeps flowing through the inviter.
-  func inviterExtend(serviceKey: String, overlayAddresses: [String]) async throws {
+  /// Gives the extension every network member's WireGuard key and overlay
+  /// addresses. The hub host keeps one peer per member: members reach hub-pro
+  /// and shared ports only through it, after their bootstrap peer expires.
+  func setMemberPeers(_ peers: [HubNetworkPeer]) async throws {
     guard let manager = try await loadManager(),
           manager.connection.status == .connected,
           let session = manager.connection as? NETunnelProviderSession else {
@@ -244,15 +244,12 @@ final class PacketTunnelController: PacketTunnelControlling {
     }
     struct Request: Codable {
       let command: String
-      let serviceKey: String
-      let overlayAddresses: [String]
+      let peers: [HubNetworkPeer]
     }
     struct Response: Codable {
       let ok: Bool
     }
-    let request = try JSONEncoder().encode(
-      Request(command: "inviterExtend", serviceKey: serviceKey, overlayAddresses: overlayAddresses)
-    )
+    let request = try JSONEncoder().encode(Request(command: "memberPeers", peers: peers))
     let response = try await withCheckedThrowingContinuation {
       (continuation: CheckedContinuation<Data, Error>) in
       do {

@@ -225,12 +225,10 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     inviterListener = listener
     let listenerEndpoint = listener.start()
 
-    // The inviter registers with the node that lives on its own host. Use
-    // loopback for the registration + probe: the node's externally-reachable
-    // address (Tailscale/LAN) may be inside the frozen overlay range and would
-    // loop through this tunnel. The joiner reaches the node via the address
-    // carried in the invitation's ?e= query.
-    let nodeEndpoint = "127.0.0.1:1964"
+    // Register with the node hub-pro names (hub/net/node), which invitations
+    // carry in ?e=. A node address inside the overlay range (Tailscale) is
+    // excluded from the tunnel through controlPlaneIPv4Hosts.
+    let nodeEndpoint = profile.nodeEndpoint ?? NetworkInvitationParser.defaultNode
     let nodeClient = InviterNodeClient(
       nodeEndpoint: nodeEndpoint,
       identity: identity,
@@ -312,7 +310,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     } else {
       do {
         let message = try JSONDecoder().decode(GatewayProviderMessage.self, from: messageData)
-        guard ["gatewayStatus", "exitStatus", "keychainProof", "inviterStatus"].contains(message.command) else { return nil }
+        guard ["gatewayStatus", "exitStatus", "keychainProof", "inviterStatus", "memberPeers"].contains(message.command) else { return nil }
         switch message.command {
         case "gatewayStatus":
           return try JSONEncoder().encode(StateResponse(state: gatewayServingState))
@@ -333,26 +331,26 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
             listenerEndpoint: inviterListener.map { "\(inviterAdvertiseAddress ?? "0.0.0.0"):\($0.port ?? 0)" } ?? ""
           )
           return try JSONEncoder().encode(status)
-        case "inviterExtend":
-          let message = try JSONDecoder().decode(InviterExtendMessage.self, from: messageData)
-          try? await inviter?.updateJoinerAllowedIPs(
-            joinerServiceKey: message.serviceKey,
-            extraAddresses: message.overlayAddresses
-          )
-          return try JSONEncoder().encode(InviterExtendResponse(ok: true))
+        case "memberPeers":
+          let message = try JSONDecoder().decode(MemberPeersMessage.self, from: messageData)
+          try await wireGuardAdapter.setMemberPeers(message.peers.map { ($0.publicKey, $0.allowedIPs) })
+          return try JSONEncoder().encode(MemberPeersResponse(ok: true))
         default: return nil
         }
       } catch { return nil }
     }
   }
 
-  private struct InviterExtendMessage: Decodable {
+  private struct MemberPeersMessage: Decodable {
+    struct Peer: Decodable {
+      let publicKey: String
+      let allowedIPs: [String]
+    }
     let command: String
-    let serviceKey: String
-    let overlayAddresses: [String]
+    let peers: [Peer]
   }
 
-  private struct InviterExtendResponse: Encodable {
+  private struct MemberPeersResponse: Encodable {
     let ok: Bool
   }
 
