@@ -12,12 +12,52 @@ import SwiftCrossUI
 #else
 import SwiftUI
 #endif
+import Security
 
 extension KeyChain {
 #if canImport(SwiftCrossUI)
   static let main = KeyChain.home
 #else
-  static let main = KeyChain.keychain("dev.v57.Hub")
+  static let main: KeyChain = {
+    let accessGroup = Bundle.main.object(forInfoDictionaryKey: "HubKeychainAccessGroup") as? String
+    return try! KeyChain(keychain: .init(
+      service: "dev.v57.Hub.identity.v1",
+      account: "ed25519-private-key",
+      accessGroup: accessGroup?.isEmpty == false ? accessGroup : nil,
+      useDataProtectionKeychain: true
+    ))
+  }()
+
+  /// Replaces the device hub identity. The joiner stages a per-transaction
+  /// service key (native-join.v1); the extension signs the bootstrap
+  /// readiness with the device identity (`identity.v1`) and requires it to
+  /// match the profile's service key, so the staged key must become the
+  /// device identity before the tunnel starts (the owner/local flows create
+  /// this item implicitly via `KeyChain.main`).
+  static func installHubIdentity(rawRepresentation data: Data) throws {
+    let accessGroup = Bundle.main.object(forInfoDictionaryKey: "HubKeychainAccessGroup") as? String
+    let configuration = KeychainConfiguration(
+      service: "dev.v57.Hub.identity.v1",
+      account: "ed25519-private-key",
+      accessGroup: accessGroup?.isEmpty == false ? accessGroup : nil,
+      useDataProtectionKeychain: true
+    )
+    var query: [String: Any] = [
+      kSecClass as String: kSecClassGenericPassword,
+      kSecAttrService as String: configuration.service,
+    ]
+    if let account = configuration.account {
+      query[kSecAttrAccount as String] = account
+    }
+    if let accessGroup = configuration.accessGroup {
+      query[kSecAttrAccessGroup as String] = accessGroup
+    }
+    if configuration.useDataProtectionKeychain {
+      query[kSecUseDataProtectionKeychain as String] = true
+    }
+    SecItemDelete(query as CFDictionary)
+    _ = try KeyChain(keychain: configuration, rawRepresentation: data)
+  }
 #endif
 }
 
@@ -36,23 +76,33 @@ extension KeyChain {
   @ObservationIgnored var appServices: AppServices!
   @ObservationIgnored var apiTask: Task<Void, Error>?
   @ObservationIgnored var state = HubStateStorage()
+  @ObservationIgnored private(set) lazy var net = HubNet(hub: self)
+  @ObservationIgnored lazy var networkAppAgent =
+    ShareNetworkAppAgentCoordinator(hub: self)
   
   init(settings: Settings) {
     self.settings = settings
-    key = KeyChain.main.publicKey()
-    self.client = HubClient(settings.address, keyChain: .main)
+    let identity = settings.identityTag.map(KeyChain.keychain) ?? .main
+    key = identity.publicKey()
+    self.client = HubClient(settings.address, keyChain: identity)
+    client.debugNetwork = true
     isConnected = client.isConnected
     client.isConnectedChanged = { [weak self] in
       self?.isConnected = $0
+      self?.net.connectionChanged($0)
     }
     apiTask = Task {
       for try await api: Set<String> in client.values("hub/api") {
         EventDelayManager.main.execute {
           self.api = api
+          self.net.apiCapabilitiesChanged()
         }
       }
     }
     appServices = AppServices(hub: self)
+    Task { [weak self] in
+      await self?.net.restoreIfActive()
+    }
   }
   deinit {
     apiTask?.cancel()
@@ -61,10 +111,12 @@ extension KeyChain {
     var id: URL { address }
     var name: String
     var address: URL
+    var identityTag: String? = nil
   }
   func require(permissions: String...) -> Bool {
     !permissions.contains { !api.contains($0) }
   }
+
 }
 
 struct Status: Decodable, Hashable {
@@ -134,15 +186,24 @@ class Hubs {
   func select(_ hub: Hub.ID?) {
     selected = hub
   }
-  func insert(with settings: Hub.Settings) {
+  @discardableResult
+  func insert(with settings: Hub.Settings) -> Hub {
+    let hub: Hub
     if let index = list.firstIndex(where: { $0.id == settings.id }) {
-      list[index].settings = settings
+      if list[index].settings == settings {
+        hub = list[index]
+      } else {
+        list[index].client.stop()
+        hub = Hub(settings: settings)
+        list[index] = hub
+      }
     } else {
-      let hub = Hub(settings: settings)
+      hub = Hub(settings: settings)
       list.append(hub)
     }
     selected = settings.id
     save()
+    return hub
   }
   func remove(with settings: Hub.Settings) {
     guard let index = self.list.firstIndex(where: { $0.id == settings.id }) else { return }

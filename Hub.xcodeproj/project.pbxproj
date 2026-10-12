@@ -11,6 +11,10 @@
 		132DD8BA2F4CDDEB00282A30 /* HubService in Frameworks */ = {isa = PBXBuildFile; productRef = 132DD8B92F4CDDEB00282A30 /* HubService */; };
 		13B4EC572F817DF50060DAE1 /* HubUI in Frameworks */ = {isa = PBXBuildFile; productRef = 13B4EC562F817DF50060DAE1 /* HubUI */; };
 		13B4EC592F817DF80060DAE1 /* HubUI in Frameworks */ = {isa = PBXBuildFile; productRef = 13B4EC582F817DF80060DAE1 /* HubUI */; };
+		262C58D530179A8200CA8880 /* NetworkExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 262C58D430179A8200CA8880 /* NetworkExtension.framework */; };
+		262C58DD30179A8200CA8880 /* PacketTunnelExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 262C58D330179A8200CA8880 /* PacketTunnelExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		48A604013018000100604001 /* WireGuardKit in Frameworks */ = {isa = PBXBuildFile; productRef = 48A604003018000100604000 /* WireGuardKit */; };
+		48A6040B301800010060400B /* HubService in Frameworks */ = {isa = PBXBuildFile; productRef = 48A6040A301800010060400A /* HubService */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -21,13 +25,43 @@
 			remoteGlobalIDString = 13C54C702D638AA1000C4CA5;
 			remoteInfo = Hub;
 		};
+		262C58DB30179A8200CA8880 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 13C54C692D638AA1000C4CA5 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 262C58D230179A8200CA8880;
+			remoteInfo = PacketTunnelExtension;
+		};
+		48A604023018000100604002 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 13C54C692D638AA1000C4CA5 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 48A604033018000100604003;
+			remoteInfo = WireGuardGoBridge;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		262C58DE30179A8200CA8880 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				262C58DD30179A8200CA8880 /* PacketTunnelExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		1323D91D2FD07C0C00E9B818 /* Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		13C54C712D638AA1000C4CA5 /* Hub.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Hub.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13DF13502F5158BF00BF8AA5 /* Hub-Pro-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "Hub-Pro-Info.plist"; sourceTree = "<group>"; };
 		13F5738E2D68EDB4008546EB /* Hub Pro.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Hub Pro.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		262C58D330179A8200CA8880 /* PacketTunnelExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PacketTunnelExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		262C58D430179A8200CA8880 /* NetworkExtension.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = NetworkExtension.framework; path = System/Library/Frameworks/NetworkExtension.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -45,6 +79,13 @@
 			);
 			target = 13F5738D2D68EDB4008546EB /* Hub Pro */;
 		};
+		262C58E230179A8200CA8880 /* Exceptions for "PacketTunnelExtension" folder in "PacketTunnelExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 262C58D230179A8200CA8880 /* PacketTunnelExtension */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -60,6 +101,14 @@
 				13DF134F2F5156DB00BF8AA5 /* Exceptions for "Hub" folder in "Hub Pro" target */,
 			);
 			path = Hub;
+			sourceTree = "<group>";
+		};
+		262C58D630179A8200CA8880 /* PacketTunnelExtension */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				262C58E230179A8200CA8880 /* Exceptions for "PacketTunnelExtension" folder in "PacketTunnelExtension" target */,
+			);
+			path = PacketTunnelExtension;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -90,6 +139,16 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		262C58D030179A8200CA8880 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				262C58D530179A8200CA8880 /* NetworkExtension.framework in Frameworks */,
+				48A604013018000100604001 /* WireGuardKit in Frameworks */,
+				48A6040B301800010060400B /* HubService in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -99,6 +158,7 @@
 				13DF13502F5158BF00BF8AA5 /* Hub-Pro-Info.plist */,
 				13C54C732D638AA1000C4CA5 /* Hub */,
 				1323D91E2FD07C0C00E9B818 /* Tests */,
+				262C58D630179A8200CA8880 /* PacketTunnelExtension */,
 				13F573AA2D68EE24008546EB /* Frameworks */,
 				13C54C722D638AA1000C4CA5 /* Products */,
 			);
@@ -110,6 +170,7 @@
 				13C54C712D638AA1000C4CA5 /* Hub.app */,
 				13F5738E2D68EDB4008546EB /* Hub Pro.app */,
 				1323D91D2FD07C0C00E9B818 /* Tests.xctest */,
+				262C58D330179A8200CA8880 /* PacketTunnelExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -117,11 +178,29 @@
 		13F573AA2D68EE24008546EB /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				262C58D430179A8200CA8880 /* NetworkExtension.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
+
+/* Begin PBXLegacyTarget section */
+		48A604033018000100604003 /* WireGuardGoBridge */ = {
+			isa = PBXLegacyTarget;
+			buildArgumentsString = "$(ACTION)";
+			buildConfigurationList = 48A604063018000100604006 /* Build configuration list for PBXLegacyTarget "WireGuardGoBridge" */;
+			buildPhases = (
+			);
+			buildToolPath = "$(PROJECT_DIR)/Scripts/build-wireguard-go-bridge.sh";
+			buildWorkingDirectory = "$(PROJECT_DIR)/Vendor/wireguard-apple/Sources/WireGuardKitGo";
+			dependencies = (
+			);
+			name = WireGuardGoBridge;
+			passBuildSettingsInEnvironment = 1;
+			productName = WireGuardGoBridge;
+		};
+/* End PBXLegacyTarget section */
 
 /* Begin PBXNativeTarget section */
 		1323D91C2FD07C0C00E9B818 /* Tests */ = {
@@ -145,7 +224,7 @@
 			);
 			productName = Tests;
 			productReference = 1323D91D2FD07C0C00E9B818 /* Tests.xctest */;
-			productType = "com.apple.product-type.bundle.ui-testing";
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
 		13C54C702D638AA1000C4CA5 /* Hub */ = {
 			isa = PBXNativeTarget;
@@ -154,10 +233,12 @@
 				13C54C6D2D638AA1000C4CA5 /* Sources */,
 				13C54C6E2D638AA1000C4CA5 /* Frameworks */,
 				13C54C6F2D638AA1000C4CA5 /* Resources */,
+				262C58DE30179A8200CA8880 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				262C58DC30179A8200CA8880 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				13C54C732D638AA1000C4CA5 /* Hub */,
@@ -195,6 +276,31 @@
 			productReference = 13F5738E2D68EDB4008546EB /* Hub Pro.app */;
 			productType = "com.apple.product-type.application";
 		};
+		262C58D230179A8200CA8880 /* PacketTunnelExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 262C58E130179A8200CA8880 /* Build configuration list for PBXNativeTarget "PacketTunnelExtension" */;
+			buildPhases = (
+				262C58CF30179A8200CA8880 /* Sources */,
+				262C58D030179A8200CA8880 /* Frameworks */,
+				262C58D130179A8200CA8880 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				48A604053018000100604005 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				262C58D630179A8200CA8880 /* PacketTunnelExtension */,
+			);
+			name = PacketTunnelExtension;
+			packageProductDependencies = (
+				48A604003018000100604000 /* WireGuardKit */,
+				48A6040A301800010060400A /* HubService */,
+			);
+			productName = PacketTunnelExtension;
+			productReference = 262C58D330179A8200CA8880 /* PacketTunnelExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -202,8 +308,8 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2650;
-				LastUpgradeCheck = 2630;
+				LastSwiftUpdateCheck = 2700;
+				LastUpgradeCheck = 2700;
 				TargetAttributes = {
 					1323D91C2FD07C0C00E9B818 = {
 						CreatedOnToolsVersion = 26.5;
@@ -214,6 +320,9 @@
 					};
 					13F5738D2D68EDB4008546EB = {
 						CreatedOnToolsVersion = 16.2;
+					};
+					262C58D230179A8200CA8880 = {
+						CreatedOnToolsVersion = 27.0;
 					};
 				};
 			};
@@ -227,7 +336,8 @@
 			mainGroup = 13C54C682D638AA1000C4CA5;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				132DD8B62F4CDDE300282A30 /* XCRemoteSwiftPackageReference "HubService" */,
+				132DD8B62F4CDDE300282A30 /* XCLocalSwiftPackageReference "../HubService" */,
+				48A604073018000100604007 /* XCLocalSwiftPackageReference "Vendor/wireguard-apple" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 13C54C722D638AA1000C4CA5 /* Products */;
@@ -237,6 +347,8 @@
 				13C54C702D638AA1000C4CA5 /* Hub */,
 				13F5738D2D68EDB4008546EB /* Hub Pro */,
 				1323D91C2FD07C0C00E9B818 /* Tests */,
+				262C58D230179A8200CA8880 /* PacketTunnelExtension */,
+				48A604033018000100604003 /* WireGuardGoBridge */,
 			);
 		};
 /* End PBXProject section */
@@ -257,6 +369,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		13F5738C2D68EDB4008546EB /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		262C58D130179A8200CA8880 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -287,6 +406,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		262C58CF30179A8200CA8880 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -295,12 +421,23 @@
 			target = 13C54C702D638AA1000C4CA5 /* Hub */;
 			targetProxy = 1323D9232FD07C0C00E9B818 /* PBXContainerItemProxy */;
 		};
+		262C58DC30179A8200CA8880 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 262C58D230179A8200CA8880 /* PacketTunnelExtension */;
+			targetProxy = 262C58DB30179A8200CA8880 /* PBXContainerItemProxy */;
+		};
+		48A604053018000100604005 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 48A604033018000100604003 /* WireGuardGoBridge */;
+			targetProxy = 48A604023018000100604002 /* PBXContainerItemProxy */;
+		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		1323D9252FD07C0C00E9B818 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -320,7 +457,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
-				TEST_TARGET_NAME = Hub;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Hub.app/Contents/MacOS/Hub";
 				XROS_DEPLOYMENT_TARGET = 26.5;
 			};
 			name = Debug;
@@ -328,6 +465,7 @@
 		1323D9262FD07C0C00E9B818 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -348,7 +486,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
-				TEST_TARGET_NAME = Hub;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Hub.app/Contents/MacOS/Hub";
 				XROS_DEPLOYMENT_TARGET = 26.5;
 			};
 			name = Release;
@@ -518,8 +656,17 @@
 				DEVELOPMENT_TEAM = AUCR797TMH;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
+				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
+				ENABLE_RESOURCE_ACCESS_USB = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Hub/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
@@ -540,6 +687,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = dev.v57.Hub;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
+				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = "appletvos appletvsimulator iphoneos iphonesimulator macosx xros xrsimulator";
 				SUPPORTS_MACCATALYST = NO;
@@ -568,8 +716,17 @@
 				DEVELOPMENT_TEAM = AUCR797TMH;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
+				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
+				ENABLE_RESOURCE_ACCESS_USB = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Hub/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
@@ -590,6 +747,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = dev.v57.Hub;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
+				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = "appletvos appletvsimulator iphoneos iphonesimulator macosx xros xrsimulator";
 				SUPPORTS_MACCATALYST = NO;
@@ -625,6 +783,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.v57.HubPro;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
 				SDKROOT = macosx;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG PRO $(inherited)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -656,10 +815,108 @@
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.v57.HubPro;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
 				SDKROOT = macosx;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = PRO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		262C58DF30179A8200CA8880 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CODE_SIGN_ENTITLEMENTS = PacketTunnelExtension/PacketTunnelExtension.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 4;
+				DEVELOPMENT_TEAM = AUCR797TMH;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = PacketTunnelExtension/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = PacketTunnelExtension;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.v57.Hub.PacketTunnelExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = auto;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		262C58E030179A8200CA8880 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CODE_SIGN_ENTITLEMENTS = PacketTunnelExtension/PacketTunnelExtension.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 4;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = AUCR797TMH;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = PacketTunnelExtension/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = PacketTunnelExtension;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.v57.Hub.PacketTunnelExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = auto;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		48A604083018000100604008 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+			};
+			name = Debug;
+		};
+		48A604093018000100604009 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 			};
 			name = Release;
 		};
@@ -702,39 +959,67 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		262C58E130179A8200CA8880 /* Build configuration list for PBXNativeTarget "PacketTunnelExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				262C58DF30179A8200CA8880 /* Debug */,
+				262C58E030179A8200CA8880 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		48A604063018000100604006 /* Build configuration list for PBXLegacyTarget "WireGuardGoBridge" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				48A604083018000100604008 /* Debug */,
+				48A604093018000100604009 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
-/* Begin XCRemoteSwiftPackageReference section */
-		132DD8B62F4CDDE300282A30 /* XCRemoteSwiftPackageReference "HubService" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/v57/HubService";
-			requirement = {
-				branch = main;
-				kind = branch;
-			};
+/* Begin XCLocalSwiftPackageReference section */
+		132DD8B62F4CDDE300282A30 /* XCLocalSwiftPackageReference "../HubService" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../HubService;
 		};
-/* End XCRemoteSwiftPackageReference section */
+		48A604073018000100604007 /* XCLocalSwiftPackageReference "Vendor/wireguard-apple" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = "Vendor/wireguard-apple";
+		};
+/* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
 		132DD8B72F4CDDE300282A30 /* HubService */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 132DD8B62F4CDDE300282A30 /* XCRemoteSwiftPackageReference "HubService" */;
+			package = 132DD8B62F4CDDE300282A30 /* XCLocalSwiftPackageReference "../HubService" */;
 			productName = HubService;
 		};
 		132DD8B92F4CDDEB00282A30 /* HubService */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 132DD8B62F4CDDE300282A30 /* XCRemoteSwiftPackageReference "HubService" */;
+			package = 132DD8B62F4CDDE300282A30 /* XCLocalSwiftPackageReference "../HubService" */;
 			productName = HubService;
 		};
 		13B4EC562F817DF50060DAE1 /* HubUI */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 132DD8B62F4CDDE300282A30 /* XCRemoteSwiftPackageReference "HubService" */;
+			package = 132DD8B62F4CDDE300282A30 /* XCLocalSwiftPackageReference "../HubService" */;
 			productName = HubUI;
 		};
 		13B4EC582F817DF80060DAE1 /* HubUI */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 132DD8B62F4CDDE300282A30 /* XCRemoteSwiftPackageReference "HubService" */;
+			package = 132DD8B62F4CDDE300282A30 /* XCLocalSwiftPackageReference "../HubService" */;
 			productName = HubUI;
+		};
+		48A604003018000100604000 /* WireGuardKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 48A604073018000100604007 /* XCLocalSwiftPackageReference "Vendor/wireguard-apple" */;
+			productName = WireGuardKit;
+		};
+		48A6040A301800010060400A /* HubService */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 132DD8B62F4CDDE300282A30 /* XCLocalSwiftPackageReference "../HubService" */;
+			productName = HubService;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

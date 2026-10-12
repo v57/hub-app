@@ -37,7 +37,11 @@ extension AppServices {
     guard let translation else { return }
     withObservationTracking {
       if let pairs = Translation.main.pairs {
-        update(pairs: pairs, isEnabled: translation.isEnabled, translation: translation.item)
+        update(
+          pairs: pairs,
+          isEnabled: translation.isEnabled && hub.net.isJoined,
+          translation: translation.item
+        )
       }
     } onChange: { [weak self] in
       Task { @MainActor [weak self] in
@@ -49,10 +53,12 @@ extension AppServices {
     if isEnabled {
       if translation.groups.isEmpty {
         for pair in pairs.available {
-          translation.groups[pair.id] = self.hub.service.group(enabled: true).translate(pair)
+          translation.groups[pair.id] = self.hub.net.service().translate(pair)
         }
         for pair in pairs.unavailable {
-          translation.groups[pair.id] = self.hub.service.group(enabled: false).translate(pair)
+          let group = self.hub.net.service().translate(pair)
+          group.isEnabled = false
+          translation.groups[pair.id] = group
         }
         self.hub.service.sendServiceUpdates()
       } else {

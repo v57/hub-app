@@ -1,0 +1,258 @@
+import Foundation
+import HubService
+import Network
+import Darwin
+
+private struct GatewayGrantRequest: Encodable, Sendable {
+  let clientKey: String
+  let clientWireGuardKey: String
+  let gatewayKey: String
+  let ipv4: Bool
+  let ipv6: Bool
+  let dns: Bool
+}
+
+private struct GatewayGrantResponse: Decodable, Sendable {
+  let grant: GatewayGrant
+}
+
+struct ReachableGateway: Identifiable, Equatable, Sendable {
+  var id: String { status.key }
+
+  let status: GatewayStatus
+  let overlayAddress: String
+  let peerEndpoint: String
+}
+
+@MainActor
+final class GatewaySelectionController {
+  static func reachable(
+    statuses: [GatewayStatus],
+    agents: [HubNetworkAgent]
+  ) -> [ReachableGateway] {
+    var reachable = [ReachableGateway]()
+    for status in statuses {
+      guard isUsable(status),
+            let agent = matchingAgent(for: status, in: agents),
+            let address = gatewayAddress(for: status, agent: agent),
+            let endpoint = Optional(status.endpoint),
+            endpointHost(endpoint) != nil else {
+        continue
+      }
+      reachable.append(
+        ReachableGateway(
+          status: status,
+          overlayAddress: address,
+          peerEndpoint: endpoint
+        )
+      )
+    }
+    return reachable.sorted {
+      if $0.status.capability.metered != $1.status.capability.metered {
+        return !$0.status.capability.metered
+      }
+      return $0.status.key < $1.status.key
+    }
+  }
+
+  private static func isUsable(_ status: GatewayStatus) -> Bool {
+    status.version == hubNetworkWireVersion
+      && status.state == .available
+      && status.capability.capability == "internet-gateway-v1"
+      && status.capability.dns
+      && (status.capability.ipv4 || status.capability.ipv6)
+  }
+
+  private static func matchingAgent(
+    for status: GatewayStatus,
+    in agents: [HubNetworkAgent]
+  ) -> HubNetworkAgent? {
+    agents.first {
+      $0.key == status.key
+        && $0.key == status.key
+        && $0.wireGuardKey == status.wireGuardKey
+    }
+  }
+
+  private static func gatewayAddress(
+    for status: GatewayStatus,
+    agent: HubNetworkAgent
+  ) -> String? {
+    agent.overlayAddresses.first {
+      if status.capability.ipv4 {
+        return IPv4Address($0) != nil
+      }
+      return IPv6Address($0) != nil
+    }
+  }
+
+  func select(
+    _ gateway: ReachableGateway,
+    hub: Hub,
+    tunnel: PacketTunnelController,
+    controlPlaneHosts: [String] = []
+  ) async throws {
+    let wireGuardKey = try HubNetworkWireGuardKeyStore().publicKeyBase64()
+    let current = try HubNetworkProfileStore().load()
+    guard current.profilePublicKey == hub.key,
+          current.hubNetworkID == gateway.status.hubNetworkId,
+          current.trustedHubKey != nil else {
+      throw GatewaySelectionError.membershipMismatch
+    }
+
+    let response: GatewayGrantResponse = try await hub.client.send(
+      "network/gateway/grant",
+      GatewayGrantRequest(
+        clientKey: hub.key,
+        clientWireGuardKey: wireGuardKey,
+        gatewayKey: gateway.status.key,
+        ipv4: gateway.status.capability.ipv4,
+        ipv6: gateway.status.capability.ipv6,
+        dns: true
+      )
+    )
+    let grant = response.grant
+    try HubNetworkSignedEnvelope.validateGatewayGrant(
+      grant,
+      binding: GatewayGrantBinding(
+        trustedHubKey: current.trustedHubKey!,
+        hubNetworkId: current.hubNetworkID,
+        gatewayKey: gateway.status.key,
+        gatewayWireGuardKey: gateway.status.wireGuardKey,
+        generation: grant.generation,
+        clientKey: hub.key,
+        clientWireGuardKey: wireGuardKey,
+        ipv4: gateway.status.capability.ipv4,
+        ipv6: gateway.status.capability.ipv6,
+        dns: true
+      )
+    )
+
+    let endpointHostValue = Self.endpointHost(gateway.peerEndpoint)
+    let namedControlHosts = [hub.settings.address.host, endpointHostValue]
+      .compactMap { $0 }
+    var resolvedControlHosts = [String]()
+    for host in namedControlHosts {
+      resolvedControlHosts.append(contentsOf: Self.resolve(host))
+    }
+    let allControlHosts = controlPlaneHosts + namedControlHosts
+      + resolvedControlHosts
+    let ipv4Hosts = Array(Set(allControlHosts.filter { IPv4Address($0) != nil })).sorted()
+    let ipv6Hosts = Array(Set(allControlHosts.filter { IPv6Address($0) != nil })).sorted()
+
+    try await tunnel.replaceAndStart(
+      configuration: HubNetworkProfileConfiguration(
+        version: current.version,
+        hubURL: current.hubURL,
+        hubNetworkID: current.hubNetworkID,
+        profilePublicKey: current.profilePublicKey,
+        overlayIPv4Address: current.overlayIPv4Address,
+        overlayIPv6Address: current.overlayIPv6Address,
+        dnsSuffix: current.dnsSuffix,
+        overlayIPv4Route: current.overlayIPv4Route,
+        overlayIPv6Route: current.overlayIPv6Route,
+        dnsRecords: [
+          HubNetworkDNSRecord(
+            authority: "gateway.\(current.dnsSuffix)",
+            address: gateway.overlayAddress
+          )
+        ],
+        dnsServerAddress: gateway.overlayAddress,
+        trustedHubKey: current.trustedHubKey,
+        wireGuardPublicKey: wireGuardKey,
+        gatewayGrant: grant,
+        peerEndpoint: gateway.peerEndpoint,
+        controlPlaneIPv4Hosts: ipv4Hosts,
+        controlPlaneIPv6Hosts: ipv6Hosts,
+        gatewayServingEnabled: current.servesGateway
+      )
+    )
+  }
+
+  func renew(
+    _ gateway: ReachableGateway,
+    hub: Hub,
+    tunnel: PacketTunnelController,
+    controlPlaneHosts: [String] = []
+  ) async throws {
+    try await select(
+      gateway,
+      hub: hub,
+      tunnel: tunnel,
+      controlPlaneHosts: controlPlaneHosts
+    )
+  }
+
+  func disable(tunnel: PacketTunnelController) async throws {
+    print("GatewaySelectionController.disable")
+    let current = try HubNetworkProfileStore().load()
+    let overlayOnly = HubNetworkProfileConfiguration(
+      version: current.version,
+      hubURL: current.hubURL,
+      hubNetworkID: current.hubNetworkID,
+      profilePublicKey: current.profilePublicKey,
+      overlayIPv4Address: current.overlayIPv4Address,
+      overlayIPv6Address: current.overlayIPv6Address,
+      dnsSuffix: current.dnsSuffix,
+      overlayIPv4Route: current.overlayIPv4Route,
+      overlayIPv6Route: current.overlayIPv6Route,
+      trustedHubKey: current.trustedHubKey,
+      gatewayServingEnabled: current.servesGateway
+    )
+    try await tunnel.replaceAndStart(configuration: overlayOnly)
+  }
+
+  private static func endpointHost(_ endpoint: String) -> String? {
+    if endpoint.hasPrefix("["),
+       let closingBracket = endpoint.firstIndex(of: "]") {
+      return String(endpoint[endpoint.index(after: endpoint.startIndex)..<closingBracket])
+    }
+    guard let separator = endpoint.lastIndex(of: ":"),
+          separator != endpoint.startIndex,
+          Int(endpoint[endpoint.index(after: separator)...]) != nil else {
+      return nil
+    }
+    return String(endpoint[..<separator])
+  }
+
+  private static func resolve(_ host: String) -> [String] {
+    if IPv4Address(host) != nil || IPv6Address(host) != nil {
+      return [host]
+    }
+    var hints = addrinfo(
+      ai_flags: AI_ADDRCONFIG,
+      ai_family: AF_UNSPEC,
+      ai_socktype: SOCK_STREAM,
+      ai_protocol: IPPROTO_TCP,
+      ai_addrlen: 0,
+      ai_canonname: nil,
+      ai_addr: nil,
+      ai_next: nil
+    )
+    var result: UnsafeMutablePointer<addrinfo>?
+    guard getaddrinfo(host, nil, &hints, &result) == 0 else { return [] }
+    defer { freeaddrinfo(result) }
+    var values = Set<String>()
+    var current = result
+    while let info = current?.pointee {
+      var buffer = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+      if getnameinfo(
+        info.ai_addr,
+        info.ai_addrlen,
+        &buffer,
+        socklen_t(buffer.count),
+        nil,
+        0,
+        NI_NUMERICHOST
+      ) == 0 {
+        values.insert(String(cString: buffer))
+      }
+      current = info.ai_next
+    }
+    return values.sorted()
+  }
+}
+
+enum GatewaySelectionError: Error, Equatable {
+  case membershipMismatch
+}

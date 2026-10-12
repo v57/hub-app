@@ -26,6 +26,18 @@ struct HubStateStorage {
   let launcherInfo = Sync("launcher/info", Hub.Launcher.Apps())
   let launcherStatus = Sync("launcher/status", Hub.Launcher.Status())
   let whitelist = Sync("hub/whitelist/status", WhitelistStatus())
+  let networkResources = Sync("network/resource/list", [HubNetworkResource]())
+  let networkAgents = Sync("network/agents/list", [HubNetworkAgent]())
+  let networkAgentStatus = Sync("network/status/agents", [HubNetworkAgentStatus]())
+  let networkConnectionStatus = Sync("network/status/connections", [HubNetworkConnectionStatus]())
+  let networkDiagnostics = Sync("network/diagnostics", [HubNetworkDiagnostic]())
+  let networkLocalAgent = Sync(
+    "hub/net/local-agent",
+    HubNetworkLocalAgentStatus.unavailable
+  )
+  let hubNetAgents = Sync("hub/net/list", [HubNetInfo]())
+  let hubNetNode = Sync("hub/net/node", "")
+  let networkGateways = Sync("network/gateway/list", [GatewayStatus]())
   
   @MainActor @Observable
   class Sync<T: Decodable & Sendable> {
@@ -59,6 +71,11 @@ struct HubStateStorage {
       }
     }
   }
+}
+
+struct HubNetInfo: Codable, Hashable, Identifiable, Sendable {
+  let id: String
+  let localIp: String
 }
 
 @MainActor

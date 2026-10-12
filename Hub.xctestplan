@@ -1,0 +1,50 @@
+{
+  "configurations" : [
+    {
+      "id" : "A11D51A8-0C48-4A8B-A07C-E128392175CB",
+      "name" : "Configuration 1",
+      "options" : {
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "environmentVariableEntries" : [
+      {
+        "enabled" : false,
+        "key" : "HUB_HUBNET_VPN_ACCEPTANCE",
+        "value" : "1"
+      },
+      {
+        "enabled" : false,
+        "key" : "HUB_HN604_REMOTE_ACCEPTANCE",
+        "value" : "1"
+      },
+      {
+        "enabled" : false,
+        "key" : "HUB_HN855_SIGNED_ACCEPTANCE",
+        "value" : "1"
+      },
+      {
+        "enabled" : false,
+        "key" : "HUB_HN855_INVITATION",
+        "value" : "hub://net/join/REPLACE_WITH_LIVE_INVITATION"
+      },
+      {
+        "enabled" : false,
+        "key" : "HUB_HN855_PROFILE_JSON",
+        "value" : "/absolute/path/to/live-profile.json"
+      }
+    ]
+  },
+  "testTargets" : [
+    {
+      "parallelizable" : true,
+      "target" : {
+        "containerPath" : "container:Hub.xcodeproj",
+        "identifier" : "1323D91C2FD07C0C00E9B818",
+        "name" : "Tests"
+      }
+    }
+  ],
+  "version" : 1
+}

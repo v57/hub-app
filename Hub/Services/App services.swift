@@ -15,7 +15,61 @@ import HubService
 import FoundationNetworking
 #endif
 
+/// RFC 3986 unreserved characters, matching Go's `url.QueryEscape` so the
+/// signed `?e=` query round-trips through hub-net-node's canonical check.
+private enum HubNetworkInvitationQuery {
+  static let allowed: CharacterSet = {
+    var allowed = CharacterSet.alphanumerics
+    allowed.insert(charactersIn: "-._~")
+    return allowed
+  }()
+}
+
 extension HubService.Group {
+  /// Thread-safe box for the current hub-pro `hub/net/node` value. The invite
+  /// service handler is `@Sendable`, so it reads the endpoint from here
+  /// instead of capturing MainActor hub state.
+  final class HubNetworkNodeEndpointStore: @unchecked Sendable {
+    static let shared = HubNetworkNodeEndpointStore()
+    private let lock = NSLock()
+    private var value = ""
+    func set(_ endpoint: String) {
+      lock.lock()
+      defer { lock.unlock() }
+      value = endpoint
+    }
+    func current() -> String {
+      lock.lock()
+      defer { lock.unlock() }
+      return value
+    }
+  }
+
+  func hubNetworkAgentService(
+    nodeEndpoint: @escaping @Sendable () -> String
+      = { HubNetworkNodeEndpointStore.shared.current() }
+  ) -> Self {
+    post("net/invite", options: .init(permissions: .init(
+      group: "Hub Network", name: "Invite to Hub Net"
+    ))) { () -> String in
+      var nonce = UInt32.random(in: .min ... .max).bigEndian
+      var expires = UInt32(Date().addingTimeInterval(7 * 24 * 60 * 60).timeIntervalSince1970).bigEndian
+      let noncePart = withUnsafeBytes(of: &nonce) { Data($0).base64URLEncodedString() }
+      let expiresPart = withUnsafeBytes(of: &expires) { Data($0).base64URLEncodedString() }
+      let spki = Data(base64Encoded: KeyChain.main.publicKey())!
+      let publicKey = Data(spki.suffix(32)).base64URLEncodedString()
+      var payload = "\(publicKey).\(expiresPart).\(noncePart)"
+      let endpoint = nodeEndpoint()
+      if !endpoint.isEmpty && endpoint != "hub.v57.dev/node" {
+        let escaped = endpoint.addingPercentEncoding(
+          withAllowedCharacters: HubNetworkInvitationQuery.allowed
+        ) ?? endpoint
+        payload += "?e=" + escaped
+      }
+      let signature = try KeyChain.main.signature(for: Data(payload.utf8)).base64URLEncodedString()
+      return "\(payload)/\(signature)"
+    }
+  }
 #if canImport(AVFoundation)
   func videoService() -> Self {
     app(App(header: .init(type: .app, name: "Video Encoder", path: "video/encode/ui"), body: [
@@ -126,6 +180,14 @@ extension HubService.Group {
     var request = URLRequest(url: to)
     request.httpMethod = "PUT"
     _ = try await URLSession.shared.upload(for: request, from: data)
+  }
+}
+
+private extension Data {
+  func base64URLEncodedString() -> String {
+    base64EncodedString().replacingOccurrences(of: "+", with: "-")
+      .replacingOccurrences(of: "/", with: "_")
+      .replacingOccurrences(of: "=", with: "")
   }
 }
 
