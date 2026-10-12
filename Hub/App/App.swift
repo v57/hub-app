@@ -47,6 +47,8 @@ struct HubApp: App {
 #else
           mainContent
 #endif
+        } else if VPNProfileProbe.mode != nil {
+          Text("VPN profile probe").task { await VPNProfileProbe.run() }
         } else {
           mainContent
         }

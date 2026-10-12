@@ -94,7 +94,28 @@ final class PacketTunnelController: PacketTunnelControlling {
     manager.connection.stopVPNTunnel()
   }
 
+  /// Stops the tunnel, disables the system VPN profile and deletes the shared
+  /// membership file.
+  ///
+  /// The profile itself stays installed: creating a new one shows the system
+  /// "Add VPN Configurations" consent prompt, while reusing an existing one
+  /// does not. `install(configuration:)` re-enables it.
   func remove() async throws {
+    if let manager = try await loadManager() {
+      manager.connection.stopVPNTunnel()
+      if manager.isEnabled {
+        manager.isEnabled = false
+        try await save(manager)
+      }
+    }
+    try store.remove()
+  }
+
+  /// Deletes the system VPN profile. The next install asks for consent again.
+  ///
+  /// Only needed when the installed profile belongs to a differently signed
+  /// build (macOS rejects it with a tunnel activation failure).
+  func deleteSystemProfile() async throws {
     if let manager = try await loadManager() {
       manager.connection.stopVPNTunnel()
       try await remove(manager)

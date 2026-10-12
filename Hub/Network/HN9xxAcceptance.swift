@@ -73,7 +73,7 @@ enum HN9xxAcceptance {
     if ProcessInfo.processInfo.environment["HUB_HN9XX_RESET_PROFILE"] != nil {
       let tunnel = try? PacketTunnelController()
       await tunnel?.stop()
-      try? await tunnel?.remove()
+      try? await tunnel?.deleteSystemProfile()
       writeStdout("[HN9XX] profile reset")
       try? await Task.sleep(for: .seconds(1))
       terminateApp()
