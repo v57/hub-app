@@ -45,13 +45,32 @@ extension HubService.Group {
     }
   }
 
+  enum HubNetworkInviteError: LocalizedError {
+    case inviterOffline
+    var errorDescription: String? { "This device is not registered with the Hub Network node yet." }
+  }
+
   func hubNetworkAgentService(
     nodeEndpoint: @escaping @Sendable () -> String
-      = { HubNetworkNodeEndpointStore.shared.current() }
+      = { HubNetworkNodeEndpointStore.shared.current() },
+    inviterOnline: @escaping @Sendable () async -> Bool = {
+      await Task { @MainActor in
+        (try? await PacketTunnelController().inviterStatus().registered) == true
+      }.value
+    }
   ) -> Self {
     post("net/invite", options: .init(permissions: .init(
       group: "Hub Network", name: "Invite to Hub Net"
     ))) { () -> String in
+      // The node rejects joins while the extension's inviter is not
+      // registered with it, so do not hand out a code that cannot work.
+      let deadline = ContinuousClock.now + .seconds(10)
+      while !(await inviterOnline()) {
+        guard ContinuousClock.now < deadline else {
+          throw HubNetworkInviteError.inviterOffline
+        }
+        try await Task.sleep(for: .milliseconds(250))
+      }
       var nonce = UInt32.random(in: .min ... .max).bigEndian
       var expires = UInt32(Date().addingTimeInterval(7 * 24 * 60 * 60).timeIntervalSince1970).bigEndian
       let noncePart = withUnsafeBytes(of: &nonce) { Data($0).base64URLEncodedString() }
