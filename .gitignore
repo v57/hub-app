@@ -3,3 +3,24 @@ xcuserdata/
 .swiftpm/
 .build/
 fastlane
+
+# macOS
+# Finder folder icon: a file named Icon plus a carriage return
+Icon[]
+
+# Build
+build/
+DerivedData/
+*.xcuserstate
+
+# Secrets
+.env
+
+# Agents (local agent instructions, settings and boards)
+CLAUDE.md
+AGENTS.md
+.claude/
+.codex/
+.commandcode/
+.hermes/
+KANBAN*.md
