@@ -218,7 +218,7 @@ struct NativeJoinCoordinator {
       }
       report(.init(transactionId: transactionId, state: .activating))
       let membershipConfiguration = try committedConfiguration(
-        hubProHost: hubProHost, record: record, enrollment: enrollment
+        hubProHost: hubProHost, record: record, enrollment: enrollment, status: status
       )
       try tunnel.stageNativeJoinMembership(configuration: membershipConfiguration)
       let committed = try await classified(
@@ -420,8 +420,20 @@ struct NativeJoinCoordinator {
   private static func committedConfiguration(
     hubProHost: String,
     record: NativeJoinRecord,
-    enrollment: NativeJoinEnrollment
+    enrollment: NativeJoinEnrollment,
+    status: PacketTunnelNativeJoinStatus
   ) throws -> HubNetworkProfileConfiguration {
+    // The hub host stays this member's only peer: hub-pro is reachable only
+    // through it, so it must survive tunnel restarts.
+    guard let admission = status.admission,
+          let endpoint = status.hubPeerEndpoint else {
+      throw NativeJoinError.invalidBootstrapIdentity
+    }
+    let hubPeer = HubNetworkPeer(
+      publicKey: admission.inviterWireGuardKey,
+      endpoint: endpoint,
+      allowedIPs: [hubProHost.contains(":") ? "\(hubProHost)/128" : "\(hubProHost)/32"]
+    )
     guard let hubURL = bootstrapHubURL(hubProHost),
           let ipv4 = enrollment.profile.overlayAddresses.first(where: { !$0.contains(":") }),
           let ipv6 = enrollment.profile.overlayAddresses.first(where: { $0.contains(":") }) else {
@@ -436,7 +448,8 @@ struct NativeJoinCoordinator {
       trustedHubKey: enrollment.hubKey,
       wireGuardPublicKey: record.wireGuardPublicKey,
       controlPlaneIPv4Hosts: [],
-      controlPlaneIPv6Hosts: []
+      controlPlaneIPv6Hosts: [],
+      hubPeer: hubPeer
     )
   }
 

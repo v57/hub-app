@@ -291,6 +291,27 @@ final class PacketTunnelWireGuardAdapter {
       peer.persistentKeepAlive = 25
       peers = [peer]
     }
+    if let hubPeer = profile.hubPeer {
+      // A joined member reaches hub-pro only through the hub host.
+      guard let keyData = Data(base64Encoded: hubPeer.publicKey),
+            let key = PublicKey(rawValue: keyData),
+            let endpoint = Endpoint(from: hubPeer.endpoint) else {
+        throw PacketTunnelWireGuardConfigurationError.invalidConfiguration
+      }
+      let allowedIPs = hubPeer.allowedIPs.compactMap(IPAddressRange.init(from:))
+      guard allowedIPs.count == hubPeer.allowedIPs.count, !allowedIPs.isEmpty else {
+        throw PacketTunnelWireGuardConfigurationError.invalidConfiguration
+      }
+      if let index = peers.firstIndex(where: { $0.publicKey == key }) {
+        peers[index].allowedIPs += allowedIPs.filter { !peers[index].allowedIPs.contains($0) }
+      } else {
+        var peer = PeerConfiguration(publicKey: key)
+        peer.endpoint = endpoint
+        peer.allowedIPs = allowedIPs
+        peer.persistentKeepAlive = 25
+        peers.append(peer)
+      }
+    }
 
     return TunnelConfiguration(
       name: "Hub Network",

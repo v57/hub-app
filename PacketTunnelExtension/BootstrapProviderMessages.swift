@@ -174,6 +174,9 @@ struct ExtensionNativeJoinStatus: Encodable {
   /// The inviter-signed bootstrap response; hub-pro requires it as the
   /// admission on the joiner's first bind.
   let admission: DirectBootstrapResponse?
+  /// The inviter's WireGuard endpoint the bootstrap link uses; the app keeps
+  /// it as the hub peer of the committed membership.
+  let hubPeerEndpoint: String?
   let state: ExtensionNativeJoinState
   let updatedAt: String
   let error: NetworkError?

@@ -6,6 +6,15 @@ import Network
 ///
 /// Keep this model free of NetworkExtension and WireGuard types: the app owns
 /// profile selection and persistence while the extension owns packet handling.
+/// The WireGuard peer of the hub host (the inviting agent) for a joined
+/// membership. A member reaches hub-pro only through it, so it is persisted
+/// with the profile and installed on every tunnel start.
+struct HubNetworkPeer: Codable, Equatable, Sendable {
+  let publicKey: String
+  let endpoint: String
+  let allowedIPs: [String]
+}
+
 struct HubNetworkProfileConfiguration: Codable, Equatable, Sendable {
   static let currentVersion = 1
 
@@ -27,9 +36,10 @@ struct HubNetworkProfileConfiguration: Codable, Equatable, Sendable {
   let peerEndpoint: String?
   let controlPlaneIPv4Hosts: [String]?
   let controlPlaneIPv6Hosts: [String]?
-  let gatewayServingEnabled: Bool?
+  private(set) var gatewayServingEnabled: Bool?
   let servesInviter: Bool?
   let nodeEndpoint: String?
+  let hubPeer: HubNetworkPeer?
 
   var servesGateway: Bool { gatewayServingEnabled == true }
   var usesGateway: Bool { gatewayGrant != nil }
@@ -56,7 +66,8 @@ struct HubNetworkProfileConfiguration: Codable, Equatable, Sendable {
     controlPlaneIPv6Hosts: [String] = [],
     gatewayServingEnabled: Bool = false,
     servesInviter: Bool = false,
-    nodeEndpoint: String? = nil
+    nodeEndpoint: String? = nil,
+    hubPeer: HubNetworkPeer? = nil
   ) {
     self.version = version
     self.hubURL = hubURL
@@ -79,6 +90,14 @@ struct HubNetworkProfileConfiguration: Codable, Equatable, Sendable {
     self.gatewayServingEnabled = gatewayServingEnabled
     self.servesInviter = servesInviter
     self.nodeEndpoint = nodeEndpoint
+    self.hubPeer = hubPeer
+  }
+
+  /// A copy with only gateway serving changed.
+  func withGatewayServing(_ enabled: Bool) -> Self {
+    var copy = self
+    copy.gatewayServingEnabled = enabled
+    return copy
   }
 
   func validate() throws {
@@ -174,6 +193,16 @@ struct HubNetworkProfileConfiguration: Codable, Equatable, Sendable {
     guard (controlPlaneIPv4Hosts ?? []).allSatisfy(Self.isIPv4Host),
           (controlPlaneIPv6Hosts ?? []).allSatisfy(Self.isIPv6Host) else {
       throw HubNetworkProfileConfigurationError.invalidControlPlaneRoute
+    }
+    if let hubPeer {
+      guard Data(base64Encoded: hubPeer.publicKey)?.count == 32,
+            !hubPeer.endpoint.isEmpty,
+            !hubPeer.allowedIPs.isEmpty,
+            hubPeer.allowedIPs.allSatisfy({
+              $0.contains(":") ? Self.isOverlayIPv6Address($0) : Self.isOverlayIPv4Address($0)
+            }) else {
+        throw HubNetworkProfileConfigurationError.incompletePeerConfiguration
+      }
     }
   }
 

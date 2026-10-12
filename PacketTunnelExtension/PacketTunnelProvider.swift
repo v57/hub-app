@@ -573,7 +573,8 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     error: NetworkError? = nil,
     hubProHost: String? = nil,
     bootstrapAddresses: [String]? = nil,
-    admission: DirectBootstrapResponse? = nil
+    admission: DirectBootstrapResponse? = nil,
+    hubPeerEndpoint: String? = nil
   ) -> ExtensionNativeJoinStatus {
     ExtensionNativeJoinStatus(
       version: 1, replayId: start.replayId,
@@ -583,6 +584,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
       expiresAt: start.expiresAt,
       hubProHost: hubProHost, bootstrapAddresses: bootstrapAddresses,
       admission: admission,
+      hubPeerEndpoint: hubPeerEndpoint,
       state: state, updatedAt: ISO8601DateFormatter.js.string(from: Date()),
       error: error
     )
@@ -657,6 +659,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
           timeout: min(20, max(5, ISO8601DateFormatter.js.date(from: start.expiresAt)?.timeIntervalSinceNow ?? 20))
         )
         Self.writeDiagnostics("bootstrap ok hubProHost=\(response.hubProHost) inviterV4=\(response.inviterAddress.ipv4) joinerV4=\(response.joinerAddress.ipv4) endpoint=\(response.endpoints.first.map(Self.directBootstrapEndpoint) ?? "none")")
+        let wireGuardEndpoint = Self.wireGuardEndpoint(response, exchangeTarget: inviterEndpoint)
         try await self.installNativeJoinPeer(
           start,
           inviterWireGuardKey: response.inviterWireGuardKey,
@@ -665,7 +668,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
             response.inviterAddress.ipv6,
           ],
           hubProHost: response.hubProHost,
-          endpoint: response.endpoints.first.map(Self.directBootstrapEndpoint) ?? inviterEndpoint
+          endpoint: wireGuardEndpoint
         )
         try await self.wireGuardAdapter.configureBootstrapLink(
           assignmentId: start.transactionId,
@@ -679,7 +682,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
             response.inviterAddress.ipv6,
           ],
           hubProHost: response.hubProHost,
-          endpoint: response.endpoints.first.map(Self.directBootstrapEndpoint) ?? inviterEndpoint
+          endpoint: wireGuardEndpoint
         )
         try await self.setTunnelNetworkSettings(
           Self.bootstrapNetworkSettings(
@@ -702,7 +705,8 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
             response.joinerAddress.ipv4,
             response.joinerAddress.ipv6,
           ],
-          admission: response
+          admission: response,
+          hubPeerEndpoint: wireGuardEndpoint
         )
       } catch is CancellationError {
         await self.removeBootstrapPeer(start.transactionId)
@@ -961,6 +965,29 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     endpoint.address.contains(":")
       ? "[\(endpoint.address)]:\(endpoint.port)"
       : "\(endpoint.address):\(endpoint.port)"
+  }
+
+  /// The inviter's WireGuard endpoint. An inviter that could not find a
+  /// reachable address advertises an unspecified one; then use the host the
+  /// exchange reached (node-observed) with the advertised WireGuard port, as
+  /// the Go joiner does.
+  private static func wireGuardEndpoint(
+    _ response: DirectBootstrapResponse,
+    exchangeTarget: String
+  ) -> String {
+    guard let endpoint = response.endpoints.first else { return exchangeTarget }
+    guard endpoint.address == "0.0.0.0" || endpoint.address == "::" else {
+      return directBootstrapEndpoint(endpoint)
+    }
+    let host: Substring
+    if exchangeTarget.hasPrefix("["), let closing = exchangeTarget.firstIndex(of: "]") {
+      host = exchangeTarget[exchangeTarget.index(after: exchangeTarget.startIndex)..<closing]
+    } else if let colon = exchangeTarget.lastIndex(of: ":") {
+      host = exchangeTarget[..<colon]
+    } else {
+      return exchangeTarget
+    }
+    return directBootstrapEndpoint(BootstrapEndpoint(address: String(host), port: endpoint.port, transport: "udp"))
   }
   
   private struct StateResponse<State: Encodable>: Encodable {

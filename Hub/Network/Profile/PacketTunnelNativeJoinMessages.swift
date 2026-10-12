@@ -98,6 +98,8 @@ struct PacketTunnelNativeJoinStatus: Codable, Hashable, Sendable {
   let bootstrapAddresses: [String]?
   /// Inviter-signed bootstrap response, sent with the first bind.
   let admission: DirectBootstrapResponse?
+  /// Inviter WireGuard endpoint used by the bootstrap link.
+  let hubPeerEndpoint: String?
   let state: PacketTunnelNativeJoinState
   let updatedAt: String
   let error: HubNetworkError?

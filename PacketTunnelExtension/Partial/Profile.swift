@@ -2,6 +2,14 @@ import Foundation
 import HubService
 import Network
 
+/// The hub host's WireGuard peer for a joined membership (see the app's
+/// `HubNetworkPeer`).
+struct HubPeer: Decodable {
+  let publicKey: String
+  let endpoint: String
+  let allowedIPs: [String]
+}
+
 struct Profile: Decodable {
   static let currentVersion = 1
   static let appGroupIdentifier = "group.dev.v57.hub"
@@ -28,6 +36,7 @@ struct Profile: Decodable {
   let gatewayServingEnabled: Bool?
   let servesInviter: Bool?
   let nodeEndpoint: String?
+  let hubPeer: HubPeer?
 
   var servesGateway: Bool { gatewayServingEnabled == true }
   var usesGateway: Bool { gatewayGrant != nil }

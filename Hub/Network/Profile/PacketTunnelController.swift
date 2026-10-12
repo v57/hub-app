@@ -130,28 +130,7 @@ final class PacketTunnelController: PacketTunnelControlling {
   /// after this method succeeds.
   func setGatewayServing(_ enabled: Bool) async throws {
     let current = try store.load()
-    let updated = HubNetworkProfileConfiguration(
-      version: current.version,
-      hubURL: current.hubURL,
-      hubNetworkID: current.hubNetworkID,
-      profilePublicKey: current.profilePublicKey,
-      overlayIPv4Address: current.overlayIPv4Address,
-      overlayIPv6Address: current.overlayIPv6Address,
-      dnsSuffix: current.dnsSuffix,
-      overlayIPv4Route: current.overlayIPv4Route,
-      overlayIPv6Route: current.overlayIPv6Route,
-      dnsRecords: current.dnsRecords ?? [],
-      dnsServerAddress: current.dnsServerAddress,
-      trustedHubKey: current.trustedHubKey,
-      wireGuardPublicKey: current.wireGuardPublicKey,
-      connectionGrant: current.connectionGrant,
-      gatewayGrant: current.gatewayGrant,
-      peerEndpoint: current.peerEndpoint,
-      controlPlaneIPv4Hosts: current.controlPlaneIPv4Hosts ?? [],
-      controlPlaneIPv6Hosts: current.controlPlaneIPv6Hosts ?? [],
-      gatewayServingEnabled: enabled,
-      servesInviter: current.inviterEnabled
-    )
+    let updated = current.withGatewayServing(enabled)
     try store.save(updated)
 
     guard let manager = try await loadManager() else {
