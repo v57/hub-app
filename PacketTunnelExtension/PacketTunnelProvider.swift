@@ -637,8 +637,16 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
           timeout: min(30, max(0, ISO8601DateFormatter.js.date(from: start.expiresAt)?.timeIntervalSinceNow ?? 0))
         )
         Self.writeDiagnostics("rendezvous ok candidates=\(peer.candidates.count) observed=\(peer.observedEndpoint.address):\(peer.observedEndpoint.port)")
-        let inviterEndpoint = peer.candidates.first.map(Self.bootstrapEndpoint)
-          ?? Self.bootstrapEndpoint(peer.observedEndpoint)
+        // A declared candidate with an unspecified address (an inviter bound
+        // to all interfaces) keeps its port on the node-observed host.
+        let inviterEndpoint = peer.candidates.first.map { candidate in
+          candidate.address == "0.0.0.0" || candidate.address == "::"
+            ? Self.bootstrapEndpoint(InvitationBootstrapClient.ObservedEndpoint(
+                version: peer.observedEndpoint.version, key: peer.observedEndpoint.key,
+                transport: "udp", address: peer.observedEndpoint.address, port: candidate.port
+              ))
+            : Self.bootstrapEndpoint(candidate)
+        } ?? Self.bootstrapEndpoint(peer.observedEndpoint)
         Self.writeDiagnostics("exchange target \(inviterEndpoint)")
         let serviceKey = try DirectBootstrapClient.joinerServiceKey(
           transactionId: start.transactionId,
