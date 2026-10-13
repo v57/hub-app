@@ -8,7 +8,8 @@ CLAUDE.md
 
 # macOS
 # Finder folder icon: a file named Icon plus a carriage return
-Icon[]
+Icon[
+]
 
 # Build
 build/
@@ -25,3 +26,10 @@ AGENTS.md
 .commandcode/
 .hermes/
 KANBAN*.md
+
+# Local runtime data (auth key), coverage output, xcodebuild caches written to the root
+/data/
+*.profraw
+/[0-9][0-9].[0-9]-*/
+# Agents
+graphify-out/

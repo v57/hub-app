@@ -18,9 +18,10 @@ struct HomeView: View {
   enum TextFieldFocus: Hashable {
     case joinHubAddress
     case joinHubName
+    case joinNetworkInvitation
   }
   @FocusState var focus: TextFieldFocus?
-  var isFocusing: Bool { focus == .joinHubAddress || focus == .joinHubName }
+  var isFocusing: Bool { focus != nil }
   @State var hubs = Hubs.main
   @Environment(\.colorScheme) var colorScheme
   var body: some View {
@@ -56,6 +57,7 @@ struct HomeView: View {
     @State private var copied = false
     @State var address: String = ""
     @State var merging: Hub?
+    @State private var invitationRouter = NetworkInvitationRouter.main
     @Namespace var namespace
     var body: some View {
       HomeGrid {
@@ -68,6 +70,11 @@ struct HomeView: View {
 #else
         JoinHubView(address: $address.animation(), focus: $focus)
           .gridSize(address.isEmpty ? .x21 : .x42)
+        JoinNetworkInvitationView(
+          pendingInput: invitationRouter.pendingInput,
+          focus: $focus
+        )
+        .gridSize(.x42)
 #endif
         NavigationLink {
           InstallationGuide().transitionTarget(id: "guide", namespace: namespace)
@@ -113,6 +120,90 @@ struct HomeView: View {
       }
     }
   }
+  struct JoinNetworkInvitationView: View {
+    let pendingInput: String
+    let focus: FocusState<TextFieldFocus?>.Binding
+    @State private var input = ""
+    @State private var joining = false
+    @State private var joinedHub: Hub?
+    @State private var error: String?
+    @State private var hubNets = HubNets.main
+
+    private var validationError: String? {
+      guard !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        return nil
+      }
+      do {
+        _ = try NetworkInvitationParser.decode(input)
+        return nil
+      } catch let invitationError as NetworkInvitationError {
+        return invitationError.message
+      } catch {
+        return "Invalid invitation."
+      }
+    }
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 8) {
+        HStack {
+          Text("Join Network").cellTitle()
+          Spacer(minLength: 0)
+          Button(joining ? "Joining…" : "Join") {
+            Task { await join() }
+          }
+          .disabled(
+            joining || input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+              || validationError != nil
+          )
+        }
+        TextField("Invite code or hub:// link", text: $input)
+          .focused(focus, equals: .joinNetworkInvitation)
+          .textFieldStyle(.plain)
+          .keyboard(style: .url)
+          .padding(.horizontal, 8).padding(.vertical, 4)
+          .background(.black.opacity(0.05), in: RoundedRectangle(cornerRadius: 8))
+          .disableHoverScale()
+          .onChange(of: input) {
+            joinedHub = nil
+            error = nil
+          }
+        if let joinedHub {
+          Text("Joined \(joinedHub.settings.name)")
+            .foregroundStyle(.green).secondary()
+        } else if joining {
+          Text(NativeJoinPresentation.progress(hubNets.joinProgress?.state))
+            .secondary()
+        } else if let message = error ?? validationError {
+          Text(message).foregroundStyle(.red).secondary().lineLimit(2)
+        } else {
+          Text("Invitation expires after ten minutes and can be used once.")
+            .secondary()
+        }
+      }
+      .blockBackground()
+      .onAppear { acceptPendingInput() }
+      .onChange(of: pendingInput) { acceptPendingInput() }
+    }
+
+    private func acceptPendingInput() {
+      guard !pendingInput.isEmpty else { return }
+      input = NetworkInvitationRouter.main.consume()
+      focus.wrappedValue = .joinNetworkInvitation
+    }
+
+    private func join() async {
+      joining = true
+      joinedHub = nil
+      error = nil
+      defer { joining = false }
+      do {
+        joinedHub = try await HubNets.main.join(link: input)
+        input = ""
+      } catch {
+        self.error = NativeJoinPresentation.error(error)
+      }
+    }
+  }
   struct HubSection: View {
     @Environment(Hub.self) var hub
     var body: some View {
@@ -127,7 +218,7 @@ struct HomeView: View {
     @Namespace var namespace
     enum Sheet: Identifiable {
       var id: Sheet { self }
-      case services, pending, connections, permissions, launcher, lockdown, installS3, files
+      case services, pending, connections, permissions, network, launcher, lockdown, installS3, files
     }
     var body: some View {
       Text(hub.settings.name).sectionTitle()
@@ -154,6 +245,11 @@ struct HomeView: View {
           if hub.require(permissions: "hub/group/list", "hub/group/names") {
             Button("Permissions", systemImage: "lock") {
               sheet = .permissions
+            }
+          }
+          if hub.canViewNetwork {
+            Button("Network", systemImage: "network") {
+              sheet = .network
             }
           }
           if hub.canLockdown {
@@ -207,6 +303,8 @@ struct HomeView: View {
             PendingListView()
           case .permissions:
             PermissionGroups()
+          case .network:
+            HubNetworkView()
           case .lockdown:
             LockdownView()
           case .launcher:

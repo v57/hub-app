@@ -1,5 +1,5 @@
 {
-  "originHash" : "80ce564b1c8400b9ca10dfe15680eeb9782dde9f1b5d24b61159a829d78204ba",
+  "originHash" : "5713141f07594bae089e11659de225ecb1b366f59bfb6bc0885cb1fb7fef9b77",
   "pins" : [
     {
       "identity" : "channelswift",
@@ -7,16 +7,7 @@
       "location" : "https://github.com/v57/ChannelSwift.git",
       "state" : {
         "branch" : "main",
-        "revision" : "99989fb3cde3865590d9ec88371df7067237b0a8"
-      }
-    },
-    {
-      "identity" : "hubservice",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/v57/HubService",
-      "state" : {
-        "branch" : "main",
-        "revision" : "7c818b2924f59013be4c498abf7bc61c7a9e75be"
+        "revision" : "684fbdabbd5b702bb8d3d21dc91bf595986c0e9e"
       }
     }
   ],
