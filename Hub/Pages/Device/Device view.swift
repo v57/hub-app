@@ -12,6 +12,7 @@ struct DeviceView: View {
   @Environment(Hub.self) private var hub
   @Environment(\.dismiss) private var dismiss
   @HubState(\.devices) private var devices
+  @HubState(\.networkResources) private var resources
   let id: String
   @State private var data: DeviceData?
   @State private var isRenaming = false
@@ -79,6 +80,27 @@ struct DeviceView: View {
       if let capabilities = device.capabilities {
         CapabilitiesView(capabilities: capabilities)
       }
+      let shares = shares(device)
+      if device.overlay != nil || !shares.isEmpty {
+        VStack(alignment: .leading, spacing: 8) {
+          Text("Hub Network").sectionTitle()
+          if let overlay = device.overlay {
+            Label(overlay.address, systemImage: "network")
+            Text(overlay.authority).code().lineLimit(1).truncationMode(.middle)
+          }
+          // A share keeps its resource id and authority when its service moves; the hub resolves it to the
+          // overlay address of the service's current device
+          ForEach(shares) { share in
+            HStack(spacing: 10) {
+              Image(systemName: "externaldrive.connected.to.line.below")
+              VStack(alignment: .leading) {
+                Text(share.shareName)
+                Text(share.authority).code().lineLimit(1).truncationMode(.middle)
+              }
+            }
+          }
+        }.frame(maxWidth: .infinity, alignment: .leading)
+      }
       VStack(alignment: .leading, spacing: 8) {
         Text("Services").sectionTitle()
         if device.services.isEmpty {
@@ -141,6 +163,11 @@ struct DeviceView: View {
              ? "For a lost or compromised device. Its connections close, its service key is revoked, its grants and Hub Network peers are removed, and it can never be approved again."
              : "For a lost or compromised device. Its connections close, its \(device.services.count) service keys are revoked, its grants and Hub Network peers are removed, and it can never be approved again.")
       }
+  }
+  /// Shares owned by the device's services, which its agent fronts
+  func shares(_ device: Device) -> [HubNetworkResource] {
+    let keys = Set(device.services.map(\.key))
+    return resources.filter { keys.contains($0.ownerKey) }.sorted { $0.shareName < $1.shareName }
   }
   struct CapabilitiesView: View {
     let capabilities: Capabilities

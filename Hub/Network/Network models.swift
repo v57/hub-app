@@ -59,6 +59,12 @@ struct HubNetworkAgent: Codable, Hashable, Identifiable, Sendable {
   let connectedAt: String
   /// False for a known member that is not connected (member lists only).
   let online: Bool?
+  /// `device:<id>` for a device-attached agent, else its service key
+  var member: String? = nil
+  /// The agent's device, which every share of the device's services is fronted by
+  var device: String? = nil
+  /// `<label>-<16>.v1-<hub>.hub.invalid`, the device's overlay DNS name
+  var deviceAuthority: String? = nil
 }
 
 enum HubNetworkLocalAgentBindingKind: String, Codable, Sendable {

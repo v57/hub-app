@@ -47,9 +47,6 @@ struct DevicesView: View {
             }.buttonStyle(.environment)
           }
         }
-        if devices.isEmpty {
-          Text("No devices yet. Apps and services with device support appear here when they connect.").secondary()
-        }
       }.padding(.horizontal, 4)
     }.navigationDestination(item: $selected) { link in
       DeviceView(id: link.id).hub(hub)
