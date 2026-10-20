@@ -84,8 +84,11 @@ extension KeyChain {
     self.settings = settings
     let identity = settings.identityTag.map(KeyChain.keychain) ?? .main
     key = identity.publicKey()
-    self.client = HubClient(settings.address, keyChain: identity)
+    self.client = HubClient(settings.address, keyChain: identity, options: .init(device: .app, instance: "Hub"))
     client.debugNetwork = true
+    if client.device != nil {
+      client.report(description: AppDevice.description, data: AppDevice.data)
+    }
     isConnected = client.isConnected
     client.isConnectedChanged = { [weak self] in
       self?.isConnected = $0
