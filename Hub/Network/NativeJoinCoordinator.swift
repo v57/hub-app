@@ -84,23 +84,16 @@ struct NativeJoinCoordinator {
       report(.init(transactionId: transactionId, state: .awaitingVPNConsent))
       try await classified(.vpnInstall, invitation: invitation, record: record) {
         // The extension reads the device WireGuard identity (wireguard.v1)
-        // at adapter start and signs the bootstrap readiness with the device
+        // at adapter start and signs the bootstrap readiness with the app's
         // hub identity (identity.v1), requiring both to match the profile's
-        // keys. The joiner stages a per-transaction keypair (native-join.v1);
-        // install both staged keys as the device identities before the
-        // tunnel starts (the owner/local flows create these implicitly via
-        // HubNetworkWireGuardKeyStore.publicKeyBase64() / KeyChain.main).
+        // keys. The joiner's service key is identity.v1 itself, so only the
+        // staged WireGuard key is installed; identity.v1 is never replaced.
         if let wireGuardData = try await NativeJoinStore.main.wireGuardPrivateKey(
           transactionId: transactionId
         ) {
           try HubNetworkWireGuardKeyStore().install(
             Curve25519.KeyAgreement.PrivateKey(rawRepresentation: wireGuardData)
           )
-        }
-        if let profileData = try await NativeJoinStore.main.profilePrivateKey(
-          transactionId: transactionId
-        ) {
-          try KeyChain.installHubIdentity(rawRepresentation: profileData)
         }
         try await tunnel.install(
           configuration: bootstrapConfiguration(invitation: invitation, record: record)
@@ -176,16 +169,20 @@ struct NativeJoinCoordinator {
           transactionId: transactionId,
           profilePublicKey: record.profilePublicKey
         )
-        bindClient = HubClient(hubURL, keyChain: identityKey)
+        bindClient = bindingClient(hubURL, identityKey: identityKey)
       } else {
         let identityKey = try await NativeJoinStore.main.serviceKey(
           transactionId: transactionId,
           profilePublicKey: record.profilePublicKey
         )
-        let client = HubClient(hubURL, keyChain: identityKey)
+        let client = bindingClient(hubURL, identityKey: identityKey)
         bindClient = client
         let binding = try await classified(.bind, invitation: invitation, record: record) {
-          try await performBind(client: client, record: record, admission: status.admission)
+          // The bind approves the app's device only on the hub-bound connection that carries its certificate
+          if client.device != nil {
+            await client.waitUntilReady(timeout: 15)
+          }
+          return try await performBind(client: client, record: record, admission: status.admission)
         }
         enrollment = NativeJoinEnrollment(
           hubKey: binding.hubKey,
@@ -251,10 +248,15 @@ struct NativeJoinCoordinator {
         record: record,
         identity: identity
       )
-      let identityTag = "dev.v57.Hub.network.membership.\(record.tokenDigest)"
-      try await NativeJoinStore.main.promoteProfileIdentity(
-        transactionId: transactionId, keychainTag: identityTag
-      )
+      // Only transactions staged before the device layer have a membership key of their own
+      var identityTag: String?
+      if try await NativeJoinStore.main.hasStagedProfileKey(transactionId: transactionId) {
+        let tag = "dev.v57.Hub.network.membership.\(record.tokenDigest)"
+        try await NativeJoinStore.main.promoteProfileIdentity(
+          transactionId: transactionId, keychainTag: tag
+        )
+        identityTag = tag
+      }
       let hub = Hubs.main.insert(with: Hub.Settings(
         name: header.name, address: hubURL, identityTag: identityTag
       ))
@@ -278,6 +280,12 @@ struct NativeJoinCoordinator {
       )
       throw error
     }
+  }
+
+  /// The app's own identity joins as the app's device; a legacy membership key joins without one
+  private static func bindingClient(_ url: URL, identityKey: KeyChain) -> HubClient {
+    let isAppIdentity = identityKey.publicKey() == KeyChain.main.publicKey()
+    return HubClient(url, keyChain: identityKey, options: .init(device: isAppIdentity ? .app : nil, instance: "Hub"))
   }
 
   /// Cleanup is deliberately best-effort: original join failure remains visible.

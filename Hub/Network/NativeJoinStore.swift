@@ -121,13 +121,17 @@ actor NativeJoinStore {
   private let encoder: JSONEncoder
   private let decoder: JSONDecoder
 
+  private let appIdentity: @Sendable () -> KeyChain
+
   init(
     directory: URL? = nil,
     secrets: any NativeJoinSecretStorage = NativeJoinKeychainStorage(),
+    appIdentity: @escaping @Sendable () -> KeyChain = { KeyChain.main },
     now: @escaping @Sendable () -> Date = Date.init
   ) {
     self.directory = directory ?? Self.defaultDirectory()
     self.secrets = secrets
+    self.appIdentity = appIdentity
     self.now = now
     encoder = JSONEncoder()
     encoder.dateEncodingStrategy = .iso8601
@@ -146,18 +150,19 @@ actor NativeJoinStore {
     }
 
     try rejectDifferentUnfinishedTransaction(tokenId)
-    let profile = Curve25519.Signing.PrivateKey()
+    // The joiner is the app's own service key (identity.v1) on the app's device; the invitation approves the
+    // device instead of replacing the identity, so the app keeps its key and owner rights on other hubs.
+    let profile = appIdentity()
     let wireGuard = Curve25519.KeyAgreement.PrivateKey()
     let accounts = secretAccounts(tokenId)
     do {
-      try secrets.insert(profile.rawRepresentation, account: accounts.profile)
       try secrets.insert(wireGuard.rawRepresentation, account: accounts.wireGuard)
       let timestamp = now()
       let record = NativeJoinRecord(
         version: NativeJoinRecord.version,
         transactionId: tokenId,
         tokenDigest: Self.digest(tokenId),
-        profilePublicKey: profile.publicKey.rawRepresentation.base64EncodedString(),
+        profilePublicKey: profile.data.base64EncodedString(),
         wireGuardPublicKey: wireGuard.publicKey.rawRepresentation.base64EncodedString(),
         createdAt: timestamp,
         updatedAt: timestamp,
@@ -194,18 +199,10 @@ actor NativeJoinStore {
     return data
   }
 
-  /// The staged per-transaction joiner service key — the identity the
-  /// extension signs the bootstrap readiness with (the extension requires it
-  /// to match the profile's service key; the coordinator installs it as the
-  /// device hub identity before the tunnel starts).
-  func profilePrivateKey(transactionId: String) throws -> Data? {
-    guard let record = try load(transactionId: transactionId) else { return nil }
-    let accounts = secretAccounts(transactionId)
-    guard let data = try secrets.load(account: accounts.profile),
-          let key = try? Curve25519.Signing.PrivateKey(rawRepresentation: data),
-          key.publicKey.rawRepresentation.base64EncodedString() == record.profilePublicKey
-    else { return nil }
-    return data
+  /// Whether the transaction has its own joiner service key. Transactions staged before the device layer did;
+  /// new ones join with the app's identity (`identity.v1`) and have none.
+  func hasStagedProfileKey(transactionId: String) throws -> Bool {
+    try secrets.load(account: secretAccounts(transactionId).profile) != nil
   }
 
   func identity(transactionId: String) throws -> NativeJoinIdentity {
@@ -243,6 +240,7 @@ actor NativeJoinStore {
     return record
   }
 
+  /// Keeps a staged joiner key (legacy transactions) as the membership's own identity
   func promoteProfileIdentity(
     transactionId: String,
     keychainTag: String
@@ -255,13 +253,21 @@ actor NativeJoinStore {
     else { throw NativeJoinStoreError.corruptRecord }
   }
 
-  /// Loads the transaction-scoped joiner service identity so callers can build
-  /// an authenticated Hub client for `hub/net/bind` and later connections.
+  /// The joiner service identity, so callers can build an authenticated Hub
+  /// client for `hub/net/bind` and later connections: the app's identity, or
+  /// the transaction's own key for transactions staged before the device layer.
   func serviceKey(
     transactionId: String,
     profilePublicKey: String
   ) throws -> KeyChain {
     let record = try requiredRecord(transactionId)
+    guard try hasStagedProfileKey(transactionId: transactionId) else {
+      let identity = appIdentity()
+      guard record.profilePublicKey == profilePublicKey,
+            identity.data.base64EncodedString() == profilePublicKey
+      else { throw NativeJoinStoreError.corruptRecord }
+      return identity
+    }
     let key = try KeyChain(
       keychain: NativeJoinKeychainStorage.serviceKeychain(
         account: secretAccounts(transactionId).profile
@@ -297,11 +303,18 @@ actor NativeJoinStore {
 
   private func identity(for record: NativeJoinRecord) throws -> NativeJoinIdentity {
     let accounts = secretAccounts(record.transactionId)
-    guard let profileData = try secrets.load(account: accounts.profile),
-          let wireGuardData = try secrets.load(account: accounts.wireGuard),
-          let profile = try? Curve25519.Signing.PrivateKey(rawRepresentation: profileData),
+    let profilePublicKey: String
+    if let profileData = try secrets.load(account: accounts.profile) {
+      guard let profile = try? Curve25519.Signing.PrivateKey(rawRepresentation: profileData) else {
+        throw NativeJoinStoreError.corruptRecord
+      }
+      profilePublicKey = profile.publicKey.rawRepresentation.base64EncodedString()
+    } else {
+      profilePublicKey = appIdentity().data.base64EncodedString()
+    }
+    guard let wireGuardData = try secrets.load(account: accounts.wireGuard),
           let wireGuard = try? Curve25519.KeyAgreement.PrivateKey(rawRepresentation: wireGuardData),
-          profile.publicKey.rawRepresentation.base64EncodedString() == record.profilePublicKey,
+          profilePublicKey == record.profilePublicKey,
           wireGuard.publicKey.rawRepresentation.base64EncodedString() == record.wireGuardPublicKey
     else { throw NativeJoinStoreError.corruptRecord }
     return NativeJoinIdentity(

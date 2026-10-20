@@ -312,12 +312,17 @@ enum DirectBootstrapClient {
       return (String(value[..<separator]), port)
   }
 
-  /// Loads the transaction-scoped joiner service private key from the shared
-  /// keychain group, mirroring `NativeJoinStore`'s secret accounts.
+  /// Loads the joiner service private key from the shared keychain group:
+  /// the app's identity (`identity.v1`), or the transaction's own key for
+  /// transactions staged before the device layer (`NativeJoinStore`'s accounts).
   static func joinerServiceKey(
     transactionId: String,
     profilePublicKey: String
   ) throws -> KeyChain {
+    let expectedKey = KeyChain.spkiPublicKey(rawBase64: profilePublicKey) ?? profilePublicKey
+    if let identity = try? KeyChain.hubIdentity(), identity.publicKey() == expectedKey {
+      return identity
+    }
     let accessGroup = Bundle.main.object(forInfoDictionaryKey: "HubKeychainAccessGroup") as? String
     let key = try KeyChain(
       keychain: .init(

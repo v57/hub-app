@@ -28,36 +28,6 @@ extension KeyChain {
     ))
   }()
 
-  /// Replaces the device hub identity. The joiner stages a per-transaction
-  /// service key (native-join.v1); the extension signs the bootstrap
-  /// readiness with the device identity (`identity.v1`) and requires it to
-  /// match the profile's service key, so the staged key must become the
-  /// device identity before the tunnel starts (the owner/local flows create
-  /// this item implicitly via `KeyChain.main`).
-  static func installHubIdentity(rawRepresentation data: Data) throws {
-    let accessGroup = Bundle.main.object(forInfoDictionaryKey: "HubKeychainAccessGroup") as? String
-    let configuration = KeychainConfiguration(
-      service: "dev.v57.Hub.identity.v1",
-      account: "ed25519-private-key",
-      accessGroup: accessGroup?.isEmpty == false ? accessGroup : nil,
-      useDataProtectionKeychain: true
-    )
-    var query: [String: Any] = [
-      kSecClass as String: kSecClassGenericPassword,
-      kSecAttrService as String: configuration.service,
-    ]
-    if let account = configuration.account {
-      query[kSecAttrAccount as String] = account
-    }
-    if let accessGroup = configuration.accessGroup {
-      query[kSecAttrAccessGroup as String] = accessGroup
-    }
-    if configuration.useDataProtectionKeychain {
-      query[kSecUseDataProtectionKeychain as String] = true
-    }
-    SecItemDelete(query as CFDictionary)
-    _ = try KeyChain(keychain: configuration, rawRepresentation: data)
-  }
 #endif
 }
 
