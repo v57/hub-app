@@ -213,12 +213,13 @@ struct HomeView: View {
   struct HubSectionContent: View {
     @HubState(\.statusBadges) var statusBadges
     @HubState(\.launcherInfo) var launcherInfo
+    @HubState(\.pendingDevices) var pendingDevices
     @Bindable var hub: Hub
     @State private var sheet: Sheet?
     @Namespace var namespace
     enum Sheet: Identifiable {
       var id: Sheet { self }
-      case services, pending, connections, permissions, network, launcher, lockdown, installS3, files
+      case services, pending, connections, devices, security, permissions, network, launcher, lockdown, installS3, files
     }
     var body: some View {
       Text(hub.settings.name).sectionTitle()
@@ -235,6 +236,16 @@ struct HomeView: View {
           if hub.require(permissions: "hub/connections") {
             Button("Connections", systemImage: "wifi") {
               sheet = .connections
+            }
+          }
+          if hub.require(permissions: "hub/devices") {
+            Button("Devices", systemImage: "macbook.and.iphone") {
+              sheet = .devices
+            }.iconBadge(pendingDevices.isEmpty ? nil : pendingDevices.count)
+          }
+          if hub.require(permissions: "hub/security/mode") {
+            Button("Security", systemImage: "lock.shield") {
+              sheet = .security
             }
           }
           if let security = statusBadges.security, security > 0 && hub.require(permissions: "hub/host/pending") {
@@ -299,6 +310,10 @@ struct HomeView: View {
             Services()
           case .connections:
             UserConnections()
+          case .devices:
+            DevicesView()
+          case .security:
+            SecurityView()
           case .pending:
             PendingListView()
           case .permissions:

@@ -38,6 +38,10 @@ struct HubStateStorage {
   let hubNetAgents = Sync("hub/net/list", [HubNetInfo]())
   let hubNetNode = Sync("hub/net/node", "")
   let networkGateways = Sync("network/gateway/list", [GatewayStatus]())
+  let devices = Sync("hub/devices", [Device]())
+  let pendingDevices = Sync("hub/devices/pending", [PendingDevice]())
+  let securityMode = Sync("hub/security/mode", SecurityMode(mode: .defaultAllow))
+  let grants = Sync("hub/grants", [Grant]())
   
   @MainActor @Observable
   class Sync<T: Decodable & Sendable> {

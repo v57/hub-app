@@ -6,74 +6,187 @@
 //
 
 import SwiftUI
+import HubService
 
 struct DeviceView: View {
-  @State var vpn = true
+  @Environment(Hub.self) private var hub
+  @Environment(\.dismiss) private var dismiss
+  @HubState(\.devices) private var devices
+  let id: String
+  @State private var data: DeviceData?
+  @State private var isRenaming = false
+  @State private var name = ""
+  @State private var isRemoving = false
+  @State private var isRevoking = false
+  var device: Device? { devices.first { $0.id == id } }
   var body: some View {
     ScrollView {
-      Placeholder(image: "macbook", title: "MacBook Pro") {
-        DeviceUsage.CompactView(usage: DeviceUsage.examples.last!)
-          .padding(.bottom)
+      if let device {
+        content(device)
+      } else {
+        Placeholder(image: "questionmark.circle", title: "Device not found") { }
       }
-      VStack {
-      }.buttonStyle(.environment)
-      HStack {
-        Button { } label: {
-          Label("Open Terminal", systemImage: "terminal")
-            .padding(.horizontal, 12).padding(.vertical, 8)
-            .hoverEffect(in: .capsule)
+    }
+  }
+  @ViewBuilder
+  func content(_ device: Device) -> some View {
+    let isThisDevice = device.key == hub.client.device?.key.publicKey
+    VStack(spacing: 16) {
+      Placeholder(image: Device.symbol(platform: device.platform), title: LocalizedStringKey(device.name), isEnabled: device.online) {
+        Label(device.statusText, systemImage: device.online ? "circle.fill" : "circle")
+        if let os = device.os {
+          Label([device.platform, os, device.arch].compactMap { $0 }.joined(separator: " "), systemImage: "info.circle")
         }
-        Button {
-          vpn.toggle()
-        } label: {
-          Label("Use as VPN", systemImage: "network")
-            .symbolEffect(.bounce, value: vpn)
-            .padding(.horizontal, 12).padding(.vertical, 8)
-            .overlay {
-              if vpn {
-                CoolEffect()
-              }
+        if let parent = device.parent {
+          Label("Runs in \(parent)", systemImage: "square.stack.3d.up")
+        }
+        if let network = device.network {
+          Label(network == .online ? "Hub Network online" : "Hub Network offline", systemImage: network == .online ? "network" : "network.slash")
+        }
+        Label("Safety code \(DeviceKey.safetyCode(publicKey: device.key))", systemImage: "checkmark.shield")
+        if isThisDevice {
+          Label("This device", systemImage: "location.fill")
+        }
+      }
+      if let data {
+        DeviceUsage.LiveView(data: data, capabilities: device.capabilities)
+      }
+      if hub.require(permissions: "hub/device/rename") || hub.require(permissions: "hub/device/approve") {
+        HStack {
+          if !device.approved && hub.require(permissions: "hub/device/approve") {
+            AsyncButton("Approve", systemImage: "checkmark") {
+              try await hub.client.devices.approve(device.id)
             }
-            .hoverEffect(in: .capsule)
-        }
-        Button {
-          vpn.toggle()
-        } label: {
-          Text("Manage")
-            .padding(.horizontal, 12).padding(.vertical, 8)
-            .hoverEffect(in: .capsule)
-        }
-      }.buttonStyle(.environment)
-      HStack {
-        Text("Services")
+          }
+          if hub.require(permissions: "hub/device/rename") {
+            Button("Rename", systemImage: "pencil") {
+              name = device.name
+              isRenaming = true
+            }
+          }
+          if !isThisDevice && hub.require(permissions: "hub/device/remove") {
+            Button("Remove", systemImage: "minus.circle") {
+              isRemoving = true
+            }
+          }
+          if !isThisDevice && hub.require(permissions: "hub/device/revoke") {
+            Button("Revoke", systemImage: "xmark.shield", role: .destructive) {
+              isRevoking = true
+            }
+          }
+        }.buttonStyle(.bordered)
       }
-    }
-  }
-  struct CircleProgress: View {
-    let progress: Float
-    var body: some View {
-      Circle().strokeBorder(.blue)
-        .frame(width: 24, height: 24)
-    }
-  }
-  struct CoolEffect: View {
-    @State var appear = false
-    var body: some View {
-      let offset: Double = appear ? 1 : -1
-      Capsule().strokeBorder(.blue)
-        .strokeBorder(LinearGradient(colors: [.clear, .white, .clear], startPoint: UnitPoint(x: offset, y: offset), endPoint: UnitPoint(x: offset + 1, y: offset + 1)))
-        .animation(.smooth.delay(1), value: appear)
-        .mask {
-          Color.black.frame(maxWidth: appear ? .infinity : 0, alignment: .leading)
-            .animation(.smooth, value: appear)
+      if let capabilities = device.capabilities {
+        CapabilitiesView(capabilities: capabilities)
+      }
+      VStack(alignment: .leading, spacing: 8) {
+        Text("Services").sectionTitle()
+        if device.services.isEmpty {
+          Text("No services").secondary()
         }
-        .onAppear {
-          appear = true
-        }.onDisappear { appear = false }
+        ForEach(device.services) { service in
+          HStack(spacing: 10) {
+            (service.online ? OnlineStatus.online : .offline).view
+            VStack(alignment: .leading) {
+              Text(service.name ?? service.instance)
+              HStack(spacing: 4) {
+                if service.name != nil {
+                  Text(service.instance)
+                }
+                Text(service.paths.count == 1 ? "1 api" : "\(service.paths.count) apis")
+                Text(service.key.suffix(8)).code()
+              }.secondary()
+            }.lineLimit(1)
+            Spacer(minLength: 0)
+          }.padding(.vertical, 4)
+        }
+      }.frame(maxWidth: .infinity, alignment: .leading)
+    }.padding(.horizontal)
+      .task(id: device.online) {
+        guard device.online, hub.require(permissions: "hub/devices/data") else { return }
+        do {
+          for try await data in hub.client.devices.data(device.id) {
+            self.data = data
+          }
+        } catch { }
+      }
+      .alert("Rename device", isPresented: $isRenaming) {
+        TextField("Name", text: $name)
+        Button("Cancel", role: .cancel) { }
+        Button("Rename") {
+          let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+          guard !name.isEmpty else { return }
+          Task { try? await hub.client.devices.rename(device.id, to: name) }
+        }
+      }
+      .confirmationDialog("Remove \(device.name)?", isPresented: $isRemoving, titleVisibility: .visible) {
+        Button("Remove", role: .destructive) {
+          Task {
+            try? await hub.client.devices.remove(device.id)
+            dismiss()
+          }
+        }
+      } message: {
+        Text("Its connections close. It can connect again and will wait for approval.")
+      }
+      .confirmationDialog("Revoke \(device.name)?", isPresented: $isRevoking, titleVisibility: .visible) {
+        Button("Revoke device and its services", role: .destructive) {
+          Task {
+            try? await hub.client.devices.revoke(device.id)
+            dismiss()
+          }
+        }
+      } message: {
+        Text(device.services.count == 1
+             ? "For a lost or compromised device. Its connections close, its service key is revoked, its grants and Hub Network peers are removed, and it can never be approved again."
+             : "For a lost or compromised device. Its connections close, its \(device.services.count) service keys are revoked, its grants and Hub Network peers are removed, and it can never be approved again.")
+      }
+  }
+  struct CapabilitiesView: View {
+    let capabilities: Capabilities
+    var body: some View {
+      VStack(alignment: .leading, spacing: 4) {
+        Text("Capabilities").sectionTitle()
+        if let model = capabilities.model {
+          Label(model, systemImage: "info.circle")
+        }
+        if let cpu = capabilities.cpu {
+          Label([cpu.model, cpu.cores.map { "\($0) cores" }].compactMap { $0 }.joined(separator: ", "), systemImage: "cpu")
+        }
+        if let memory = capabilities.memory {
+          Label(memory.formatted(.byteCount(style: .memory)), systemImage: "memorychip")
+        }
+        if let gpu = capabilities.gpu {
+          Label(gpu, systemImage: "display")
+        }
+        ForEach(capabilities.disks ?? [], id: \.name) { disk in
+          Label("\(disk.name): \((disk.free ?? 0).formatted(.byteCount(style: .file))) free", systemImage: "internaldrive")
+        }
+        if let tools = capabilities.tools {
+          let names = [tools.xcode.map { "Xcode \($0)" }, tools.swift.map { "Swift \($0)" },
+                       tools.docker == true ? "Docker" : nil, tools.adb == true ? "adb" : nil].compactMap { $0 }
+          if !names.isEmpty {
+            Label(names.joined(separator: ", "), systemImage: "hammer")
+          }
+        }
+        if let ssh = capabilities.ssh {
+          Label("SSH on port \(ssh.port)", systemImage: "terminal")
+        }
+      }.secondary().frame(maxWidth: .infinity, alignment: .leading)
     }
   }
 }
 
+extension Device {
+  var statusText: String {
+    if revoked { return String(localized: "Revoked") }
+    if !approved { return String(localized: "Waiting for approval") }
+    if online { return String(localized: "Online") }
+    if let lastSeen { return String(localized: "Last seen \(lastSeen.formatted(.relative(presentation: .named)))") }
+    return String(localized: "Offline")
+  }
+}
+
 #Preview {
-  DeviceView().test().frame(maxWidth: .infinity)
+  DeviceView(id: "").test().frame(maxWidth: .infinity)
 }
