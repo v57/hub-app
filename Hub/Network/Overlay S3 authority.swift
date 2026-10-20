@@ -7,12 +7,8 @@ import Foundation
 /// `URL` values constructed from a published share authority plus the runtime
 /// port advertised by a live provider. No WireGuard or NetworkExtension code
 /// belongs here: the active app-scoped packet-tunnel profile routes the
-/// resulting host name through `hub-net`.
-///
-/// See `openspec/changes/hub-network/protocol-foundations.md` for the
-/// `<display>-<resource-tag>.v1-<hub-tag>.hub.invalid` authority grammar and
-/// `specs/network-integrations/spec.md` for the "Local S3 uses actual selected
-/// port" requirement.
+/// resulting host name through `hub-net`. Authorities follow the
+/// `<display>-<resource-tag>.v1-<hub-tag>.hub.invalid` grammar.
 enum HubNetworkOverlayS3 {
   /// Reserved Hub Network DNS suffix. Active profile resolves only this suffix.
   static let reservedSuffix = "hub.invalid"
