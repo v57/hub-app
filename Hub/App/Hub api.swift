@@ -36,7 +36,8 @@ struct HubStateStorage {
     HubNetworkLocalAgentStatus.unavailable
   )
   let hubNetAgents = Sync("hub/net/list", [HubNetInfo]())
-  let hubNetNode = Sync("hub/net/node", "")
+  /// `null` until an owner sets one; there is no default node
+  let hubNetNode = Sync("hub/net/node", String?.none)
   let networkGateways = Sync("network/gateway/list", [GatewayStatus]())
   let devices = Sync("hub/devices", [Device]())
   let pendingDevices = Sync("hub/devices/pending", [PendingDevice]())

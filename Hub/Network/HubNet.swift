@@ -215,7 +215,9 @@ final class HubNet {
     }) else {
       throw HubNetError.localAgentUnavailable
     }
-    let node = await Self.currentNodeEndpoint(hub: hub)
+    guard let node = await Self.currentNodeEndpoint(hub: hub) else {
+      throw HubNetError.nodeNotSet
+    }
     HubService.Group.HubNetworkNodeEndpointStore.shared.set(node)
     let link = try await hub.createNetworkInvitation(service: agent.id)
     guard (try? NetworkInvitationParser.decode(link)) != nil else {
@@ -386,17 +388,23 @@ final class HubNet {
     throw HubNetError.localAgentUnavailable
   }
 
-  private static func currentNodeEndpoint(hub: Hub) async -> String {
+  /// The node `hub/net/node` names, `nil` when no owner has set one (there is no default node)
+  private static func currentNodeEndpoint(hub: Hub) async -> String? {
     hub.state.hubNetNode.subscribe(hub: hub)
     let deadline = ContinuousClock.now.advanced(by: .seconds(5))
     while ContinuousClock.now < deadline {
-      if !hub.state.hubNetNode.value.isEmpty {
-        return hub.state.hubNetNode.value
+      if let node = hub.state.hubNetNode.value, !node.isEmpty {
+        return node
       }
       try? await Task.sleep(for: .milliseconds(25))
     }
-    // No stream value yet: fall back to the default node (omit the e query).
-    return ""
+    return nil
+  }
+
+  /// Sets or clears (`nil`) the node invitations name. Owners only.
+  func setNode(_ endpoint: String?) async throws {
+    let endpoint = endpoint?.trimmingCharacters(in: .whitespacesAndNewlines)
+    try await hub.client.send("hub/net/node/set", endpoint?.isEmpty == false ? endpoint : nil)
   }
 
   private func refreshGlobalVPN() async {
@@ -445,6 +453,7 @@ enum HubNetError: LocalizedError, Equatable {
   case invalidPort(Int)
   case localAgentUnavailable
   case notJoined
+  case nodeNotSet
 
   var errorDescription: String? {
     switch self {
@@ -458,6 +467,8 @@ enum HubNetError: LocalizedError, Equatable {
       "Local Hub Network agent is not ready to create invitations."
     case .notJoined:
       "Join Hub Network before sharing ports."
+    case .nodeNotSet:
+      "This Hub has no Hub Network node. An owner has to set one before invitations work."
     }
   }
 }

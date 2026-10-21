@@ -93,6 +93,9 @@ struct HubNetworkView: View {
   @State private var tcpPort = ""
   @State private var udpPort = ""
   @State private var portError: String?
+  @HubState(\.hubNetNode) private var node
+  @State private var nodeInput = ""
+  @State private var nodeError: String?
 
   var body: some View {
     ScrollView {
@@ -146,6 +149,7 @@ struct HubNetworkView: View {
         }
         .disabled(!canCreateInvitation || isCreatingInvitation)
       }
+      nodeSection
       LabeledContent("Bootstrap readiness", value: localAgent.readinessLabel)
       if let invitationConfirmation {
         Label(invitationConfirmation, systemImage: "checkmark.circle.fill")
@@ -165,8 +169,44 @@ struct HubNetworkView: View {
     .background(.regularMaterial, in: .rect(cornerRadius: 16))
   }
 
+  /// Invitations name the hub's node; there is no default one, so an owner sets it here
+  @ViewBuilder private var nodeSection: some View {
+    if hub.api.contains("hub/net/node") {
+      if let node, !node.isEmpty {
+        LabeledContent("Node", value: node)
+      } else {
+        Label(hub.api.contains("hub/net/node/set")
+              ? "Set the Hub Network node before inviting devices."
+              : "This Hub has no Hub Network node yet. Ask an owner to set one.",
+              systemImage: "exclamationmark.triangle")
+          .font(.caption)
+          .foregroundStyle(.orange)
+      }
+      if hub.api.contains("hub/net/node/set") {
+        HStack {
+          TextField(node ?? "node.example.com:7000", text: $nodeInput)
+            .textFieldStyle(.roundedBorder)
+            .autocorrectionDisabled()
+          AsyncButton("Set Node") {
+            nodeError = nil
+            do {
+              try await hub.net.setNode(nodeInput)
+              nodeInput = ""
+            } catch {
+              nodeError = String(error.localizedDescription.prefix(240))
+            }
+          }.disabled(nodeInput.trimmingCharacters(in: .whitespaces).isEmpty)
+        }
+        if let nodeError {
+          Text(nodeError).font(.caption).foregroundStyle(.red)
+        }
+      }
+    }
+  }
+
   private var canCreateInvitation: Bool {
-    hub.api.contains("hub/net/list")
+    node?.isEmpty == false
+      && hub.api.contains("hub/net/list")
       && hubNetAgents.contains(where: { $0.localIp == "127.0.0.1" })
       && localAgent.canIssueInvitation
   }

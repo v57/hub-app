@@ -47,7 +47,13 @@ extension HubService.Group {
 
   enum HubNetworkInviteError: LocalizedError {
     case inviterOffline
-    var errorDescription: String? { "This device is not registered with the Hub Network node yet." }
+    case nodeNotSet
+    var errorDescription: String? {
+      switch self {
+      case .inviterOffline: "This device is not registered with the Hub Network node yet."
+      case .nodeNotSet: "This Hub has no Hub Network node. An owner has to set one before invitations work."
+      }
+    }
   }
 
   func hubNetworkAgentService(
@@ -78,13 +84,13 @@ extension HubService.Group {
       let spki = Data(base64Encoded: KeyChain.main.publicKey())!
       let publicKey = Data(spki.suffix(32)).base64URLEncodedString()
       var payload = "\(publicKey).\(expiresPart).\(noncePart)"
+      // Invitations carry their node: there is no default one
       let endpoint = nodeEndpoint()
-      if !endpoint.isEmpty && endpoint != "hub.v57.dev/node" {
-        let escaped = endpoint.addingPercentEncoding(
-          withAllowedCharacters: HubNetworkInvitationQuery.allowed
-        ) ?? endpoint
-        payload += "?e=" + escaped
-      }
+      guard !endpoint.isEmpty else { throw HubNetworkInviteError.nodeNotSet }
+      let escaped = endpoint.addingPercentEncoding(
+        withAllowedCharacters: HubNetworkInvitationQuery.allowed
+      ) ?? endpoint
+      payload += "?e=" + escaped
       let signature = try KeyChain.main.signature(for: Data(payload.utf8)).base64URLEncodedString()
       return "\(payload)/\(signature)"
     }

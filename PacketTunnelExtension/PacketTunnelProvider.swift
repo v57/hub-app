@@ -228,7 +228,12 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     // Register with the node hub-pro names (hub/net/node), which invitations
     // carry in ?e=. A node address inside the overlay range (Tailscale) is
     // excluded from the tunnel through controlPlaneIPv4Hosts.
-    let nodeEndpoint = profile.nodeEndpoint ?? NetworkInvitationParser.defaultNode
+    // There is no default node: without one the inviter can't register
+    guard let nodeEndpoint = profile.nodeEndpoint, !nodeEndpoint.isEmpty else {
+      listener.stop()
+      inviterListener = nil
+      return
+    }
     let nodeClient = InviterNodeClient(
       nodeEndpoint: nodeEndpoint,
       identity: identity,
