@@ -25,6 +25,7 @@ struct LocalHubView: View {
         if hub.isRunning {
           addresses
           pairing
+          network
           connections
         } else if !hub.isStarting {
           port
@@ -117,6 +118,27 @@ struct LocalHubView: View {
         }
         Text("A pairing code makes another device an owner of this hub, for example your iPad or Mac.").secondary()
         AsyncButton("Show Pairing Code") { await hub.newPairingCode() }.buttonStyle(.bordered)
+      }
+    }
+  }
+
+  /// The hub hosts a Hub Network like any hub: this device's agent is its owner and inviter
+  @ViewBuilder
+  var network: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Text("Hub Network").font(.headline)
+      Text("Devices you invite join a private network hosted by this hub. Set its node and create invitations here; this device's own network extension is the first member and the inviter.")
+        .secondary()
+      if (hub.status.port ?? hub.port) != 1997 {
+        Label("Members reach the hub on port 1997 over the network. Use port 1997 to host one.", systemImage: "exclamationmark.triangle")
+          .foregroundStyle(.orange)
+      }
+      if let localHub = Hubs.main.list.first(where: { $0.settings.address == hub.localURL }) {
+        NavigationLink {
+          HubNetworkView().hub(localHub)
+        } label: {
+          Label("Open Hub Network", systemImage: "network")
+        }.buttonStyle(.bordered)
       }
     }
   }
