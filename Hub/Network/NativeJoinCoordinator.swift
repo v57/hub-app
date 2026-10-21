@@ -221,7 +221,7 @@ struct NativeJoinCoordinator {
         guard let bindClient else {
           throw NativeJoinError.invalidBootstrapIdentity
         }
-        // hub/header is a STREAM on the TS reference hub-pro; a request/
+        // hub/header is a STREAM on the TS reference hub-server; a request/
         // response send to a stream-only path is rejected with an RPC error.
         // Read one stream value instead (the stream is cancelled on return).
         return try await bindClient.oneValue("hub/header", as: HubHeader.self)
@@ -351,7 +351,7 @@ struct NativeJoinCoordinator {
         admission: admission
       )
     )
-    // hub-pro returns profile.key in the canonical SPKI form (the auth
+    // hub-server returns profile.key in the canonical SPKI form (the auth
     // header key it verified at upgrade); the staged record stores the raw
     // 32-byte form. Normalize before comparing — pitfall #12, 5th site.
     let expectedProfileKey =
@@ -453,7 +453,7 @@ struct NativeJoinCoordinator {
     enrollment: NativeJoinEnrollment,
     status: PacketTunnelNativeJoinStatus
   ) throws -> HubNetworkProfileConfiguration {
-    // The hub host stays this member's only peer: hub-pro is reachable only
+    // The hub host stays this member's only peer: hub-server is reachable only
     // through it, so it must survive tunnel restarts.
     guard let admission = status.admission,
           let endpoint = status.hubPeerEndpoint else {
@@ -551,10 +551,10 @@ struct NativeJoinCoordinator {
 #endif
   }
 
-  /// Derives the hub-pro URL (port 1997 on the same host) from a node
+  /// Derives the hub-server URL (port 1997 on the same host) from a node
   /// endpoint or inviter host value. Accepts bare hosts ("100.96.0.3"),
   /// host:port, and full URLs ("ws://mac.local:1964"). Plain (non-TLS)
-  /// hub-pro is the default — wss only when the endpoint itself is
+  /// hub-server is the default — wss only when the endpoint itself is
   /// wss/https (TLS-terminating proxy deployment).
   private static func bootstrapHubURL(_ node: String) -> URL? {
     let value = node.trimmingCharacters(in: .whitespaces)
@@ -585,7 +585,7 @@ private struct HubNetworkAgentRegistration: Encodable {
   let platform = NativeJoinCoordinator.nativePlatform
   let overlayAddresses: [String]
   let connectedAt: String
-  /// Inviter-signed bootstrap response; hub-pro admits a new key only with it.
+  /// Inviter-signed bootstrap response; hub-server admits a new key only with it.
   let admission: DirectBootstrapResponse?
 }
 

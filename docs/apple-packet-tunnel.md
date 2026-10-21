@@ -39,7 +39,7 @@ shared-access Keychain group, not in the app-group JSON file.
 Readiness uses the Hub Ed25519 identity stored as
 `dev.v57.Hub.identity.v1` / `ed25519-private-key` in the Keychain access group
 shared by `dev.v57.Hub` and `dev.v57.Hub.PacketTunnelExtension`. Assertions do
-not carry a public key; hub-pro verifies them against authenticated sender
+not carry a public key; hub-server verifies them against authenticated sender
 context. WireGuard retains a separate X25519 key because it serves tunnel key
 agreement rather than identity signing.
 
@@ -141,7 +141,7 @@ switch on failed handshake/grant/DNS, immediate revocation, and final teardown.
 
 `integration/hn893_apple_join.sh` builds and verifies signed Hub.app and its
 embedded PacketTunnelExtension, activates Share Network for the first connected
-owner Hub, and waits until hub-pro reports `Available (This Mac)`. It writes one
+owner Hub, and waits until hub-server reports `Available (This Mac)`. It writes one
 invitation to a private temporary file, asks the configured Linux `hub-net`
 daemon to join it over SSH, and passes only after Hub observes a newly connected
 agent. The App then stops the tunnel and removes the profile when the harness

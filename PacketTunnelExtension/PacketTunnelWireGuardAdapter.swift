@@ -96,10 +96,10 @@ final class PacketTunnelWireGuardAdapter {
           return
         }
         // The committed membership keeps the inviter bootstrap peer so the
-        // joiner can still reach hub-pro on the inviter's overlay host after
+        // joiner can still reach hub-server on the inviter's overlay host after
         // the temporary link is replaced (Go parity: LoadInviterPeers /
         // inviter.json). The peer's allowed IPs already cover the inviter
-        // addresses plus the hub-pro host. Its endpoint stays the inviter's
+        // addresses plus the hub-server host. Its endpoint stays the inviter's
         // WireGuard socket, which remains valid after the commit.
         let configuration = TunnelConfiguration(
           name: base.name,
@@ -125,7 +125,7 @@ final class PacketTunnelWireGuardAdapter {
   /// Replaces the base WireGuard configuration with the temporary
   /// point-to-point bootstrap link: the joiner's assigned addresses on the
   /// interface and the inviter peer covering the inviter's addresses plus
-  /// hub-pro. Used after the direct bootstrap exchange, before ordinary
+  /// hub-server. Used after the direct bootstrap exchange, before ordinary
   /// `hub/net/bind` assigns permanent overlay addresses.
   func configureBootstrapLink(
     assignmentId: String,
@@ -150,7 +150,7 @@ final class PacketTunnelWireGuardAdapter {
         }
         do {
           let interfaceAddresses = try Self.bootstrapHostRoutes(joinerAddresses)
-          // The inviter's overlay IPv4 is also the hub-pro host, so the
+          // The inviter's overlay IPv4 is also the hub-server host, so the
           // combined list can contain duplicates — dedupe before the route
           // validation (which rejects repeated entries).
           let allowedRoutes = try Self.bootstrapHostRoutes(
@@ -301,7 +301,7 @@ final class PacketTunnelWireGuardAdapter {
       peers = [peer]
     }
     if let hubPeer = profile.hubPeer {
-      // A joined member reaches hub-pro only through the hub host.
+      // A joined member reaches hub-server only through the hub host.
       guard let keyData = Data(base64Encoded: hubPeer.publicKey),
             let key = PublicKey(rawValue: keyData),
             let endpoint = Endpoint(from: hubPeer.endpoint) else {
@@ -433,7 +433,7 @@ final class PacketTunnelWireGuardAdapter {
   /// bootstrap listener address, and WireGuard learns the peer's endpoint from
   /// that handshake. Allowed IPs are the joiner's temporary point-to-point
   /// addresses, later extended with the joiner's permanent overlay addresses
-  /// once it binds at hub-pro.
+  /// once it binds at hub-server.
   func installInviterPeer(
     assignmentId: String,
     publicKeyBase64: String,
@@ -495,7 +495,7 @@ final class PacketTunnelWireGuardAdapter {
       }
       // Or the frozen overlay prefixes themselves (100.96.0.0/11,
       // fd48:5542:4e45::/48): the inviter cannot know the joiner's
-      // hub-pro-assigned address at install time, so the peer scopes the
+      // hub-server-assigned address at install time, so the peer scopes the
       // whole overlay. Interim until per-address extension from
       // hub/net/list lands (Go parity: UpdateJoinerAllowedIPs).
       guard isOverlayPrefix(route) else { return nil }

@@ -230,7 +230,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     inviterListener = listener
     let listenerEndpoint = listener.start()
 
-    // Register with the node hub-pro names (hub/net/node), which invitations
+    // Register with the node hub-server names (hub/net/node), which invitations
     // carry in ?e=. A node address inside the overlay range (Tailscale) is
     // excluded from the tunnel through controlPlaneIPv4Hosts.
     // There is no default node: without one the inviter can't register
@@ -754,7 +754,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
   ) async throws {
     // Bootstrap host-route validation requires prefix notation ("100.96.0.3/32",
     // "fd48::1/128"); the response carries bare addresses. The inviter's
-    // overlay IPv4 is also the hub-pro host, so drop the hub-pro entry when it
+    // overlay IPv4 is also the hub-server host, so drop the hub-server entry when it
     // duplicates an inviter route (duplicates are rejected).
     let inviterRoutes = inviterAddresses.map { $0.contains(":") ? "\($0)/128" : "\($0)/32" }
     let hubProRoute = hubProHost.contains(":") ? "\(hubProHost)/128" : "\(hubProHost)/32"
@@ -892,7 +892,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
 
   /// Network settings for the temporary direct bootstrap link. The joiner's
   /// assigned point-to-point addresses are the tunnel addresses; overlay
-  /// routes keep hub-pro (reachable through the inviter) inside the tunnel.
+  /// routes keep hub-server (reachable through the inviter) inside the tunnel.
   static func bootstrapNetworkSettings(
     joinerIPv4: String,
     joinerIPv6: String

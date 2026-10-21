@@ -171,7 +171,7 @@ struct ExtensionNativeJoinStatus: Encodable {
   let expiresAt: String
   let hubProHost: String?
   let bootstrapAddresses: [String]?
-  /// The inviter-signed bootstrap response; hub-pro requires it as the
+  /// The inviter-signed bootstrap response; hub-server requires it as the
   /// admission on the joiner's first bind.
   let admission: DirectBootstrapResponse?
   /// The inviter's WireGuard endpoint the bootstrap link uses; the app keeps

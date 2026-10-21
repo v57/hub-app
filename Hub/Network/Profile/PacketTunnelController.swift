@@ -244,7 +244,7 @@ final class PacketTunnelController: PacketTunnelControlling {
   }
 
   /// Gives the extension every network member's WireGuard key and overlay
-  /// addresses. The hub host keeps one peer per member: members reach hub-pro
+  /// addresses. The hub host keeps one peer per member: members reach hub-server
   /// and shared ports only through it, after their bootstrap peer expires.
   func setMemberPeers(_ peers: [HubNetworkPeer]) async throws {
     guard let manager = try await loadManager(),

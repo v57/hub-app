@@ -3,7 +3,7 @@ set -euo pipefail
 umask 077
 
 # Signed-device regression. Fixture must expose two distinct invitations issued
-# by production hub-pro. Success transcript records server-side event order;
+# by production hub-server. Success transcript records server-side event order;
 # failure invitation points at a node path that times out without fixture prearm.
 
 workspace=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)

@@ -12,7 +12,7 @@ import SwiftUI
 /// the same hooks run under `xcrun devicectl device process launch -e ...`.
 ///
 /// Owner acceptance (`HUB_HN9XX_OWNER_ACCEPTANCE=1`):
-///   - connects to hub-pro as the owner,
+///   - connects to hub-server as the owner,
 ///   - sets `hub/net/node` to `HUB_HN9XX_NODE_ENDPOINT` (Tailscale name),
 ///   - joins the local network and waits for the local `net/invite` provider,
 ///   - issues a single-use invitation and writes `HUB_HN9XX_RESULT_JSON`
@@ -24,7 +24,7 @@ import SwiftUI
 ///   - pastes `HUB_HN9XX_INVITATION` through `HubNets.main.join`,
 ///   - verifies hub connectivity through the inviter overlay and real overlay
 ///     traffic (ICMP ping of the inviter overlay address and a TCP connect to
-///     hub-pro `:1997` through the tunnel, plus a hub-pro RPC round trip),
+///     hub-server `:1997` through the tunnel, plus a hub-server RPC round trip),
 ///   - unjoins (tunnel stop + profile removal + keychain cleanup),
 ///   - writes `HUB_HN9XX_RESULT_JSON`
 ///     (`{joined, hub, overlay, traffic, unjoined, error}`) and exits.
@@ -312,8 +312,8 @@ enum HN9xxAcceptance {
 
   /// Real overlay traffic both directions, no loopback:
   /// 1. ICMP ping of the inviter overlay IPv4 through the tunnel.
-  /// 2. TCP connect to hub-pro `:1997` on the inviter overlay address.
-  /// 3. One hub-pro RPC round trip (`hub/net/list`) over the same path.
+  /// 2. TCP connect to hub-server `:1997` on the inviter overlay address.
+  /// 3. One hub-server RPC round trip (`hub/net/list`) over the same path.
   private static func verifyOverlayTraffic(hub: Hub, overlayHost: String) async throws -> String {
     guard !overlayHost.isEmpty else { throw AcceptanceError.badAddress("") }
     var results: [String] = []

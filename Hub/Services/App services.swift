@@ -26,7 +26,7 @@ private enum HubNetworkInvitationQuery {
 }
 
 extension HubService.Group {
-  /// Thread-safe box for the current hub-pro `hub/net/node` value. The invite
+  /// Thread-safe box for the current hub-server `hub/net/node` value. The invite
   /// service handler is `@Sendable`, so it reads the endpoint from here
   /// instead of capturing MainActor hub state.
   final class HubNetworkNodeEndpointStore: @unchecked Sendable {

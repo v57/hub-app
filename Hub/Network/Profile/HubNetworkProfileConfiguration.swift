@@ -7,7 +7,7 @@ import Network
 /// Keep this model free of NetworkExtension and WireGuard types: the app owns
 /// profile selection and persistence while the extension owns packet handling.
 /// The WireGuard peer of the hub host (the inviting agent) for a joined
-/// membership. A member reaches hub-pro only through it, so it is persisted
+/// membership. A member reaches hub-server only through it, so it is persisted
 /// with the profile and installed on every tunnel start.
 struct HubNetworkPeer: Codable, Equatable, Sendable {
   let publicKey: String

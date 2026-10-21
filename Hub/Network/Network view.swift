@@ -38,7 +38,7 @@ extension Hub {
   func createNetworkInvitation(service: String) async throws -> String {
     struct ServiceContext: Encodable, Sendable { let service: String }
     // The channel send has no built-in timeout and its continuation ignores
-    // cancellation, so a hub-pro that never answers `net/invite` would hang
+    // cancellation, so a hub-server that never answers `net/invite` would hang
     // the caller forever. Race the send against a 10-second deadline with a
     // resume-once guard and fail fast.
     final class OnceBox: @unchecked Sendable {

@@ -37,7 +37,7 @@ private struct HubNetworkGrantResponse: Decodable {
 extension PacketTunnelController {
   /// Restores server-side registration for an already-installed profile.
   ///
-  /// hub-pro may restart while NetworkExtension state remains installed. Any
+  /// hub-server may restart while NetworkExtension state remains installed. Any
   /// capability mutation must recreate and verify that ephemeral registration
   /// before using it.
   func restoreInstalledLocalMembership(hub: Hub) async throws {

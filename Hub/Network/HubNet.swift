@@ -428,7 +428,7 @@ final class HubNet {
 
   /// While serving as the hub's inviter, mirror every member from
   /// `network/agents/list` into the extension as a WireGuard peer. Members
-  /// reach hub-pro and shared ports only through this host, after their
+  /// reach hub-server and shared ports only through this host, after their
   /// temporary bootstrap peer expires.
   private func startInviterAgentWatcher() {
     guard (try? PacketTunnelController()) != nil,
