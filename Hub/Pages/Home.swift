@@ -58,7 +58,11 @@ struct HomeView: View {
     }.buttonStyle(.plain).navigationTitle("Home")
       .navigationDestination(for: HubAppLink.self) { link in
         if let hub = link.hub(in: hubs.list) {
-          HubAppView(header: link.app).hub(hub)
+          if link.app.web != nil {
+            HubWebAppView(header: link.app).hub(hub)
+          } else {
+            HubAppView(header: link.app).hub(hub)
+          }
         }
       }
       .scrollDismissesKeyboardImmediately()
@@ -239,6 +243,7 @@ struct HomeView: View {
     @HubState(\.pendingDevices) var pendingDevices
     @Bindable var hub: Hub
     @State private var sheet: Sheet?
+    @State private var homeApps = HomeApps.main
     @Namespace var namespace
     enum Sheet: Identifiable {
       var id: Sheet { self }
@@ -311,15 +316,13 @@ struct HomeView: View {
         }.labelStyle(.appIcon).buttonStyle(.environment)
         ShareServicesView().gridSize(.x22)
         if let apps = statusBadges.apps, !apps.isEmpty {
-          ForEach(apps) { app in
-            NavigationLink(value: HubAppLink(hub: hub.id, app: app)) {
-              Label {
-                Text(app.name)
-              } icon: {
-                Text(String(app.name.first ?? "A"))
-              }
-            }.iconBadge(app.isOnline ? nil : "Offline")
-          }.labelStyle(.appIcon).buttonStyle(.environment)
+          let hidden = apps.filter { homeApps.isHidden($0, in: hub.id) }
+          ForEach(apps.filter { !homeApps.isHidden($0, in: hub.id) }) { app in
+            AppTile(hub: hub, app: app)
+          }
+          if !hidden.isEmpty {
+            HiddenAppsTile(hub: hub, hidden: hidden)
+          }
         }
       }
       .navigationDestination(item: $sheet) { sheet in
