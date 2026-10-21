@@ -120,6 +120,17 @@ enum HN9xxAcceptance {
         at: root.appendingPathComponent("Hub/NativeNetworkJoins/v1", isDirectory: true)
       )
     }
+    // A hung earlier run can leave its tunnel up (activeVPNConflict); stop it, keeping the approved profile
+    if let tunnel = try? PacketTunnelController() { await tunnel.stop() }
+    // A rebuilt test hub answers at the same overlay address with a new hub key, and a pinned key is never
+    // replaced on its own. Forget pins for overlay addresses (100.64.0.0/10) only; real hubs keep theirs.
+    let pins = HubKeyPins.beside(KeyChain.main)
+    for address in pins.all.keys {
+      guard let url = URL(string: address), let host = url.host,
+            host.hasPrefix("100."), let second = Int(host.split(separator: ".")[1]), (64...127).contains(second)
+      else { continue }
+      pins.forget(url)
+    }
     do {
       let decoded = try NetworkInvitationParser.decode(invitation)
       progress("joiner: invitation decoded (replay \(String(decoded.replayId.prefix(8))))")
@@ -366,8 +377,10 @@ enum HN9xxAcceptance {
     return ok
   }
 
+  /// An authenticated round trip over the overlay. `hub/net/list` is owner-only since the device layer, and a
+  /// joiner isn't an owner, so this reads `hub/api/services`, which any keyed caller may read.
   private static func hubRPC(_ hub: Hub) async throws {
-    _ = try await firstValue(from: hub.client.values("hub/net/list")) { _ in true }
+    _ = try await firstValue(from: hub.client.values("hub/api/services", "")) { _ in true }
   }
 
   private static func firstValue<S: AsyncSequence & Sendable>(
@@ -377,11 +390,11 @@ enum HN9xxAcceptance {
     try await withThrowingTaskGroup(of: S.Element.self) { group in
       group.addTask {
         for try await value in stream where predicate(value) { return value }
-        throw AcceptanceError.timeout("hub/net/list")
+        throw AcceptanceError.timeout("hub/api/services")
       }
       group.addTask {
         try await Task.sleep(for: timeout)
-        throw AcceptanceError.timeout("hub/net/list")
+        throw AcceptanceError.timeout("hub/api/services")
       }
       let value = try await group.next()!
       group.cancelAll()
