@@ -13,6 +13,16 @@ import SwiftUI
 import HubUI
 import HubService
 
+/// A service app on one of the hubs. Every hub section shares the home navigation stack, which uses a single
+/// destination per value type, so the value names its hub instead of each section adding a destination.
+struct HubAppLink: Hashable {
+  let hub: Hub.ID
+  let app: AppHeader
+  @MainActor func hub(in hubs: [Hub]) -> Hub? {
+    hubs.first { $0.id == hub }
+  }
+}
+
 struct HomeView: View {
   typealias StatusBadges = Hub.StatusBadges
   enum TextFieldFocus: Hashable {
@@ -46,6 +56,11 @@ struct HomeView: View {
           .animation(.home, value: hubs.list.count)
       }.environment(\.homeGridSpacing, HomeGridLayout.spacing(width: view.size.width - 16))
     }.buttonStyle(.plain).navigationTitle("Home")
+      .navigationDestination(for: HubAppLink.self) { link in
+        if let hub = link.hub(in: hubs.list) {
+          HubAppView(header: link.app).hub(hub)
+        }
+      }
       .scrollDismissesKeyboardImmediately()
       .scrollBounceBehavior(.basedOnSize)
       .toolbarTitleDisplayMode(.inline)
@@ -297,7 +312,7 @@ struct HomeView: View {
         ShareServicesView().gridSize(.x22)
         if let apps = statusBadges.apps, !apps.isEmpty {
           ForEach(apps) { app in
-            NavigationLink(value: app) {
+            NavigationLink(value: HubAppLink(hub: hub.id, app: app)) {
               Label {
                 Text(app.name)
               } icon: {
@@ -306,10 +321,6 @@ struct HomeView: View {
             }.iconBadge(app.isOnline ? nil : "Offline")
           }.labelStyle(.appIcon).buttonStyle(.environment)
         }
-      }
-      .navigationDestination(for: AppHeader.self) { app in
-        HubAppView(header: app).hub(hub)
-          .transitionTarget(id: app.id, namespace: namespace)
       }
       .navigationDestination(item: $sheet) { sheet in
         ZStack {
