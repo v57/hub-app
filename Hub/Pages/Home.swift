@@ -17,7 +17,6 @@ struct HomeView: View {
   typealias StatusBadges = Hub.StatusBadges
   enum TextFieldFocus: Hashable {
     case joinHubAddress
-    case joinHubName
     case joinHubCode
     case joinNetworkInvitation
   }
@@ -640,25 +639,22 @@ struct HomeView: View {
     }
   }
   /// Connect to a Hub: an address, and for a new hub-server the pairing code it shows, which makes this device its
-  /// first owner. A `hub://pair` link (opened, or pasted into the address) fills in both.
+  /// first owner. A `hub://pair` link pasted into the address fills in both; an opened one goes to `PairingConfirmation`.
   struct JoinHubView: View {
     let hubs = Hubs.main
     @Binding var address: String
-    @State var name: String = ""
     @State var code: String = ""
     let pairing: HubPairing
-    @State private var router = PairingRouter.main
     let focus: FocusState<TextFieldFocus?>.Binding
     var url: URL? { URL(hubAddress: address) }
-    var providedName: String? { name.isEmpty ? url?.name : name }
     var body: some View {
       VStack(alignment: .leading) {
         HStack {
-          Text(url?.absoluteString ?? "Connect to a Hub").cellTitle()
+          Text("Connect to a Hub").cellTitle()
           Spacer(minLength: 0)
-          if let url, let providedName {
+          if let url {
             Button {
-              Task { await connect(url: url, name: providedName) }
+              Task { await connect(url: url) }
             } label: {
               Text(code.isEmpty ? "Connect" : "Pair")
                 .padding(.horizontal, 12).padding(.vertical, 4)
@@ -672,8 +668,8 @@ struct HomeView: View {
           .onChange(of: address) { acceptLink(address) }
         if !address.isEmpty {
           HStack {
-            field(url?.name ?? "Name", text: $name, focus: .joinHubName)
-            field("Pairing code", text: $code, focus: .joinHubCode)
+            Text("Pairing code").secondary()
+            field("New hub only", text: $code, focus: .joinHubCode)
               // Editing the code clears a failure; clearing it after a success keeps the result
               .onChange(of: code) { if case .failed = pairing.state { pairing.reset() } }
           }.transition(.blurReplace)
@@ -681,11 +677,9 @@ struct HomeView: View {
         if pairing.state != .idle {
           PairingStatusView(pairing).secondary().lineLimit(2).transition(.blurReplace)
         } else if !address.isEmpty {
-          Text("New hub? Enter the pairing code that hub-launcher shows.").secondary().lineLimit(2).transition(.blurReplace)
+          Text("A new hub shows its pairing code in hub-launcher or `hub pair`.").secondary().lineLimit(2).transition(.blurReplace)
         }
       }.animation(.home, value: address.isEmpty).blockBackground()
-        .onAppear(perform: acceptPending)
-        .onChange(of: router.pending) { acceptPending() }
     }
     func field(_ title: String, text: Binding<String>, focus value: TextFieldFocus) -> some View {
       TextField(title, text: text).focused(focus, equals: value)
@@ -694,11 +688,10 @@ struct HomeView: View {
         .background(.black.opacity(0.05), in: RoundedRectangle(cornerRadius: 8))
         .disableHoverScale()
     }
-    func connect(url: URL, name providedName: String) async {
-      let settings = Hub.Settings(name: providedName, address: url)
+    func connect(url: URL) async {
+      let settings = Hub.Settings(name: url.name ?? address, address: url)
       let paired = !code.isEmpty
-      guard await hubs.connect(settings, code: code, named: !name.isEmpty, pairing: pairing) != nil else { return }
-      name = ""
+      guard await hubs.connect(settings, code: code, named: false, pairing: pairing) != nil else { return }
       code = ""
       address = ""
       focus.wrappedValue = nil
@@ -713,13 +706,6 @@ struct HomeView: View {
       guard let link = PairingLink(text) else { return }
       address = link.address
       code = PairingCode.format(link.code)
-    }
-    func acceptPending() {
-      guard let link = router.consume() else { return }
-      pairing.reset()
-      address = link.address
-      code = PairingCode.format(link.code)
-      focus.wrappedValue = .joinHubCode
     }
   }
   struct ServiceContent: View {

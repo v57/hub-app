@@ -13,8 +13,8 @@ import SwiftUI
 import HubService
 import HubUI
 
-/// `hub://pair` links opened from outside (a QR scanned with the camera, `hub pair` in a terminal), for the Connect to a
-/// Hub views to pick up
+/// `hub://pair` links opened from outside (a QR scanned with the camera, `hub pair` in a terminal), which
+/// `PairingConfirmation` asks about
 @MainActor
 @Observable
 final class PairingRouter {
@@ -27,9 +27,77 @@ final class PairingRouter {
     pending = PairingLink(url: url)
     return true
   }
-  func consume() -> PairingLink? {
-    defer { pending = nil }
-    return pending
+  func dismiss() {
+    pending = nil
+  }
+}
+
+/// Asks to pair with the hub a `hub://pair` link names, in front of everything, and pairs on confirm
+struct PairingConfirmation: View {
+  @State private var router = PairingRouter.main
+  @State private var pairing = HubPairing()
+  var body: some View {
+    ZStack {
+      if let link = router.pending {
+        Color.black.opacity(0.35).ignoresSafeArea()
+          .onTapGesture { if !pairing.state.isWorking { close() } }
+          .transition(.opacity)
+        card(link).transition(.scale(scale: 0.9).combined(with: .opacity))
+      }
+    }.animation(.home, value: router.pending)
+      .animation(.home, value: pairing.state)
+      .onChange(of: router.pending) { pairing.reset() }
+  }
+  func card(_ link: PairingLink) -> some View {
+    let url = URL(hubAddress: link.address)
+    return VStack(alignment: .leading, spacing: 12) {
+      Text("Pair with this hub?").font(.title3.bold())
+      VStack(alignment: .leading, spacing: 4) {
+        Text(url?.absoluteString ?? link.address).font(.body.monospaced()).lineLimit(1).truncationMode(.middle)
+        Text("Pairing code \(PairingCode.format(link.code))").secondary()
+      }
+      if pairing.state == .idle {
+        Text("This device becomes the hub's owner.").secondary()
+      } else {
+        PairingStatusView(pairing).font(.callout).lineLimit(3)
+      }
+      HStack {
+        if case .paired = pairing.state {
+          Spacer(minLength: 0)
+          Button("Done") { close() }.buttonStyle(.borderedProminent)
+        } else {
+          Button("Cancel", role: .cancel) { close() }
+            .buttonStyle(.bordered).disabled(pairing.state.isWorking)
+          Spacer(minLength: 0)
+          Button {
+            Task { await pair(link, url: url) }
+          } label: {
+            Text(pairing.state.isFailed ? "Try Again" : "Pair").frame(minWidth: 80)
+          }.buttonStyle(.borderedProminent).disabled(url == nil || pairing.state.isWorking)
+        }
+      }.controlSize(.large)
+    }.padding(20).frame(maxWidth: 380)
+      .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24))
+      .shadow(color: .black.opacity(0.2), radius: 24, y: 8)
+      .padding(16)
+  }
+  func pair(_ link: PairingLink, url: URL?) async {
+    guard let url else { return }
+    let settings = Hub.Settings(name: url.name ?? link.address, address: url)
+    guard await Hubs.main.connect(settings, code: link.code, named: false, pairing: pairing) != nil else { return }
+    // Leaves the result on screen for a moment
+    try? await Task.sleep(for: .seconds(2))
+    if router.pending == link, case .paired = pairing.state { close() }
+  }
+  func close() {
+    router.dismiss()
+    pairing.reset()
+  }
+}
+
+extension PairingState {
+  var isFailed: Bool {
+    if case .failed = self { true } else { false }
   }
 }
 
@@ -80,7 +148,6 @@ struct ConnectView: View {
   @State var name: String = ""
   @State var code: String = ""
   @State private var pairing = HubPairing()
-  @State private var router = PairingRouter.main
   var url: URL? { URL(hubAddress: address) }
   var providedName: String? { name.isEmpty ? url?.name : name }
   var body: some View {
@@ -115,16 +182,9 @@ struct ConnectView: View {
       PairingStatusView(pairing)
     }.animation(.home, value: address.isEmpty)
       .navigationTitle("Connect to a Hub")
-      .onAppear(perform: acceptPending)
-      .onChange(of: router.pending) { acceptPending() }
   }
   func acceptLink(_ text: String) {
     guard let link = PairingLink(text) else { return }
-    address = link.address
-    code = PairingCode.format(link.code)
-  }
-  func acceptPending() {
-    guard let link = router.consume() else { return }
     address = link.address
     code = PairingCode.format(link.code)
   }
