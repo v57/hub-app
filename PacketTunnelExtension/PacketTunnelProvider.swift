@@ -507,6 +507,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
       dnsListener = replacementDNSListener
       activeBootstrapProfile = profile
       finishNativeJoinTransientState(start.transactionId)
+      Self.writeDiagnostics("commit ok overlay=\(profile.overlayIPv4Address) hubNetwork=\(profile.hubNetworkID.prefix(8))")
       let status = nativeJoinStatus(start, state: .committed)
       nativeJoinStatuses[start.transactionId] = status
       return try? JSONEncoder().encode(ExtensionNativeJoinResponse(
@@ -515,6 +516,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         transactionId: start.transactionId, status: status
       ))
     } catch {
+      Self.writeDiagnostics("commit failed: \(error)")
       finishNativeJoinTransientState(start.transactionId)
       let status = nativeJoinStatus(
         start, state: .failed,
@@ -765,7 +767,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
   }
 
   private func handleBootstrapMessage(_ message: ExtensionBootstrapMessage) async -> Data? {
-    Self.writeDiagnostics("bootstrap message received: \(message.command.rawValue)")
+    Self.writeDiagnostics("bootstrap message received: \(message.command.rawValue) hubNetwork=\(activeBootstrapProfile?.hubNetworkID.prefix(8) ?? "none")")
     guard message.version == 1 else {
       Self.writeDiagnostics("bootstrap message bad version: \(message.version)")
       return nil

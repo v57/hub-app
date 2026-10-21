@@ -304,6 +304,8 @@ final class HubNet {
       vpn = devices.first { $0.key == profile.gatewayGrant?.gatewayKey }
     }
     await refreshGlobalVPN()
+    // After a relaunch the inviter still has to mirror members into the extension
+    startInviterAgentWatcher()
   }
 
   func connectionChanged(_ connected: Bool) {

@@ -89,9 +89,19 @@ final class PacketTunnelController: PacketTunnelControlling {
     try await start()
   }
 
+  /// Stops the tunnel and waits until it is down (at most 15 seconds), so a join or start right after doesn't find
+  /// it still disconnecting
   func stop() async {
     guard let manager = try? await loadManager() else { return }
+    guard manager.connection.status != .disconnected, manager.connection.status != .invalid else { return }
     manager.connection.stopVPNTunnel()
+    try? await waitForConnection(manager, expected: .disconnected)
+  }
+
+  /// Waits for a tunnel that is going down to finish, at most 15 seconds
+  func waitUntilDisconnected() async {
+    guard let manager = try? await loadManager(), manager.connection.status == .disconnecting else { return }
+    try? await waitForConnection(manager, expected: .disconnected)
   }
 
   /// Stops the tunnel, disables the system VPN profile and deletes the shared

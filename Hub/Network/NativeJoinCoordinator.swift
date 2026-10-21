@@ -79,6 +79,8 @@ struct NativeJoinCoordinator {
     var bindingRecorded = record.stage != .staged
 
     do {
+      // A tunnel stopped just before (an earlier join's, or one this device left) may still be going down
+      await tunnel.waitUntilDisconnected()
       switch await tunnel.status {
       case .connected, .connecting, .reasserting, .disconnecting:
         throw NativeJoinError.activeVPNConflict
@@ -244,6 +246,7 @@ struct NativeJoinCoordinator {
           expiresAt: ISO8601DateFormatter.js.string(from: invitation.expiresAt)
         ))
       }
+      trace("membership committed in the extension (\(committed.state.rawValue))")
       guard committed.state == .committed else {
         throw NativeJoinError.staged(
           .activation,
@@ -259,6 +262,7 @@ struct NativeJoinCoordinator {
         record: record,
         identity: identity
       )
+      trace("committed tunnel confirmed the membership")
       // Only transactions staged before the device layer have a membership key of their own
       var identityTag: String?
       if try await NativeJoinStore.main.hasStagedProfileKey(transactionId: transactionId) {
@@ -268,6 +272,12 @@ struct NativeJoinCoordinator {
         )
         identityTag = tag
       }
+      // An entry for this address from an earlier join keeps a client that connected over the bootstrap link (gone
+      // with the commit) or is waiting out a reconnect backoff, so start from a fresh one
+      if let stale = Hubs.main.list.first(where: { $0.settings.address == hubURL }) {
+        trace("replacing the existing entry for \(hubURL.absoluteString) (connected=\(stale.isConnected))")
+        Hubs.main.remove(with: stale.settings)
+      }
       let hub = Hubs.main.insert(with: Hub.Settings(
         name: header.name, address: hubURL, identityTag: identityTag
       ))
@@ -276,6 +286,7 @@ struct NativeJoinCoordinator {
         throw NativeJoinError.invalidBootstrapIdentity
       }
       try await waitForHubConnection(hub)
+      trace("joined hub connected")
       bindClient?.stop()
       bindClient = nil
       _ = try await NativeJoinStore.main.markCommitted(transactionId: transactionId)
@@ -484,13 +495,16 @@ struct NativeJoinCoordinator {
   }
 
   private static func waitForHubConnection(_ hub: Hub) async throws {
-    let deadline = ContinuousClock.now + .seconds(15)
+    let deadline = ContinuousClock.now + .seconds(20)
     while !hub.isConnected {
       if let refusal = hub.refusal {
         throw NativeJoinError.refused(refusal)
       }
       guard ContinuousClock.now < deadline else {
-        throw NativeJoinError.bootstrapTimedOut
+        throw NativeJoinError.staged(
+          .connection,
+          "The joined hub didn't answer through Hub Network in 20 seconds (connected=\(hub.isConnected), ready=\(hub.client.isReady))."
+        )
       }
       try await Task.sleep(for: .milliseconds(100))
     }
@@ -503,18 +517,38 @@ struct NativeJoinCoordinator {
     identity: PacketTunnelBootstrapIdentity
   ) async throws {
     let deadline = ContinuousClock.now + .seconds(15)
+    var observed = "no answer"
     while ContinuousClock.now < deadline {
-      if await tunnel.status == .connected,
-         let readiness = try? await tunnel.bootstrapReadiness(),
-         readiness.hubNetworkId == enrollment.hubNetworkId,
-         readiness.wireGuardKey == record.wireGuardPublicKey,
-         readiness.tunnelInstanceId == identity.tunnelInstanceId,
-         readiness.generation == identity.generation {
-        return
+      let status = await tunnel.status
+      if status != .connected {
+        observed = "tunnel \(status)"
+      } else {
+        do {
+          let readiness = try await tunnel.bootstrapReadiness()
+          let mismatches = [
+            readiness.hubNetworkId == enrollment.hubNetworkId ? nil : "hubNetworkId",
+            readiness.wireGuardKey == record.wireGuardPublicKey ? nil : "wireGuardKey",
+            readiness.tunnelInstanceId == identity.tunnelInstanceId ? nil : "tunnelInstanceId",
+            readiness.generation == identity.generation ? nil : "generation",
+          ].compactMap { $0 }
+          if mismatches.isEmpty { return }
+          observed = "readiness differs in \(mismatches.joined(separator: ", "))"
+        } catch {
+          observed = "readiness failed: \(error.localizedDescription)"
+        }
       }
       try await Task.sleep(for: .milliseconds(100))
     }
-    throw NativeJoinError.bootstrapTimedOut
+    throw NativeJoinError.staged(
+      .activation, "The tunnel didn't confirm the membership in 15 seconds (\(observed))."
+    )
+  }
+
+  /// Progress lines the device acceptance runs read
+  private static func trace(_ line: String) {
+#if DEBUG
+    print("[HN9XX] coordinator: \(line)")
+#endif
   }
 
   /// Derives the hub-pro URL (port 1997 on the same host) from a node
