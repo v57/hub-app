@@ -48,6 +48,8 @@ struct HubApp: App {
 #else
           mainContent
 #endif
+        } else if let target = ProcessInfo.processInfo.environment["HUB_OPEN_NETWORK"] {
+          NetworkPageLaunch(target: target).page()
         } else if VPNProfileProbe.mode != nil {
           Text("VPN profile probe").task { await VPNProfileProbe.run() }
         } else {

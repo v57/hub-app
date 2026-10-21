@@ -184,7 +184,7 @@ struct HomeView: View {
         } else if let message = error ?? validationError {
           Text(message).foregroundStyle(.red).secondary().lineLimit(2)
         } else {
-          Text("Invitation expires after ten minutes and can be used once.")
+          Text("Invitations work once, for seven days.")
             .secondary()
         }
       }
