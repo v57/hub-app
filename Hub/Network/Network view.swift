@@ -1170,6 +1170,22 @@ struct NetworkPageLaunch: View {
       }
     }
     .task {
+      // HUB_TUNNEL_DIAG=1: prints the extension's inviter status and diagnostics every few seconds
+      guard ProcessInfo.processInfo.environment["HUB_TUNNEL_DIAG"] != nil else { return }
+      var printed = 0
+      while !Task.isCancelled {
+        try? await Task.sleep(for: .seconds(3))
+        guard let controller = try? PacketTunnelController() else { continue }
+        if let status = try? await controller.inviterStatus() {
+          print("[tunnel] inviter registered=\(status.registered) listener=\(status.listenerEndpoint)")
+        }
+        let lines = (await controller.extensionDiagnostics() ?? "").split(separator: "\n")
+        if lines.count < printed { printed = 0 }
+        for line in lines.dropFirst(printed) { print("[tunnel]", line) }
+        printed = lines.count
+      }
+    }
+    .task {
 #if canImport(HubServer)
       if target == "local" {
         await LocalHub.main.setEnabled(true)

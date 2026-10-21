@@ -143,9 +143,17 @@ final class HubNet {
     self.hub = hub
   }
 
-  func joinNetwork(enabled: Bool) async throws {
+  /// `node`: the hub's node when the caller just set it, since `hub/net/node` may not have streamed it back yet
+  func joinNetwork(enabled: Bool, node: String? = nil) async throws {
     let tunnel = try PacketTunnelController()
     if enabled {
+      // The profile saves whether this device serves invitations, which needs the hub's node: learn it first, or a
+      // device that joins right after its owner sets the node never registers its inviter
+      var node = node
+      if node == nil { node = await Self.currentNodeEndpoint(hub: hub, timeout: .seconds(2)) }
+      if let node {
+        HubService.Group.HubNetworkNodeEndpointStore.shared.set(node)
+      }
       if await tunnel.status == .notInstalled {
         try await tunnel.authorizeAndInstallLocalHub(hub: hub)
       } else {
@@ -391,9 +399,9 @@ final class HubNet {
   }
 
   /// The node `hub/net/node` names, `nil` when no owner has set one (there is no default node)
-  private static func currentNodeEndpoint(hub: Hub) async -> String? {
+  private static func currentNodeEndpoint(hub: Hub, timeout: Duration = .seconds(5)) async -> String? {
     hub.state.hubNetNode.subscribe(hub: hub)
-    let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+    let deadline = ContinuousClock.now.advanced(by: timeout)
     while ContinuousClock.now < deadline {
       if let node = hub.state.hubNetNode.value, !node.isEmpty {
         return node
@@ -407,6 +415,10 @@ final class HubNet {
   func setNode(_ endpoint: String?) async throws {
     let endpoint = endpoint?.trimmingCharacters(in: .whitespacesAndNewlines)
     try await hub.client.send("hub/net/node/set", endpoint?.isEmpty == false ? endpoint : nil)
+    // A joined device's inviter registers with the node its profile names: apply the new one to the running tunnel
+    guard isJoined, let endpoint, !endpoint.isEmpty,
+          endpoint != HubService.Group.HubNetworkNodeEndpointStore.shared.current() else { return }
+    try await joinNetwork(enabled: true, node: endpoint)
   }
 
   private func refreshGlobalVPN() async {

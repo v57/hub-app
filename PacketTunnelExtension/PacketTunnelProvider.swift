@@ -112,6 +112,8 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
       }
       if profile.inviterEnabled {
         startInviter(profile: profile)
+      } else {
+        extensionDiagnostics("inviter off in this profile")
       }
     } catch {
       gatewayServingState = profile.servesGateway ? .unavailable : .disabled
@@ -166,9 +168,11 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     do {
       identity = try KeyChain.hubIdentity()
     } catch {
+      extensionDiagnostics("inviter not started: no hub identity in the keychain: \(error)")
       return
     }
     guard let overlayIPv4 = profile.overlayIPv4Address.split(separator: "/").first.map(String.init) else {
+      extensionDiagnostics("inviter not started: no overlay IPv4 in \(profile.overlayIPv4Address)")
       return
     }
     // The HUBB listener binds INADDR_ANY, so its socket address is not
@@ -220,6 +224,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         return try await inviter.handle(request)
       }
     } catch {
+      extensionDiagnostics("inviter not started: bootstrap listener failed: \(error)")
       return
     }
     inviterListener = listener
@@ -230,6 +235,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     // excluded from the tunnel through controlPlaneIPv4Hosts.
     // There is no default node: without one the inviter can't register
     guard let nodeEndpoint = profile.nodeEndpoint, !nodeEndpoint.isEmpty else {
+      extensionDiagnostics("inviter not started: the profile names no node")
       listener.stop()
       inviterListener = nil
       return
@@ -273,7 +279,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         await self?.inviter?.sweep()
       }
     }
-    print("inviter started on \(listenerEndpoint)")
+    extensionDiagnostics("inviter started on \(listenerEndpoint), node \(nodeEndpoint), advertising \(advertiseAddress ?? "none")")
   }
 
   private func stopInviter() {
