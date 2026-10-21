@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		4D5B0A042F90000100A0B004 /* HubServer in Frameworks */ = {isa = PBXBuildFile; productRef = 4D5B0A022F90000100A0B002 /* HubServer */; };
+		4D5B0A052F90000100A0B005 /* HubServer in Frameworks */ = {isa = PBXBuildFile; productRef = 4D5B0A032F90000100A0B003 /* HubServer */; };
 		132DD8B82F4CDDE300282A30 /* HubService in Frameworks */ = {isa = PBXBuildFile; productRef = 132DD8B72F4CDDE300282A30 /* HubService */; };
 		132DD8BA2F4CDDEB00282A30 /* HubService in Frameworks */ = {isa = PBXBuildFile; productRef = 132DD8B92F4CDDEB00282A30 /* HubService */; };
 		13B4EC572F817DF50060DAE1 /* HubUI in Frameworks */ = {isa = PBXBuildFile; productRef = 13B4EC562F817DF50060DAE1 /* HubUI */; };
@@ -127,6 +129,7 @@
 			files = (
 				13B4EC572F817DF50060DAE1 /* HubUI in Frameworks */,
 				132DD8B82F4CDDE300282A30 /* HubService in Frameworks */,
+				4D5B0A042F90000100A0B004 /* HubServer in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -136,6 +139,7 @@
 			files = (
 				13B4EC592F817DF80060DAE1 /* HubUI in Frameworks */,
 				132DD8BA2F4CDDEB00282A30 /* HubService in Frameworks */,
+				4D5B0A052F90000100A0B005 /* HubServer in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -247,6 +251,7 @@
 			packageProductDependencies = (
 				132DD8B72F4CDDE300282A30 /* HubService */,
 				13B4EC562F817DF50060DAE1 /* HubUI */,
+				4D5B0A022F90000100A0B002 /* HubServer */,
 			);
 			productName = Hub;
 			productReference = 13C54C712D638AA1000C4CA5 /* Hub.app */;
@@ -271,6 +276,7 @@
 			packageProductDependencies = (
 				132DD8B92F4CDDEB00282A30 /* HubService */,
 				13B4EC582F817DF80060DAE1 /* HubUI */,
+				4D5B0A032F90000100A0B003 /* HubServer */,
 			);
 			productName = HubAdmin;
 			productReference = 13F5738E2D68EDB4008546EB /* Hub Pro.app */;
@@ -337,6 +343,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				132DD8B62F4CDDE300282A30 /* XCLocalSwiftPackageReference "../HubService" */,
+				4D5B0A012F90000100A0B001 /* XCLocalSwiftPackageReference "../../Core/HubServer" */,
 				48A604073018000100604007 /* XCLocalSwiftPackageReference "Vendor/wireguard-apple" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -980,6 +987,10 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
+		4D5B0A012F90000100A0B001 /* XCLocalSwiftPackageReference "../../Core/HubServer" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../Core/HubServer;
+		};
 		132DD8B62F4CDDE300282A30 /* XCLocalSwiftPackageReference "../HubService" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../../HubService/HubService;
@@ -991,6 +1002,16 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		4D5B0A022F90000100A0B002 /* HubServer */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4D5B0A012F90000100A0B001 /* XCLocalSwiftPackageReference "../../Core/HubServer" */;
+			productName = HubServer;
+		};
+		4D5B0A032F90000100A0B003 /* HubServer */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4D5B0A012F90000100A0B001 /* XCLocalSwiftPackageReference "../../Core/HubServer" */;
+			productName = HubServer;
+		};
 		132DD8B72F4CDDE300282A30 /* HubService */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 132DD8B62F4CDDE300282A30 /* XCLocalSwiftPackageReference "../HubService" */;
