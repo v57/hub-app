@@ -40,6 +40,8 @@ extension KeyChain {
   let client: HubClient
   var service: HubService { client.service }
   var isConnected: Bool = false
+  /// Why the hub refuses this app's connection, while it does
+  var refusal: HubClient.Refusal?
   var api = Set<String>()
   var hasLauncher: Bool { require(permissions: "launcher/info") }
   
@@ -60,8 +62,10 @@ extension KeyChain {
       client.report(description: AppDevice.description, data: AppDevice.data)
     }
     isConnected = client.isConnected
+    client.onRefused = { [weak self] in self?.refusal = $0 }
     client.isConnectedChanged = { [weak self] in
       self?.isConnected = $0
+      if $0 { self?.refusal = nil }
       self?.net.connectionChanged($0)
     }
     apiTask = Task {

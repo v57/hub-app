@@ -611,6 +611,13 @@ struct HomeView: View {
             merging = hub
           }
         }
+        if case .hubKeyChanged = hub.refusal {
+          // Only when the hub was really reinstalled: otherwise another server answers at this address
+          Button("Trust New Hub Key") {
+            hub.refusal = nil
+            hub.client.forgetHubKey()
+          }
+        }
         Button("Remove") {
           Hubs.main.remove(with: hub.settings)
         }
@@ -632,6 +639,8 @@ struct HomeView: View {
                 Text("\(security) service requests").foregroundStyle(.green)
               }
             }.secondary().transition(.blurReplace)
+          } else if let refusal = hub.refusal {
+            Text(refusal.description).foregroundStyle(.red).note().lineLimit(3).transition(.blurReplace)
           } else {
             Text("Connecting...").secondary().transition(.blurReplace)
           }

@@ -1,6 +1,7 @@
 import CryptoKit
 import Foundation
 import HubService
+import Channel
 
 enum NativeJoinProgressState: String, Sendable {
   case validating
@@ -37,9 +38,15 @@ enum NativeJoinError: LocalizedError, Equatable {
   case bootstrapFailed(String)
   case bootstrapTimedOut
   case staged(NativeJoinFailureStage, String)
+  /// The hub refused the joiner's connection
+  case refused(HubClient.Refusal)
 
   var errorDescription: String? {
     switch self {
+    case .refused(.keyRefused):
+      "This device was revoked by the hub, so it can't join it. (Or this device's clock is wrong.)"
+    case .refused(let refusal):
+      refusal.description
     case .transactionConflict:
       "Another Hub Network join is already in progress."
     case .activeVPNConflict:
@@ -169,7 +176,9 @@ struct NativeJoinCoordinator {
           transactionId: transactionId,
           profilePublicKey: record.profilePublicKey
         )
-        bindClient = bindingClient(hubURL, identityKey: identityKey)
+        let client = bindingClient(hubURL, identityKey: identityKey)
+        bindClient = client
+        try await failIfRefused(client)
       } else {
         let identityKey = try await NativeJoinStore.main.serviceKey(
           transactionId: transactionId,
@@ -177,12 +186,14 @@ struct NativeJoinCoordinator {
         )
         let client = bindingClient(hubURL, identityKey: identityKey)
         bindClient = client
+        // The bind approves the app's device only on the hub-bound connection that carries its certificate
+        try await failIfRefused(client)
         let binding = try await classified(.bind, invitation: invitation, record: record) {
-          // The bind approves the app's device only on the hub-bound connection that carries its certificate
-          if client.device != nil {
-            await client.waitUntilReady(timeout: 15)
+          do {
+            return try await performBind(client: client, record: record, admission: status.admission)
+          } catch let error as ChannelError where error.code == .refused {
+            throw await refusal(of: client) ?? error
           }
-          return try await performBind(client: client, record: record, admission: status.admission)
         }
         enrollment = NativeJoinEnrollment(
           hubKey: binding.hubKey,
@@ -461,9 +472,23 @@ struct NativeJoinCoordinator {
     )
   }
 
+  /// Waits for the client's connection and fails at once, with the reason, when the hub refuses it (a revoked key
+  /// or device, a changed hub key, a locked-down hub) instead of retrying until a timeout
+  private static func failIfRefused(_ client: HubClient) async throws {
+    guard !(await client.waitUntilReady(timeout: 15)), let error = await refusal(of: client) else { return }
+    throw error
+  }
+
+  private static func refusal(of client: HubClient) async -> NativeJoinError? {
+    await client.refusalReason().map(NativeJoinError.refused)
+  }
+
   private static func waitForHubConnection(_ hub: Hub) async throws {
     let deadline = ContinuousClock.now + .seconds(15)
     while !hub.isConnected {
+      if let refusal = hub.refusal {
+        throw NativeJoinError.refused(refusal)
+      }
       guard ContinuousClock.now < deadline else {
         throw NativeJoinError.bootstrapTimedOut
       }
