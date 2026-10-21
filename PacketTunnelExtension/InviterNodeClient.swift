@@ -1,24 +1,25 @@
 import Foundation
-import HubService
-import Network
-import OSLog
 
 /// Online-inviter registration client for hub-net-node.
 ///
-/// Mirrors the Go `hub-net/agent/nodeclient`: it holds one persistent
-/// WebSocket to the node's `/rendezvous` and runs the signed challenge
-/// handshake:
+/// Mirrors the Go `hub-net/agent/nodeclient`: it holds one persistent WebSocket to the node's `/rendezvous` and runs
+/// the signed challenge handshake:
 ///
 ///     inviter.register (service key only) -> inviter.challenge
 ///     -> inviter.register (nonce + signature) -> inviter.registered
 ///
-/// The lease is 2 minutes; the client re-runs the handshake before expiry and
-/// reconnects with bounded backoff on failure. While registered, `inviter.bootstrap`
-/// pushes arrive when a joiner opens a session with one of this inviter's
-/// invitations; the client then probes, opens its own side of the paired
-/// session, offers the inviter's declared candidates, and reports the joiner's
-/// candidates + observed endpoint to a handler.
-final class InviterNodeClient: NSObject, URLSessionWebSocketDelegate {
+/// The node keeps a registration for its lease (2 minutes) and drops it when the connection closes, and an
+/// invitation only works while its inviter is registered. So the client renews at half the remaining lease on its
+/// own task, re-registers at once on a new connection when the socket closes, and reads the socket on a dedicated
+/// reader, so no wait for a reply can block a renewal. While registered, `inviter.bootstrap` pushes arrive when a
+/// joiner opens a session with one of this inviter's invitations; the client then probes, opens its own side of the
+/// paired session (on this connection: the node requires it), offers the inviter's candidate, and reports the
+/// joiner's candidates + observed endpoint to a handler. Bootstrap sessions run one at a time and close as soon as
+/// the joiner's candidates arrive.
+///
+/// Depends only on Foundation (signing is a closure), so it is tested against the real node outside the extension
+/// (`Scripts/InviterNodeTests`).
+final class InviterNodeClient: NSObject, URLSessionWebSocketDelegate, @unchecked Sendable {
   struct BootstrapEvent {
     let invitationCode: String
     let tokenDigest: String
@@ -27,14 +28,32 @@ final class InviterNodeClient: NSObject, URLSessionWebSocketDelegate {
     let generation: UInt64
     let joinerKey: String
     let sessionId: String
-    let candidates: [InvitationBootstrapClient.Candidate]
-    let observedEndpoint: InvitationBootstrapClient.ObservedEndpoint
+    let candidates: [Candidate]
+    let observedEndpoint: ObservedEndpoint
   }
 
-  typealias Candidate = InvitationBootstrapClient.Candidate
-  typealias ObservedEndpoint = InvitationBootstrapClient.ObservedEndpoint
+  struct Candidate: Codable, Equatable {
+    let version: Int
+    let candidateId: String
+    let sessionId: String
+    let key: String
+    let kind: String
+    let transport: String
+    let address: String
+    let port: UInt16
+    let priority: Int
+    let expiresAt: String
+  }
 
-  private struct Envelope: Codable {
+  struct ObservedEndpoint: Codable, Equatable {
+    let version: Int
+    let key: String
+    let transport: String
+    let address: String
+    let port: UInt16
+  }
+
+  struct Envelope: Codable {
     let majorVersion: Int
     let minorVersion: Int
     let type: String
@@ -56,7 +75,7 @@ final class InviterNodeClient: NSObject, URLSessionWebSocketDelegate {
     var registrationExpiresAt: String? = nil
   }
 
-  private struct NodeError: Codable {
+  struct NodeError: Codable {
     let code: String
     let message: String
   }
@@ -74,309 +93,242 @@ final class InviterNodeClient: NSObject, URLSessionWebSocketDelegate {
   /// Signing domain for the online-inviter registration challenge, matching
   /// `hub-service-go/protocol` `PurposeInviterRegistration`.
   static let registrationDomain = "hub-network/inviter-registration/v1"
-  private static let leaseRefreshLeeway: TimeInterval = 30
-  private static let handshakeTimeout: TimeInterval = 15
-  private static let bootstrapTimeout: TimeInterval = 45
+  /// How long a request waits for its reply
+  var replyTimeout: TimeInterval = 15
+  /// How long a bootstrap session waits for the joiner's candidates
+  var candidateTimeout: TimeInterval = 30
 
   private let nodeEndpoint: String
-  private let identity: KeyChain
+  private let serviceKey: String
+  /// Signs the challenge nonce under `registrationDomain`, standard base64
+  private let sign: (Data) throws -> String
   private let probe: (String, Data) async throws -> Void
   private let candidates: () -> Candidate?
   private let onBootstrap: (BootstrapEvent) async -> Void
   private let onStatusChange: (Bool) -> Void
-  private let logger: Logger
+  private let log: (String) -> Void
 
-  private var session: URLSession?
-  private var socket: URLSessionWebSocketTask?
+  private let lock = NSLock()
+  private var link: InviterNodeLink?
   private var isRegistered = false
   private var runTask: Task<Void, Never>?
-  /// `inviter.bootstrap` pushes that arrived while a registration handshake
-  /// receive loop was awaiting its own reply. The handshake loops must not
-  /// discard non-matching envelopes (they would silently eat a push and the
-  /// one-shot signal would be lost); buffer them here and drain in the main
-  /// receive loop. Accessed only from the run task (sequential awaits).
-  private var pendingBootstraps: [Envelope] = []
+  /// Registrations completed, renewals included (for tests)
+  private(set) var registrations = 0
 
   init(
     nodeEndpoint: String,
-    identity: KeyChain,
+    serviceKey: String,
+    sign: @escaping (Data) throws -> String,
     probe: @escaping (String, Data) async throws -> Void,
     candidates: @escaping () -> Candidate?,
     onBootstrap: @escaping (BootstrapEvent) async -> Void,
-    onStatusChange: @escaping (Bool) -> Void
+    onStatusChange: @escaping (Bool) -> Void,
+    log: @escaping (String) -> Void = { _ in }
   ) {
     self.nodeEndpoint = nodeEndpoint
-    self.identity = identity
+    self.serviceKey = serviceKey
+    self.sign = sign
     self.probe = probe
     self.candidates = candidates
     self.onBootstrap = onBootstrap
     self.onStatusChange = onStatusChange
-    self.logger = Logger(
-      subsystem: "dev.v57.Hub.PacketTunnelExtension",
-      category: "InviterNodeClient"
-    )
+    self.log = log
   }
 
-  var registered: Bool { isRegistered }
+  var registered: Bool { lock.withLock { isRegistered } }
 
   func start() {
-    guard runTask == nil else { return }
-    runTask = Task { [weak self] in
-      await self?.run()
+    lock.withLock {
+      guard runTask == nil else { return }
+      runTask = Task { [weak self] in await self?.run() }
     }
   }
 
   func stop() {
-    runTask?.cancel()
-    runTask = nil
-    socket?.cancel(with: .goingAway, reason: nil)
-    session?.invalidateAndCancel()
-    socket = nil
-    session = nil
+    let (task, link) = lock.withLock { () -> (Task<Void, Never>?, InviterNodeLink?) in
+      defer {
+        runTask = nil
+        self.link = nil
+      }
+      return (runTask, self.link)
+    }
+    task?.cancel()
+    if let link { Task { await link.close() } }
     setRegistered(false)
   }
 
+  /// Closes the current connection as if the network dropped it (for tests): the client registers again at once
+  func dropConnection() async {
+    await lock.withLock { link }?.close()
+  }
+
+  // MARK: Run loop
+
   private func run() async {
-    var backoff: TimeInterval = 1
+    var failures = 0
     while !Task.isCancelled {
+      var wasLive = false
       do {
-        try await connectAndRegister()
-        backoff = 1
+        wasLive = try await connectAndServe()
       } catch is CancellationError {
         return
       } catch {
-        logger.warning("node registration failed: \(String(describing: error), privacy: .public); retry in \(backoff)s")
+        log("inviter node: registration failed: \(error)")
       }
       setRegistered(false)
-      try? await Task.sleep(for: .seconds(backoff))
-      backoff = min(backoff * 2, 30)
+      guard !Task.isCancelled else { return }
+      // A connection that was registered closed: register again at once. Failures back off up to 30 s.
+      let delay: TimeInterval
+      if wasLive {
+        failures = 0
+        delay = 0.2
+      } else {
+        failures += 1
+        delay = min(pow(2, Double(failures - 1)), 30)
+      }
+      log("inviter node: connecting again in \(delay)s")
+      try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
     }
   }
 
-  private func connectAndRegister() async throws {
-    guard let url = try? rendezvousURL(nodeEndpoint) else {
-      throw InviterNodeError.invalidNode
-    }
+  /// One connection: registers, renews ahead of expiry and serves bootstrap pushes until the socket closes. Returns
+  /// whether it was registered.
+  private func connectAndServe() async throws -> Bool {
+    guard let url = Self.rendezvousURL(nodeEndpoint) else { throw InviterNodeError.invalidNode }
     let configuration = URLSessionConfiguration.ephemeral
-    configuration.timeoutIntervalForRequest = Self.handshakeTimeout
-    // The registration connection is long-lived (lease + bootstrap sessions
-    // multiplex on it); a short RESOURCE timeout kills the WS ~15s after
-    // connect — exactly when a bootstrap exchange is in flight — and the
-    // inviter's node connection churns every ~16s. Bound the total duration
-    // generously; per-read timeouts drive the lease refresh instead.
-    configuration.timeoutIntervalForResource = 3600
+    configuration.timeoutIntervalForRequest = 300
+    configuration.timeoutIntervalForResource = 7 * 24 * 3600
     let session = URLSession(configuration: configuration, delegate: self, delegateQueue: nil)
-    let socket = session.webSocketTask(with: url)
-    self.session = session
-    self.socket = socket
-    socket.resume()
+    let link = InviterNodeLink(socket: session.webSocketTask(with: url), log: log)
+    lock.withLock { self.link = link }
+    defer {
+      session.invalidateAndCancel()
+      lock.withLock { if self.link === link { self.link = nil } }
+    }
+    await link.start()
 
-    var expiresAt = try await register(socket: socket)
+    var expiresAt = try await link.exclusive { try await self.register(link) }
     setRegistered(true)
-    logger.info("node registration live, expires \(expiresAt)")
+    log("inviter node: registered, lease until \(expiresAt)")
 
-    while !Task.isCancelled {
-      // A bootstrap push that arrived during a registration handshake was
-      // buffered; process it before the next receive so the one-shot signal
-      // is never lost to the handshake's requestId filtering.
-      if let pending = pendingBootstraps.first {
-        pendingBootstraps.removeFirst()
-        await handleBootstrap(socket: socket, pending: pending)
-        continue
-      }
-      do {
-        let refreshIn = max(1, expiresAt.timeIntervalSinceNow - Self.leaseRefreshLeeway)
-        let reply = try await receive(socket: socket, timeout: refreshIn)
-        switch reply.type {
-        case "inviter.bootstrap":
-          await handleBootstrap(socket: socket, pending: reply)
-        case "error":
-          if let error = reply.error {
-            logger.warning("node error: \(error.code) \(error.message, privacy: .public)")
-          }
-        default:
-          break
+    let renewal = Task { [weak self] in
+      while !Task.isCancelled {
+        // Half of the remaining lease, so a bootstrap holding the connection can't outlast it
+        let wait = max(1, expiresAt.timeIntervalSinceNow / 2)
+        try? await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000))
+        guard !Task.isCancelled, let self else { return }
+        do {
+          expiresAt = try await link.exclusive { try await self.register(link) }
+          self.log("inviter node: renewed, lease until \(expiresAt)")
+        } catch {
+          self.log("inviter node: renewal failed: \(error); reconnecting")
+          await link.close()
+          return
         }
-      } catch InviterNodeError.timeout {
-        // Lease refresh: re-run the challenge on the same connection.
-        let refreshed = try await register(socket: socket)
-        expiresAt = refreshed
-        logger.info("node registration refreshed, expires \(refreshed)")
-      } catch {
-        throw error
       }
     }
+    defer { renewal.cancel() }
+
+    for await push in await link.bootstraps {
+      await handleBootstrap(link, push)
+    }
+    log("inviter node: connection closed\(await link.closeReason.map { ": \($0)" } ?? "")")
+    return true
   }
 
   // MARK: Registration handshake
 
-  private func register(socket: URLSessionWebSocketTask) async throws -> Date {
-    let challengeRequestID = UUID().uuidString
-    try await send(socket: socket, Envelope(
-      majorVersion: 1, minorVersion: 0, type: "inviter.register",
-      requestId: challengeRequestID,
-      serviceKey: identity.publicKey()
-    ))
-
-    var nonce: String?
-    var challengeExpires = Date().addingTimeInterval(Self.handshakeTimeout)
-    while Date() < challengeExpires {
-      let reply = try await receive(socket: socket, timeout: Self.handshakeTimeout)
-      if reply.type == "error" {
-        throw InviterNodeError.node(reply.error?.code ?? "unknown")
-      }
-      guard reply.requestId == challengeRequestID else {
-        bufferBootstrapIfNeeded(reply)
-        continue
-      }
-      guard reply.type == "inviter.challenge", let value = reply.challengeNonce, !value.isEmpty else {
-        throw InviterNodeError.invalidResponse
-      }
-      nonce = value
-      break
+  /// Runs the challenge handshake. Call inside `link.exclusive`.
+  private func register(_ link: InviterNodeLink) async throws -> Date {
+    let challenge = try await link.request(Envelope(
+      majorVersion: 1, minorVersion: 0, type: "inviter.register", requestId: UUID().uuidString, serviceKey: serviceKey
+    ), timeout: replyTimeout)
+    guard challenge.type == "inviter.challenge", let nonce = challenge.challengeNonce, !nonce.isEmpty else {
+      throw InviterNodeError.invalidResponse
     }
-    guard let nonce else { throw InviterNodeError.invalidResponse }
-
-    let nonceData: Data
-    if let decoded = HubNetworkCrypto.base64URLDecode(nonce), !decoded.isEmpty {
-      nonceData = decoded
-    } else if let padded = Data(base64Encoded: nonce), !padded.isEmpty {
-      nonceData = padded
-    } else {
+    guard let nonceData = Self.base64URLDecode(nonce) ?? Data(base64Encoded: nonce), !nonceData.isEmpty else {
       throw InviterNodeError.invalidNonce
     }
-    let signature = try HubNetworkCrypto.signBytes(
-      nonceData, domain: Self.registrationDomain, key: identity
-    )
-
-    let answerRequestID = UUID().uuidString
-    try await send(socket: socket, Envelope(
-      majorVersion: 1, minorVersion: 0, type: "inviter.register",
-      requestId: answerRequestID,
-      serviceKey: identity.publicKey(),
-      challengeNonce: nonce,
-      challengeSignature: signature
-    ))
-
-    var expiresAt: Date?
-    var answerExpires = Date().addingTimeInterval(Self.handshakeTimeout)
-    while Date() < answerExpires {
-      let reply = try await receive(socket: socket, timeout: Self.handshakeTimeout)
-      if reply.type == "error" {
-        throw InviterNodeError.node(reply.error?.code ?? "unknown")
-      }
-      guard reply.requestId == answerRequestID else {
-        bufferBootstrapIfNeeded(reply)
-        continue
-      }
-      guard reply.type == "inviter.registered",
-            let raw = reply.registrationExpiresAt,
-            let parsed = Self.parseRFC3339(raw) else {
-        throw InviterNodeError.invalidResponse
-      }
-      expiresAt = parsed
-      break
-    }
-    guard let expiresAt else { throw InviterNodeError.invalidResponse }
+    let registered = try await link.request(Envelope(
+      majorVersion: 1, minorVersion: 0, type: "inviter.register", requestId: UUID().uuidString,
+      serviceKey: serviceKey, challengeNonce: nonce, challengeSignature: try sign(nonceData)
+    ), timeout: replyTimeout)
+    guard registered.type == "inviter.registered", let raw = registered.registrationExpiresAt,
+      let expiresAt = Self.parseRFC3339(raw)
+    else { throw InviterNodeError.invalidResponse }
+    lock.withLock { registrations += 1 }
     return expiresAt
-  }
-
-  private static func parseRFC3339(_ value: String) -> Date? {
-    let formatter = ISO8601DateFormatter()
-    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    if let date = formatter.date(from: value) { return date }
-    formatter.formatOptions = [.withInternetDateTime]
-    return formatter.date(from: value)
-  }
-
-  /// Buffers a push envelope received while a registration handshake loop
-  /// was filtering for its own requestId. Only `inviter.bootstrap` signals
-  /// are retained; other stray envelopes are dropped as before.
-  private func bufferBootstrapIfNeeded(_ reply: Envelope) {
-    guard reply.type == "inviter.bootstrap" else { return }
-    extensionDiagnostics(
-      "inviter.bootstrap buffered during handshake replay=\(reply.tokenDigest?.prefix(8) ?? "?")"
-    )
-    pendingBootstraps.append(reply)
   }
 
   // MARK: Bootstrap exchange
 
-  private func handleBootstrap(socket: URLSessionWebSocketTask, pending: Envelope) async {
-    extensionDiagnostics("inviter.bootstrap rx replay=\(pending.tokenDigest?.prefix(8) ?? "?")")
-    guard let invitationCode = pending.invitationCode,
-          let tokenDigest = pending.tokenDigest,
-          let transactionId = pending.transactionId,
-          let joinerKey = pending.key,
-          !invitationCode.isEmpty, !tokenDigest.isEmpty, !transactionId.isEmpty else {
-      logger.warning("incomplete inviter.bootstrap signal")
-      extensionDiagnostics("inviter.bootstrap incomplete signal")
+  private func handleBootstrap(_ link: InviterNodeLink, _ pending: Envelope) async {
+    log("inviter.bootstrap rx replay=\(pending.tokenDigest?.prefix(8) ?? "?")")
+    guard let invitationCode = pending.invitationCode, let tokenDigest = pending.tokenDigest,
+      let transactionId = pending.transactionId, let joinerKey = pending.key,
+      !invitationCode.isEmpty, !tokenDigest.isEmpty, !transactionId.isEmpty
+    else {
+      log("inviter.bootstrap incomplete signal")
       return
     }
     do {
-      let sessionId = try await openBootstrapSessionAfterProbe(
-        socket: socket, pending: pending,
-        tokenDigest: tokenDigest, transactionId: transactionId, invitationCode: invitationCode)
-      defer {
-        Task { try? await closeBootstrapSession(socket: socket, sessionId: sessionId) }
-      }
-      if let candidate = candidates() {
-        try await send(socket: socket, Envelope(
-          majorVersion: 1, minorVersion: 0, type: "candidate.offer",
-          sessionId: sessionId,
-          candidate: Candidate(
-            version: 1, candidateId: candidate.candidateId,
-            sessionId: sessionId, key: identity.publicKey(),
-            kind: candidate.kind, transport: "udp",
-            address: candidate.address, port: candidate.port,
-            priority: candidate.priority, expiresAt: candidate.expiresAt
-          )
-        ))
-      }
-      var event: BootstrapEvent?
-      var deadline = Date().addingTimeInterval(Self.bootstrapTimeout)
-      while Date() < deadline {
-        let reply: Envelope
+      // The session holds the connection until it closes, so a renewal never runs inside it on older nodes
+      let event = try await link.exclusive { () -> BootstrapEvent? in
+        let sessionId = try await self.openSessionAfterProbe(link, pending: pending)
         do {
-          reply = try await receive(socket: socket, timeout: Self.bootstrapTimeout)
+          let event = try await self.exchangeCandidates(link, pending: pending, sessionId: sessionId,
+            invitationCode: invitationCode, tokenDigest: tokenDigest, transactionId: transactionId, joinerKey: joinerKey)
+          try? await link.send(Envelope(majorVersion: 1, minorVersion: 0, type: "session.close", sessionId: sessionId))
+          return event
         } catch {
-          if event != nil { break }
+          try? await link.send(Envelope(majorVersion: 1, minorVersion: 0, type: "session.close", sessionId: sessionId))
           throw error
         }
-        guard reply.type == "candidate.list", reply.sessionId == sessionId else { continue }
-        let observed = reply.observedEndpoint
-        event = BootstrapEvent(
-          invitationCode: invitationCode,
-          tokenDigest: tokenDigest,
-          transactionId: transactionId,
-          tunnelInstanceId: pending.tunnelInstanceId ?? "",
-          generation: pending.generation ?? 0,
-          joinerKey: joinerKey,
-          sessionId: sessionId,
-          candidates: reply.candidates ?? [],
-          observedEndpoint: observed ?? ObservedEndpoint(
-            version: 1, key: joinerKey, transport: "udp", address: "", port: 0
-          )
-        )
-        if !(reply.candidates ?? []).isEmpty { break }
       }
-      if let event {
-        await onBootstrap(event)
-      }
+      if let event { await onBootstrap(event) }
     } catch {
-      logger.warning("inviter bootstrap exchange failed: \(String(describing: error), privacy: .public)")
+      log("inviter bootstrap exchange failed: \(error)")
     }
   }
 
-  private func sendProbe(tokenDigest: String, transactionId: String, invitationCode: String) async throws {
-    let invitationProbe = InvitationProbe(
-      version: 1, invitationCode: invitationCode,
-      key: identity.publicKey(),
-      tokenDigest: tokenDigest, transactionId: transactionId,
-      tunnelInstanceId: "", generation: 0
-    )
-    let data = try JSONEncoder().encode(invitationProbe)
-    let endpoint = nodeUDPEndpoint()
+  private func exchangeCandidates(
+    _ link: InviterNodeLink, pending: Envelope, sessionId: String,
+    invitationCode: String, tokenDigest: String, transactionId: String, joinerKey: String
+  ) async throws -> BootstrapEvent? {
+    if let candidate = candidates() {
+      try await link.send(Envelope(
+        majorVersion: 1, minorVersion: 0, type: "candidate.offer", sessionId: sessionId,
+        candidate: Candidate(version: 1, candidateId: candidate.candidateId, sessionId: sessionId, key: serviceKey,
+          kind: candidate.kind, transport: "udp", address: candidate.address, port: candidate.port,
+          priority: candidate.priority, expiresAt: candidate.expiresAt)
+      ))
+    }
+    var event: BootstrapEvent?
+    let deadline = Date().addingTimeInterval(candidateTimeout)
+    while Date() < deadline {
+      let list: Envelope
+      do {
+        list = try await link.candidates(sessionId: sessionId, timeout: deadline.timeIntervalSinceNow)
+      } catch InviterNodeError.timeout where event != nil {
+        break
+      }
+      event = BootstrapEvent(
+        invitationCode: invitationCode, tokenDigest: tokenDigest, transactionId: transactionId,
+        tunnelInstanceId: pending.tunnelInstanceId ?? "", generation: pending.generation ?? 0,
+        joinerKey: joinerKey, sessionId: sessionId, candidates: list.candidates ?? [],
+        observedEndpoint: list.observedEndpoint ?? ObservedEndpoint(version: 1, key: joinerKey, transport: "udp", address: "", port: 0)
+      )
+      if !(list.candidates ?? []).isEmpty { break }
+    }
+    return event
+  }
+
+  private func sendProbe(_ pending: Envelope) async throws {
+    let data = try JSONEncoder().encode(InvitationProbe(
+      version: 1, invitationCode: pending.invitationCode ?? "", key: serviceKey, tokenDigest: pending.tokenDigest ?? "",
+      transactionId: pending.transactionId ?? "", tunnelInstanceId: "", generation: 0
+    ))
+    let endpoint = Self.nodeUDPEndpoint(nodeEndpoint)
     guard !endpoint.isEmpty else { throw InviterNodeError.invalidNode }
     try await probe(endpoint, data)
   }
@@ -384,156 +336,262 @@ final class InviterNodeClient: NSObject, URLSessionWebSocketDelegate {
   /// The node records the UDP probe asynchronously and refuses `session.open` with the retryable
   /// `udp_observation_required` until it has: probe like the joiner does (three datagrams 50 ms apart), then
   /// re-probe and retry the open a few times instead of failing the bootstrap on the first refusal.
-  private func openBootstrapSessionAfterProbe(
-    socket: URLSessionWebSocketTask, pending: Envelope,
-    tokenDigest: String, transactionId: String, invitationCode: String
-  ) async throws -> String {
+  private func openSessionAfterProbe(_ link: InviterNodeLink, pending: Envelope) async throws -> String {
     var attempt = 0
     while true {
       for _ in 0..<3 {
-        try await sendProbe(tokenDigest: tokenDigest, transactionId: transactionId, invitationCode: invitationCode)
-        try await Task.sleep(for: .milliseconds(50))
+        try await sendProbe(pending)
+        try await Task.sleep(nanoseconds: 50_000_000)
       }
       do {
-        return try await openBootstrapSession(socket: socket, pending: pending)
+        let opened = try await link.request(Envelope(
+          majorVersion: 1, minorVersion: 0, type: "session.open", requestId: UUID().uuidString,
+          invitationCode: pending.invitationCode, key: serviceKey, tokenDigest: pending.tokenDigest,
+          transactionId: pending.transactionId, tunnelInstanceId: pending.tunnelInstanceId, generation: pending.generation
+        ), timeout: replyTimeout)
+        guard opened.type == "session.opened", let sessionId = opened.sessionId, !sessionId.isEmpty else {
+          throw InviterNodeError.invalidResponse
+        }
+        return sessionId
       } catch InviterNodeError.node("udp_observation_required") where attempt < 5 {
         attempt += 1
-        extensionDiagnostics("inviter.bootstrap udp observation pending, retry \(attempt)")
-        try await Task.sleep(for: .milliseconds(200 * attempt))
+        log("inviter.bootstrap udp observation pending, retry \(attempt)")
+        try await Task.sleep(nanoseconds: UInt64(200_000_000 * attempt))
       }
     }
   }
 
-  private func openBootstrapSession(socket: URLSessionWebSocketTask, pending: Envelope) async throws -> String {
-    guard let invitationCode = pending.invitationCode,
-          let tokenDigest = pending.tokenDigest,
-          let transactionId = pending.transactionId else {
-      throw InviterNodeError.invalidResponse
+  // MARK: Helpers
+
+  private func setRegistered(_ value: Bool) {
+    let changed = lock.withLock { () -> Bool in
+      guard isRegistered != value else { return false }
+      isRegistered = value
+      return true
     }
-    let requestID = UUID().uuidString
-    try await send(socket: socket, Envelope(
-      majorVersion: 1, minorVersion: 0, type: "session.open",
-      requestId: requestID,
-      invitationCode: invitationCode,
-      key: identity.publicKey(),
-      tokenDigest: tokenDigest,
-      transactionId: transactionId,
-      tunnelInstanceId: pending.tunnelInstanceId,
-      generation: pending.generation
-    ))
-    var deadline = Date().addingTimeInterval(Self.handshakeTimeout)
-    while Date() < deadline {
-      let reply = try await receive(socket: socket, timeout: Self.handshakeTimeout)
-      if reply.type == "error" {
-        throw InviterNodeError.node(reply.error?.code ?? "unknown")
-      }
-      guard reply.requestId == requestID else { continue }
-      guard reply.type == "session.opened", let sessionId = reply.sessionId, !sessionId.isEmpty else {
-        throw InviterNodeError.invalidResponse
-      }
-      return sessionId
-    }
-    throw InviterNodeError.timeout
+    if changed { onStatusChange(value) }
   }
 
-  private func closeBootstrapSession(socket: URLSessionWebSocketTask, sessionId: String) async throws {
-    try await send(socket: socket, Envelope(
-      majorVersion: 1, minorVersion: 0, type: "session.close",
-      sessionId: sessionId
-    ))
-  }
-
-  // MARK: Transport
-
-  private func send(socket: URLSessionWebSocketTask, _ envelope: Envelope) async throws {
-    let data = try JSONEncoder().encode(envelope)
-    guard let text = String(data: data, encoding: .utf8) else {
-      throw InviterNodeError.invalidResponse
+  static func parseRFC3339(_ value: String) -> Date? {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    if let date = formatter.date(from: value) { return date }
+    formatter.formatOptions = [.withInternetDateTime]
+    if let date = formatter.date(from: value) { return date }
+    // Go writes up to nanoseconds; keep milliseconds
+    guard let dot = value.firstIndex(of: "."), let zone = value[dot...].firstIndex(where: { $0 == "Z" || $0 == "+" || $0 == "-" }) else {
+      return nil
     }
-    try await socket.send(.string(text))
+    let fraction = value[value.index(after: dot)..<zone].prefix(3)
+    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    return formatter.date(from: String(value[..<dot]) + "." + fraction + String(value[zone...]))
   }
 
-  private func receive(socket: URLSessionWebSocketTask, timeout: TimeInterval) async throws -> Envelope {
-    do {
-      return try await withThrowingTaskGroup(of: Envelope.self) { group in
-        group.addTask {
-          let message: URLSessionWebSocketTask.Message
-          do {
-            message = try await socket.receive()
-          } catch {
-            throw InviterNodeError.closed
-          }
-          let data: Data
-          switch message {
-          case .data(let value): data = value
-          case .string(let value): data = Data(value.utf8)
-          @unknown default: throw InviterNodeError.invalidResponse
-          }
-          let envelope = try JSONDecoder().decode(Envelope.self, from: data)
-          guard envelope.majorVersion == 1, envelope.minorVersion <= 0 else {
-            throw InviterNodeError.invalidResponse
-          }
-          return envelope
-        }
-        group.addTask {
-          try await Task.sleep(for: .seconds(max(0.1, timeout)))
-          throw InviterNodeError.timeout
-        }
-        guard let envelope = try await group.next() else {
-          group.cancelAll()
-          throw InviterNodeError.closed
-        }
-        group.cancelAll()
-        return envelope
-      }
-    }
+  static func base64URLDecode(_ text: String) -> Data? {
+    var base64 = text.replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
+    while base64.count % 4 != 0 { base64 += "=" }
+    return Data(base64Encoded: base64)
   }
 
-  private func rendezvousURL(_ value: String) throws -> URL {
-    // The stored node endpoint may be a bare host:port (no scheme); the node
-    // listens on :1964 for plain WebSocket + UDP. Default the scheme and port
-    // like the Go nodeclient's normalizeEndpoint.
+  /// The node's `/rendezvous` URL. The stored endpoint may be a bare `host:port`; the node listens on :1964 for plain
+  /// WebSocket + UDP. Defaults the scheme and port like the Go nodeclient's normalizeEndpoint.
+  static func rendezvousURL(_ value: String) -> URL? {
     var normalized = value.trimmingCharacters(in: .whitespacesAndNewlines)
-    if !normalized.contains("://") {
-      normalized = "ws://" + normalized
-    }
-    guard var components = URLComponents(string: normalized),
-          components.host != nil,
-          components.scheme == "https" || components.scheme == "http" ||
-          components.scheme == "wss" || components.scheme == "ws" else {
-      throw InviterNodeError.invalidNode
-    }
+    if !normalized.contains("://") { normalized = "ws://" + normalized }
+    guard var components = URLComponents(string: normalized), components.host != nil,
+      ["https", "http", "wss", "ws"].contains(components.scheme ?? "")
+    else { return nil }
     if components.scheme == "https" { components.scheme = "wss" }
     if components.scheme == "http" { components.scheme = "ws" }
-    if components.port == nil && components.scheme == "ws" {
-      components.port = 1964
-    }
-    let basePath = components.path.hasSuffix("/")
-      ? String(components.path.dropLast())
-      : components.path
+    if components.port == nil && components.scheme == "ws" { components.port = 1964 }
+    let basePath = components.path.hasSuffix("/") ? String(components.path.dropLast()) : components.path
     components.path = basePath + "/rendezvous"
     components.query = nil
     components.fragment = nil
-    guard let url = components.url else { throw InviterNodeError.invalidNode }
-    return url
+    return components.url
   }
 
-  private func nodeUDPEndpoint() -> String {
+  static func nodeUDPEndpoint(_ nodeEndpoint: String) -> String {
     var normalized = nodeEndpoint.trimmingCharacters(in: .whitespacesAndNewlines)
-    if !normalized.contains("://") {
-      normalized = "ws://" + normalized
-    }
-    guard let components = URLComponents(string: normalized),
-          let host = components.host else { return "" }
+    if !normalized.contains("://") { normalized = "ws://" + normalized }
+    guard let components = URLComponents(string: normalized), let host = components.host else { return "" }
     let port = components.port ?? (components.scheme == "https" || components.scheme == "wss" ? 443 : 1964)
     return host.contains(":") ? "[\(host)]:\(port)" : "\(host):\(port)"
   }
+}
 
-  private func setRegistered(_ value: Bool) {
-    if isRegistered != value {
-      isRegistered = value
-      onStatusChange(value)
+/// One WebSocket to the node. A reader task delivers every message: replies to the one request in flight, error
+/// replies (the node sends them without a request id) to that request, `inviter.bootstrap` pushes to `bootstraps`,
+/// and `candidate.list` to the session waiting for it. Timeouts never cancel the socket read, so nothing blocks.
+actor InviterNodeLink {
+  typealias Envelope = InviterNodeClient.Envelope
+
+  private let socket: URLSessionWebSocketTask
+  private let log: (String) -> Void
+  private var reply: (id: Int, requestId: String?, continuation: CheckedContinuation<Envelope, Error>)?
+  private var candidateWaiter: (id: Int, sessionId: String, continuation: CheckedContinuation<Envelope, Error>)?
+  private var candidateLists: [String: [Envelope]] = [:]
+  private var nextWaiter = 0
+  private var pushes: AsyncStream<Envelope>.Continuation!
+  let bootstraps: AsyncStream<Envelope>
+  private(set) var closeReason: String?
+  private var isClosed = false
+  /// One holder at a time: registrations and whole bootstrap sessions
+  private var busy = false
+  private var queue: [CheckedContinuation<Void, Never>] = []
+
+  init(socket: URLSessionWebSocketTask, log: @escaping (String) -> Void) {
+    self.socket = socket
+    self.log = log
+    var continuation: AsyncStream<Envelope>.Continuation!
+    bootstraps = AsyncStream(bufferingPolicy: .unbounded) { continuation = $0 }
+    pushes = continuation
+  }
+
+  func start() {
+    socket.resume()
+    Task { await self.read() }
+  }
+
+  private func read() async {
+    while !isClosed {
+      let message: URLSessionWebSocketTask.Message
+      do {
+        message = try await socket.receive()
+      } catch {
+        finish("\(error.localizedDescription)")
+        return
+      }
+      let data: Data
+      switch message {
+      case .data(let value): data = value
+      case .string(let value): data = Data(value.utf8)
+      @unknown default: continue
+      }
+      guard let envelope = try? JSONDecoder().decode(Envelope.self, from: data), envelope.majorVersion == 1 else {
+        log("inviter node: unreadable message")
+        continue
+      }
+      deliver(envelope)
     }
+  }
+
+  private func deliver(_ envelope: Envelope) {
+    if envelope.type == "inviter.bootstrap" {
+      pushes.yield(envelope)
+    } else if envelope.type == "error" {
+      let error = InviterNodeError.node(envelope.error?.code ?? "unknown")
+      if let reply {
+        self.reply = nil
+        reply.continuation.resume(throwing: error)
+      } else {
+        log("inviter node: error \(envelope.error?.code ?? "?") \(envelope.error?.message ?? "")")
+      }
+    } else if envelope.type == "candidate.list", let sessionId = envelope.sessionId {
+      if let waiter = candidateWaiter, waiter.sessionId == sessionId {
+        candidateWaiter = nil
+        waiter.continuation.resume(returning: envelope)
+      } else {
+        candidateLists[sessionId, default: []].append(envelope)
+      }
+    } else if let reply, envelope.requestId == nil || envelope.requestId == reply.requestId {
+      self.reply = nil
+      reply.continuation.resume(returning: envelope)
+    }
+  }
+
+  private func finish(_ reason: String) {
+    guard !isClosed else { return }
+    isClosed = true
+    closeReason = reason
+    pushes.finish()
+    if let reply {
+      self.reply = nil
+      reply.continuation.resume(throwing: InviterNodeError.closed)
+    }
+    if let waiter = candidateWaiter {
+      candidateWaiter = nil
+      waiter.continuation.resume(throwing: InviterNodeError.closed)
+    }
+  }
+
+  func close() {
+    socket.cancel(with: .goingAway, reason: nil)
+    finish("closed by the client")
+  }
+
+  func send(_ envelope: Envelope) async throws {
+    guard !isClosed else { throw InviterNodeError.closed }
+    let data = try JSONEncoder().encode(envelope)
+    try await socket.send(.string(String(decoding: data, as: UTF8.self)))
+  }
+
+  /// Sends a request and waits for its reply (or an error reply) up to `timeout`. Call inside `exclusive`.
+  func request(_ envelope: Envelope, timeout: TimeInterval) async throws -> Envelope {
+    guard !isClosed else { throw InviterNodeError.closed }
+    nextWaiter += 1
+    let id = nextWaiter
+    return try await withCheckedThrowingContinuation { continuation in
+      reply = (id, envelope.requestId, continuation)
+      Task {
+        do {
+          try await self.send(envelope)
+        } catch {
+          self.failReply(id, error)
+        }
+      }
+      Task {
+        try? await Task.sleep(nanoseconds: UInt64(max(0.1, timeout) * 1_000_000_000))
+        self.failReply(id, InviterNodeError.timeout)
+      }
+    }
+  }
+
+  private func failReply(_ id: Int, _ error: Error) {
+    guard let reply, reply.id == id else { return }
+    self.reply = nil
+    reply.continuation.resume(throwing: error)
+  }
+
+  /// The next `candidate.list` of the session, up to `timeout`
+  func candidates(sessionId: String, timeout: TimeInterval) async throws -> Envelope {
+    if var lists = candidateLists[sessionId], !lists.isEmpty {
+      let first = lists.removeFirst()
+      candidateLists[sessionId] = lists.isEmpty ? nil : lists
+      return first
+    }
+    guard !isClosed else { throw InviterNodeError.closed }
+    nextWaiter += 1
+    let id = nextWaiter
+    return try await withCheckedThrowingContinuation { continuation in
+      candidateWaiter = (id, sessionId, continuation)
+      Task {
+        try? await Task.sleep(nanoseconds: UInt64(max(0.1, timeout) * 1_000_000_000))
+        self.failCandidates(id)
+      }
+    }
+  }
+
+  private func failCandidates(_ id: Int) {
+    guard let waiter = candidateWaiter, waiter.id == id else { return }
+    candidateWaiter = nil
+    waiter.continuation.resume(throwing: InviterNodeError.timeout)
+  }
+
+  /// Runs `body` while no other registration or bootstrap session uses the connection
+  func exclusive<T>(_ body: @Sendable () async throws -> T) async throws -> T {
+    if busy {
+      await withCheckedContinuation { queue.append($0) }
+    }
+    busy = true
+    defer {
+      if queue.isEmpty {
+        busy = false
+      } else {
+        queue.removeFirst().resume()
+      }
+    }
+    return try await body()
   }
 }
 
