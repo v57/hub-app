@@ -314,8 +314,9 @@ final class InviterNodeClient: NSObject, URLSessionWebSocketDelegate {
       return
     }
     do {
-      try await sendProbe(tokenDigest: tokenDigest, transactionId: transactionId, invitationCode: invitationCode)
-      let sessionId = try await openBootstrapSession(socket: socket, pending: pending)
+      let sessionId = try await openBootstrapSessionAfterProbe(
+        socket: socket, pending: pending,
+        tokenDigest: tokenDigest, transactionId: transactionId, invitationCode: invitationCode)
       defer {
         Task { try? await closeBootstrapSession(socket: socket, sessionId: sessionId) }
       }
@@ -378,6 +379,29 @@ final class InviterNodeClient: NSObject, URLSessionWebSocketDelegate {
     let endpoint = nodeUDPEndpoint()
     guard !endpoint.isEmpty else { throw InviterNodeError.invalidNode }
     try await probe(endpoint, data)
+  }
+
+  /// The node records the UDP probe asynchronously and refuses `session.open` with the retryable
+  /// `udp_observation_required` until it has: probe like the joiner does (three datagrams 50 ms apart), then
+  /// re-probe and retry the open a few times instead of failing the bootstrap on the first refusal.
+  private func openBootstrapSessionAfterProbe(
+    socket: URLSessionWebSocketTask, pending: Envelope,
+    tokenDigest: String, transactionId: String, invitationCode: String
+  ) async throws -> String {
+    var attempt = 0
+    while true {
+      for _ in 0..<3 {
+        try await sendProbe(tokenDigest: tokenDigest, transactionId: transactionId, invitationCode: invitationCode)
+        try await Task.sleep(for: .milliseconds(50))
+      }
+      do {
+        return try await openBootstrapSession(socket: socket, pending: pending)
+      } catch InviterNodeError.node("udp_observation_required") where attempt < 5 {
+        attempt += 1
+        extensionDiagnostics("inviter.bootstrap udp observation pending, retry \(attempt)")
+        try await Task.sleep(for: .milliseconds(200 * attempt))
+      }
+    }
   }
 
   private func openBootstrapSession(socket: URLSessionWebSocketTask, pending: Envelope) async throws -> String {
