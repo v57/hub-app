@@ -14,6 +14,10 @@ final class PacketTunnelWireGuardAdapter {
   private var isStarted = false
   private var baseConfiguration: TunnelConfiguration?
   private var bootstrapPeers: [String: PeerConfiguration] = [:]
+  /// Install order per assignment, newest highest: the newest peer keeps a route several claim
+  /// (`BootstrapRouteClaims`)
+  private var bootstrapOrder: [String: Int] = [:]
+  private var nextBootstrapOrder = 0
   /// Permanent peers for network members (hub host only), keyed by base64
   /// WireGuard key. Merged with a member's bootstrap peer by key.
   private var memberPeers: [String: [IPAddressRange]] = [:]
@@ -37,6 +41,7 @@ final class PacketTunnelWireGuardAdapter {
       isStarted = true
       baseConfiguration = configuration
       bootstrapPeers.removeAll()
+      bootstrapOrder.removeAll()
     } catch {
       let logger = Logger(
         subsystem: "dev.v57.Hub.PacketTunnelExtension",
@@ -109,6 +114,7 @@ final class PacketTunnelWireGuardAdapter {
             }
             self.baseConfiguration = configuration
             self.bootstrapPeers.removeAll()
+            self.bootstrapOrder.removeAll()
             continuation.resume()
           }
         }
@@ -329,6 +335,7 @@ final class PacketTunnelWireGuardAdapter {
     isStarted = false
     baseConfiguration = nil
     bootstrapPeers.removeAll()
+    bootstrapOrder.removeAll()
   }
 
   /// Adds or replaces one transaction-scoped peer. Repeating an identical
@@ -386,10 +393,7 @@ final class PacketTunnelWireGuardAdapter {
           continuation.resume()
           return
         }
-        let previous = self.bootstrapPeers[assignmentId]
-        self.bootstrapPeers[assignmentId] = peer
-        if let error = self.applyBootstrapPeers() {
-          self.bootstrapPeers[assignmentId] = previous
+        if let error = self.updateBootstrapPeer(peer, for: assignmentId) {
           continuation.resume(throwing: error)
         } else {
           continuation.resume()
@@ -409,12 +413,11 @@ final class PacketTunnelWireGuardAdapter {
           )
           return
         }
-        guard let previous = self.bootstrapPeers.removeValue(forKey: assignmentId) else {
+        guard self.bootstrapPeers[assignmentId] != nil else {
           continuation.resume()
           return
         }
-        if let error = self.applyBootstrapPeers() {
-          self.bootstrapPeers[assignmentId] = previous
+        if let error = self.updateBootstrapPeer(nil, for: assignmentId) {
           continuation.resume(throwing: error)
         } else {
           continuation.resume()
@@ -465,10 +468,7 @@ final class PacketTunnelWireGuardAdapter {
           continuation.resume()
           return
         }
-        let previous = self.bootstrapPeers[assignmentId]
-        self.bootstrapPeers[assignmentId] = peer
-        if let error = self.applyBootstrapPeers() {
-          self.bootstrapPeers[assignmentId] = previous
+        if let error = self.updateBootstrapPeer(peer, for: assignmentId) {
           continuation.resume(throwing: error)
         } else {
           continuation.resume()
@@ -539,6 +539,23 @@ final class PacketTunnelWireGuardAdapter {
     }
   }
 
+  /// Sets (or removes, with `nil`) one bootstrap peer and applies them all. Restores the previous state when
+  /// WireGuard refuses the configuration.
+  private func updateBootstrapPeer(_ peer: PeerConfiguration?, for assignmentId: String) -> Error? {
+    let previous = (peer: bootstrapPeers[assignmentId], order: bootstrapOrder[assignmentId])
+    bootstrapPeers[assignmentId] = peer
+    if peer == nil {
+      bootstrapOrder[assignmentId] = nil
+    } else {
+      nextBootstrapOrder += 1
+      bootstrapOrder[assignmentId] = nextBootstrapOrder
+    }
+    guard let error = applyBootstrapPeers() else { return nil }
+    bootstrapPeers[assignmentId] = previous.peer
+    bootstrapOrder[assignmentId] = previous.order
+    return error
+  }
+
   private func applyBootstrapPeers() -> Error? {
     guard isStarted, let baseConfiguration else {
       return PacketTunnelWireGuardConfigurationError.invalidBootstrapPeer
@@ -550,8 +567,15 @@ final class PacketTunnelWireGuardAdapter {
     // One entry per key: a member that is still inside its bootstrap window
     // keeps the bootstrap peer's endpoint and addresses plus its own.
     var merged: [String: PeerConfiguration] = [:]
+    let routes = BootstrapRouteClaims.resolve(
+      bootstrapPeers.reduce(into: [:]) { claims, entry in
+        claims[entry.key] = (order: bootstrapOrder[entry.key] ?? 0, routes: entry.value.allowedIPs)
+      },
+      identity: Self.routeIdentity
+    )
     for key in bootstrapPeers.keys.sorted() {
-      guard let peer = bootstrapPeers[key] else { continue }
+      guard var peer = bootstrapPeers[key] else { continue }
+      peer.allowedIPs = routes[key] ?? []
       let id = peer.publicKey.base64Key
       guard merged[id] == nil else { return PacketTunnelWireGuardConfigurationError.peerConflict }
       merged[id] = peer

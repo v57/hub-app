@@ -47,7 +47,7 @@ final class InviterNodeTests: XCTestCase {
   }
 
   func testSequentialInvitesWithOneInviter() async throws {
-    let inviter = Inviter(port: port)
+    let inviter = NodeInviter(port: port)
     inviter.client.start()
     defer { inviter.client.stop() }
     try await inviter.waitRegistered(true)
@@ -64,7 +64,7 @@ final class InviterNodeTests: XCTestCase {
   }
 
   func testConcurrentInvitesShareTheRegistration() async throws {
-    let inviter = Inviter(port: port)
+    let inviter = NodeInviter(port: port)
     inviter.client.start()
     defer { inviter.client.stop() }
     try await inviter.waitRegistered(true)
@@ -78,7 +78,7 @@ final class InviterNodeTests: XCTestCase {
   }
 
   func testRegistersAgainAtOnceWhenTheConnectionCloses() async throws {
-    let inviter = Inviter(port: port)
+    let inviter = NodeInviter(port: port)
     inviter.client.start()
     defer { inviter.client.stop() }
     try await inviter.waitRegistered(true)
@@ -94,7 +94,7 @@ final class InviterNodeTests: XCTestCase {
   // MARK: Joiner
 
   /// The joiner side of one invitation: probe, open, offer, then the inviter's handler sees the bootstrap
-  func invite(_ inviter: Inviter, round: Int) async throws {
+  func invite(_ inviter: NodeInviter, round: Int) async throws {
     do {
       try await join(inviter, round: round)
     } catch {
@@ -103,7 +103,7 @@ final class InviterNodeTests: XCTestCase {
     }
   }
 
-  private func join(_ inviter: Inviter, round: Int) async throws {
+  private func join(_ inviter: NodeInviter, round: Int) async throws {
     let (code, digest) = inviter.invitation()
     let joinerKey = "joiner-\(round)-\(UUID().uuidString.prefix(6))"
     let transaction = "transaction-\(UUID().uuidString)"
@@ -141,8 +141,8 @@ final class InviterNodeTests: XCTestCase {
   }
 }
 
-/// An inviter with its own key, driving the client under test
-final class Inviter: @unchecked Sendable {
+/// An inviter with its own key, driving the node client under test
+final class NodeInviter: @unchecked Sendable {
   let key = Curve25519.Signing.PrivateKey()
   private(set) var client: InviterNodeClient!
   private let lock = NSLock()

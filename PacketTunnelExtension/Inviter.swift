@@ -131,7 +131,19 @@ final class Inviter {
 
     lock.lock()
     let existing = active[request.replayId]
+    // A fresh, verified admission of a joiner that bootstrapped before (a rejoin with a new WireGuard key, or an
+    // earlier attempt that never finished) replaces its old peer, as hub-server replaces a member's WireGuard key
+    let superseded = active.values.filter {
+      $0.replayId != request.replayId
+        && ($0.joinerService == request.joinerServiceKey || $0.joinerWireGuardKey == request.joinerWireGuardKey)
+    }
+    for peer in superseded {
+      active.removeValue(forKey: peer.replayId)
+    }
     lock.unlock()
+    for peer in superseded {
+      await removeActivePeer(peer)
+    }
     if let existing {
       guard existing.expiresAt > now else {
         await removeActivePeer(existing)
@@ -238,15 +250,14 @@ final class Inviter {
       throw InviterError.internalError(String(describing: error))
     }
 
-    // The joiner's permanent overlay addresses are assigned by hub-pro only
-    // after `hub/net/bind`, which the inviter cannot observe (it lives in
-    // the extension, with no hub-pro connection). The temporary bootstrap
-    // addresses alone would make the inviter drop the adopted session's
-    // post-commit control traffic (source = assigned overlay address), so
-    // the peer scopes the frozen overlay prefixes instead. Interim until
-    // per-address extension from hub/net/list lands (Go parity:
-    // UpdateJoinerAllowedIPs).
-    let allowedIPs = ["100.96.0.0/11", "fd48:5542:4e45::/48"]
+    // The joiner's permanent overlay addresses are assigned by the hub only
+    // after `hub/net/bind`; the app adds them as member peers once it sees
+    // them. Until then the temporary bootstrap addresses alone would make the
+    // inviter drop the joiner's post-commit traffic (source = assigned overlay
+    // address), so the peer also scopes the frozen overlay prefixes. The
+    // newest joiner keeps those when several bootstrap at once
+    // (BootstrapRouteClaims); each keeps its own bootstrap addresses.
+    let allowedIPs = ["\(joinerV4)/32", "\(joinerV6)/128", "100.96.0.0/11", "fd48:5542:4e45::/48"]
     do {
       try await installPeer(request.joinerWireGuardKey, allowedIPs, request.joinerServiceKey)
     } catch {
