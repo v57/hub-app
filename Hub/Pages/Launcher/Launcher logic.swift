@@ -31,9 +31,6 @@ extension Hub {
     func updateAll() async throws {
       try await hub.client.send("launcher/update/all")
     }
-    func pro(_ key: String) async throws {
-      try await hub.client.send("launcher/pro", key)
-    }
     struct AppApi {
       let hub: Hub
       let id: String

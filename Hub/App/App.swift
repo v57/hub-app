@@ -62,7 +62,11 @@ struct HubApp: App {
     NavigationStack {
       HomeView().page()
     }.modifier(TranslationModifier())
-      .onOpenURL { NetworkInvitationRouter.main.open($0) }
+      .onOpenURL { url in
+        if !PairingRouter.main.open(url) {
+          NetworkInvitationRouter.main.open(url)
+        }
+      }
   }
 #endif
 }

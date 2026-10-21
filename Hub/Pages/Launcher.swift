@@ -232,11 +232,6 @@ struct LauncherView: View {
             }
           }
         }
-        if app.id == "Hub Lite" || app.id == "Hub" {
-          AsyncButton("Get Pro") {
-            try await hub.launcher.pro(KeyChain.main.publicKey())
-          }.buttonStyle(ActionButtonStyle())
-        }
       }
       .padding(.vertical, 4).padding(.horizontal, 12)
       .background(.secondaryBackground, in: .rounded(12))

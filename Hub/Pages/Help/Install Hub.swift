@@ -25,6 +25,14 @@ struct InstallationGuide: View {
     }
   }
   @State var os: OS = .macOS
+  /// The pairing code makes this app the new hub's owner
+  @ViewBuilder
+  func pair(_ code: CodeView) -> some View {
+    Text("Pair").title()
+    code
+    Text("Enter the address and pairing code it shows under **Connect to a Hub** to become the hub's owner.")
+      .secondary()
+  }
   var body: some View {
     VStack {
       Group {
@@ -34,6 +42,7 @@ struct InstallationGuide: View {
           CodeView("curl -fsSL https://bun.sh/install | bash")
           Text("Run").title()
           CodeView("bunx v57/hub")
+          pair(CodeView("bunx v57/hub pair"))
         case .docker:
           Text("Run").title()
           CodeView("""
@@ -53,6 +62,7 @@ struct InstallationGuide: View {
           CodeView(title: "Powershell", #"powershell -c "irm bun.sh/install.ps1 | iex""#)
           Text("Run").title()
           CodeView(title: "Powershell", "bunx v57/hub")
+          pair(CodeView(title: "Powershell", "bunx v57/hub pair"))
         }
       }.transition(.blurReplace)
     }.multilineTextAlignment(.center).frame(maxWidth: .infinity, maxHeight: .infinity)
