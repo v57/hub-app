@@ -53,9 +53,10 @@ struct InstallationGuide: View {
             .secondary()
         case .iOS:
           Text("""
-          Currently you can only start hub server on
-          **macOS**, **Linux**, **Windows** and using **Docker**.
-          In the future **any Hub App** may be used to connect your services
+          Any device with the Hub app can be the hub:
+          open **This Device** on the Home screen
+          and turn on **Run a Hub on this device**.
+          The app becomes the hub's owner.
           """).secondary()
         case .windows:
           Text("Install [Bun](https://bun.com)").title()

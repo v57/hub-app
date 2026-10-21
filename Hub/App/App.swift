@@ -32,6 +32,7 @@ struct HubApp: App {
 #if os(macOS)
   @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 #endif
+  @Environment(\.scenePhase) private var scenePhase
   var body: some Scene {
     WindowGroup {
       if ProcessInfo.isScreenshot {
@@ -68,6 +69,17 @@ struct HubApp: App {
           NetworkInvitationRouter.main.open(url)
         }
       }
+#if canImport(HubServer)
+      // The hub this device runs: started at launch when it's on, again after iOS suspended it
+      .task { await LocalHub.main.resume() }
+      .onChange(of: scenePhase) {
+        switch scenePhase {
+        case .active: Task { await LocalHub.main.resume() }
+        case .background: LocalHub.main.enteredBackground()
+        default: break
+        }
+      }
+#endif
   }
 #endif
 }

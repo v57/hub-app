@@ -88,6 +88,13 @@ struct HomeView: View {
               .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
           }.blockBackground().transitionSource(id: "guide", namespace: namespace)
         }.gridSize(.x21).buttonStyle(.environment)
+#if canImport(HubServer) && !canImport(SwiftCrossUI)
+        NavigationLink {
+          LocalHubView()
+        } label: {
+          LocalHubCard()
+        }.gridSize(.x21).buttonStyle(.environment)
+#endif
         ForEach(Hubs.main.list) { hub in
           HubView(merging: $merging).hub(hub)
             .gridSize(.x21)
