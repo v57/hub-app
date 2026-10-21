@@ -396,6 +396,7 @@ struct HomeView: View {
       @State private var targetInstances: Int = 0
       @State private var showsInstances = false
       @State private var editing: Hub.Launcher.AppInfo?
+      /// hub-server is "Hub" in the store; older launchers list "Hub Pro" and "Hub Lite"
       var isHub: Bool { app.id == "Hub" || app.id == "Hub Pro" || app.id == "Hub Lite" }
       var instances: Int { app.instances }
       var body: some View {

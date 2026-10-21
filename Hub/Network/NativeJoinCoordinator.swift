@@ -396,7 +396,7 @@ struct NativeJoinCoordinator {
   ) throws -> HubNetworkProfileConfiguration {
     guard let hubURL = bootstrapHubURL(invitation.node) else {
       throw NetworkInvitationError(
-        code: .malformed, message: "invitation hub-pro address is invalid"
+        code: .malformed, message: "invitation hub-server address is invalid"
       )
     }
     // The node lives on the inviter's host. If its endpoint is a Tailscale /

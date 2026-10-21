@@ -9,7 +9,7 @@ import SwiftUI
 /// Env-driven cross-machine test harness for the Hub Network redesign.
 ///
 /// Environments:
-///   HUBTESTENV=network  local hub owner; hub-pro API surface smoke
+///   HUBTESTENV=network  local hub owner; hub-server API surface smoke
 ///   HUBTESTENV=host     local hub owner; TCP server on 18403, shares invite,
 ///                       waits for client completion
 ///   HUBTESTENV=client   remote; joins via invite, verifies overlay traffic
@@ -18,7 +18,7 @@ import SwiftUI
 ///   HUBTESTENV=gateway  remote; selects host gateway, fetches public URL
 ///
 /// Config env:
-///   HUBTESTENV_HUB        hub-pro address (default ws://127.0.0.1:1997)
+///   HUBTESTENV_HUB        hub-server address (default ws://127.0.0.1:1997)
 ///   HUBTESTENV_NODE       node endpoint (default empty -> server default)
 ///   HUBTESTENV_INVITE     invite code for client/replay
 ///   HUBTESTENV_PORT       TCP port (default 18403)
@@ -202,7 +202,7 @@ final class HubTestRunner {
 
   private func networkTasks() -> [HubTestItem] {
     [
-      HubTestItem(title: "Connect to hub-pro"),
+      HubTestItem(title: "Connect to hub-server"),
       HubTestItem(title: "Check permissions"),
       HubTestItem(title: "Join network"),
       HubTestItem(title: "Share port"),
@@ -213,7 +213,7 @@ final class HubTestRunner {
 
   private func hostTasks() -> [HubTestItem] {
     [
-      HubTestItem(title: "Connect to hub-pro"),
+      HubTestItem(title: "Connect to hub-server"),
       HubTestItem(title: "Check permissions"),
       HubTestItem(title: "Join network"),
       HubTestItem(title: "Share port"),
@@ -228,7 +228,7 @@ final class HubTestRunner {
     [
       HubTestItem(title: "Use invite"),
       HubTestItem(title: "Join network"),
-      HubTestItem(title: "Join hub-pro"),
+      HubTestItem(title: "Join hub-server"),
       HubTestItem(title: "Resolve host overlay address"),
       HubTestItem(title: "Send requests to \(port)"),
       HubTestItem(title: "Report completion"),
@@ -265,7 +265,7 @@ final class HubTestRunner {
 
   private func networkOperations(_ hub: Hub) -> [String: @MainActor () async throws -> Void] {
     [
-      "Connect to hub-pro": { try await self.assertConnected(hub) },
+      "Connect to hub-server": { try await self.assertConnected(hub) },
       "Check permissions": { try await self.assertPermissions(hub) },
       "Join network": { try await self.joinNetwork(hub) },
       "Share port": { try await self.sharePort(hub, port: self.port) },
@@ -286,7 +286,7 @@ final class HubTestRunner {
     return [
       "Use invite": { _ = try NetworkInvitationParser.decode(link) },
       "Join network": { _ = try await self.joinWithInvite(link) },
-      "Join hub-pro": { try await self.assertJoinedHubConnected() },
+      "Join hub-server": { try await self.assertJoinedHubConnected() },
       "Resolve host overlay address": { _ = try await self.hostOverlayIPv4() },
       "Send requests to \(port)": { try await self.sendTrafficToHost(port: self.port) },
       "Report completion": { try await self.reportCompletion(hub: self.hub, result: "client-traffic-ok") },
@@ -576,7 +576,7 @@ enum HubTestError: Error, CustomStringConvertible {
 
   var description: String {
     switch self {
-    case .hubUnavailable: "hub-pro is not connected"
+    case .hubUnavailable: "hub-server is not connected"
     case .missingPermissions(let paths): "missing permissions: \(paths.joined(separator: ", "))"
     case .tunnelNotReady: "tunnel did not reach connected"
     case .portNotShared(let port): "port \(port) is not shared"
