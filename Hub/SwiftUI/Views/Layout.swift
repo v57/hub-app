@@ -82,15 +82,11 @@ struct HomeGridLayout: Layout {
     var data = [Placement]()
     var cache = [GridSize: GridCache]()
     var minHeight: Int = 1
+    /// Rows down to the last filled cell. Rows don't line up with the 64-bit words, so this goes by the cell index.
     var height: Int {
       for i in (0..<space.count).reversed() where space[i] > 0 {
-        let rows = i * 64 / width
-        let last = (64 - space[i].leadingZeroBitCount)
-        if last % width == 0 {
-          return rows + last / width
-        } else {
-          return rows + last / width + 1
-        }
+        let last = i * 64 + 63 - space[i].leadingZeroBitCount
+        return last / width + 1
       }
       return 0
     }
