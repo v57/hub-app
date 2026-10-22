@@ -34,6 +34,11 @@ extension KeyChain {
   var isConnected: Bool = false
   /// Why the hub refuses this app's connection, while it does
   var refusal: HubClient.Refusal?
+  /// Not connected for a while: listed behind the sidebar's Show More
+  var isUnreachable = false
+  @ObservationIgnored private var unreachableTask: Task<Void, Never>?
+  /// Filled from fixtures (`--demo`): the connection's events leave its state alone
+  @ObservationIgnored var isDemo = false
   var api = Set<String>()
   var hasLauncher: Bool { require(permissions: "launcher/info") }
   
@@ -54,10 +59,15 @@ extension KeyChain {
       client.report(description: AppDevice.description, data: AppDevice.data)
     }
     isConnected = client.isConnected
-    client.onRefused = { [weak self] in self?.refusal = $0 }
+    client.onRefused = { [weak self] in
+      guard self?.isDemo == false else { return }
+      self?.refusal = $0
+    }
     client.isConnectedChanged = { [weak self] in
+      guard self?.isDemo == false else { return }
       self?.isConnected = $0
       if $0 { self?.refusal = nil }
+      self?.waitForConnection()
       self?.net.connectionChanged($0)
     }
     apiTask = Task {
@@ -69,12 +79,28 @@ extension KeyChain {
       }
     }
     appServices = AppServices(hub: self)
+    waitForConnection()
     Task { [weak self] in
       await self?.net.restoreIfActive()
     }
   }
   deinit {
     apiTask?.cancel()
+    unreachableTask?.cancel()
+  }
+  /// A hub that doesn't connect within 15 seconds reads as unreachable until it does
+  private func waitForConnection() {
+    unreachableTask?.cancel()
+    guard !isDemo else { return }
+    guard !isConnected else {
+      isUnreachable = false
+      return
+    }
+    unreachableTask = Task { [weak self] in
+      try? await Task.sleep(for: .seconds(15))
+      guard !Task.isCancelled, let self, !self.isConnected, !self.isDemo else { return }
+      self.isUnreachable = true
+    }
   }
   struct Settings: Codable, Identifiable, Hashable {
     var id: URL { address }
@@ -138,6 +164,12 @@ class Hubs {
       list.append(.test)
       return
     }
+#if DEBUG
+    if HubDemo.isOn {
+      list = HubDemo.hubs()
+      return
+    }
+#endif
     guard let data = UserDefaults.standard.data(forKey: "hubs") else { return }
     do {
       list = []
