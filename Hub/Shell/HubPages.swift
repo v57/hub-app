@@ -178,7 +178,7 @@ struct HubPagesList: View {
   var body: some View {
     ScrollView {
       VStack(spacing: KitMetrics.gutter) {
-        OpenHubSections(hub: hub, page: nil) { pushed = $0 }
+        HubPagesCards(hub: hub) { pushed = $0 }
       }
       .padding(KitMetrics.gutter)
       .padding(.bottom, 24)

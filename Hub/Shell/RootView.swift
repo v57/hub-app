@@ -76,6 +76,11 @@ struct RootView: View {
     // `--connect ws://127.0.0.1:2097 --code ABC-123`: pairs with a hub at launch, for checks against a real hub
     .task {
       let arguments = CommandLine.arguments
+      // `--forget ws://127.0.0.1:2097`: removes a hub a check added
+      if let index = arguments.firstIndex(of: "--forget"), index + 1 < arguments.count,
+         let hub = Hubs.main.list.first(where: { $0.settings.address.absoluteString == arguments[index + 1] }) {
+        Hubs.main.remove(with: hub.settings)
+      }
       guard let index = arguments.firstIndex(of: "--connect"), index + 1 < arguments.count,
             let url = URL(hubAddress: arguments[index + 1]) else { return }
       let code = arguments.firstIndex(of: "--code").flatMap { $0 + 1 < arguments.count ? arguments[$0 + 1] : nil } ?? ""

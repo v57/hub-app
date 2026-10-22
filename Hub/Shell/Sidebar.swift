@@ -200,39 +200,23 @@ private struct HubSwitcherMenu: View {
 struct OpenHubSections: View {
   let hub: Hub
   let page: HubPage?
-  /// Pushes a page instead of selecting it (iPhone's list of a hub's pages)
-  var open: ((HubPage) -> Void)?
   var facts = HubFacts()
   @State private var showsMenu = false
   @Environment(\.kitIdiom) private var idiom
-  @HubState(\.status) private var status
-  @HubState(\.launcherInfo) private var launcher
   @HubState(\.whitelist) private var whitelist
-  @HubState(\.groups) private var groups
-  @HubState(\.hostPending) private var hostPending
 
   var body: some View {
     let pages = HubPage.allCases.filter { hub.canOpen($0) }
-    if open != nil {
-      // iPhone's list of a hub's pages: the toolbar already names the hub
-      VStack(spacing: 2) {
-        ForEach(pages.filter { $0.group == .hub }, id: \.self) { page in
-          row(page)
-        }
-      }
-      .padding(KitMetrics.cardPadding)
-      .kitSurface(.card)
-    } else {
     KitSection(Text(hub.settings.name)) {
       ForEach(pages.filter { $0.group == .hub }, id: \.self) { page in
-        row(page)
+        HubPageRow(hub: hub, page: page)
       }
     } icon: {
       HubTile(hub: hub, size: idiom == .mac ? 24 : 28)
     } meta: {
       MetaLine(facts.summary)
     } accessory: {
-      if idiom == .pad && open == nil {
+      if idiom == .pad {
         // iPad: the open hub's header switches hubs
         if facts.requests > 0 { Count(facts.requests, .attention) }
         Button("Switch Hub", systemImage: "chevron.up.chevron.down") { showsMenu = true }
@@ -243,18 +227,17 @@ struct OpenHubSections: View {
       }
     }
     .kitSticky(top: .none, bottom: sticky(.hub))
-    }
     let access = pages.filter { $0.group == .access }
     if !access.isEmpty {
-      KitSection("Access", meta: accessMeta, systemImage: "shield", hue: .orange) {
+      KitSection("Access", meta: AccessMeta.parts(facts: facts, hub: hub, lockdown: whitelist.enabled), systemImage: "shield", hue: .orange) {
         ForEach(access, id: \.self) { page in
-          row(page)
+          HubPageRow(hub: hub, page: page)
         }
       }
       .kitSticky(top: .none, bottom: sticky(.access))
     }
     if hub.canViewNetwork {
-      NetworkSection(hub: hub, open: open)
+      NetworkSection(hub: hub)
         .kitSticky(top: .none, bottom: sticky(.network))
     }
   }
@@ -262,37 +245,84 @@ struct OpenHubSections: View {
   private func sticky(_ group: HubPage.Group) -> KitStickyBottom {
     page?.group == group ? .content : .title
   }
+}
 
-  private var accessMeta: [String] {
+/// iPhone: a hub's pages in the sidebar's cards, pushed instead of selected; the toolbar names the hub, so the first
+/// card has no header
+struct HubPagesCards: View {
+  let hub: Hub
+  let open: (HubPage) -> Void
+  var facts = HubFacts()
+  @HubState(\.whitelist) private var whitelist
+
+  var body: some View {
+    let pages = HubPage.allCases.filter { hub.canOpen($0) }
+    VStack(spacing: 2) {
+      ForEach(pages.filter { $0.group == .hub }, id: \.self) { page in
+        HubPageRow(hub: hub, page: page, open: open)
+      }
+    }
+    .padding(KitMetrics.cardPadding)
+    .kitSurface(.card)
+    let access = pages.filter { $0.group == .access }
+    if !access.isEmpty {
+      KitSection("Access", meta: AccessMeta.parts(facts: facts, hub: hub, lockdown: whitelist.enabled), systemImage: "shield", hue: .orange) {
+        ForEach(access, id: \.self) { page in
+          HubPageRow(hub: hub, page: page, open: open)
+        }
+      }
+    }
+    if hub.canViewNetwork {
+      NetworkSection(hub: hub, open: open)
+    }
+  }
+}
+
+/// The Access card's line: who waits, requests, Lockdown
+@MainActor
+enum AccessMeta {
+  static func parts(facts: HubFacts, hub: Hub, lockdown: Bool) -> [String] {
     var parts = [String]()
     let waiting = facts.pendingDevices.count
     if waiting > 0 { parts.append("\(waiting) waiting") }
     let requests = facts.badges.security ?? 0
     if requests > 0 { parts.append(requests == 1 ? "1 request" : "\(requests) requests") }
-    if hub.canLockdown { parts.append(whitelist.enabled ? "Lockdown on" : "Lockdown off") }
+    if hub.canLockdown { parts.append(lockdown ? "Lockdown on" : "Lockdown off") }
     return parts
   }
+}
 
-  @ViewBuilder
-  private func row(_ page: HubPage) -> some View {
+/// A hub page's row, with what it counts at the end; it selects the page, or pushes it with `open`
+struct HubPageRow: View {
+  let hub: Hub
+  let page: HubPage
+  var open: ((HubPage) -> Void)?
+  var facts = HubFacts()
+  @HubState(\.status) private var status
+  @HubState(\.launcherInfo) private var launcher
+  @HubState(\.whitelist) private var whitelist
+  @HubState(\.groups) private var groups
+  @HubState(\.hostPending) private var hostPending
+
+  var body: some View {
     if let open {
       SidebarRow(page.title) {
         RowTile(systemImage: page.systemImage)
       } trailing: {
-        trailing(page)
+        trailing
       }
       .action { open(page) }
     } else {
       SidebarRow(value: Route.hub(hub.id, page), page.title) {
         RowTile(systemImage: page.systemImage)
       } trailing: {
-        trailing(page)
+        trailing
       }
     }
   }
 
   @ViewBuilder
-  private func trailing(_ page: HubPage) -> some View {
+  private var trailing: some View {
     switch page {
     case .services:
       if facts.services > 0 { Count(status.services.count) }

@@ -43,7 +43,7 @@ private struct PageToolbar<Title: View>: ViewModifier {
     if hides {
       content
     } else {
-      content.pageToolbar(windowTitle, title: { title }) { tools }
+      content.kitToolbar(windowTitle, title: { title }) { tools }
     }
   }
 }
