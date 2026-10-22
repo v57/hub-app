@@ -228,7 +228,7 @@ struct HubNetworkView: View {
     VStack(alignment: .leading, spacing: 6) {
       HStack {
         TextField(node ?? "node.example.com:7000", text: $nodeInput)
-          .textFieldStyle(.roundedBorder)
+          .roundedBorderField()
           .autocorrectionDisabled()
 #if os(iOS)
           .textInputAutocapitalization(.never)
@@ -419,7 +419,7 @@ struct HubNetworkView: View {
           .labelsHidden()
           .fixedSize()
           TextField("Port", text: $portText)
-            .textFieldStyle(.roundedBorder)
+            .roundedBorderField()
             .monospacedDigit()
 #if os(iOS)
             .keyboardType(.numberPad)
@@ -616,7 +616,7 @@ struct HubNetworkView: View {
   // MARK: Details
 
   private var details: some View {
-    DisclosureGroup("Details") {
+    DetailsGroup("Details") {
       NetworkCard {
         detailRow("Hub") { Text(hub.settings.name) }
         if hub.api.contains("hub/net/node") {
@@ -677,6 +677,37 @@ struct HubNetworkView: View {
         Text(subtitle).secondary()
       }
     }
+  }
+}
+
+/// A titled group that folds away; always open on Apple TV, which has no disclosure group
+private struct DetailsGroup<Content: View>: View {
+  let title: LocalizedStringKey
+  @ViewBuilder var content: Content
+  init(_ title: LocalizedStringKey, @ViewBuilder content: () -> Content) {
+    self.title = title
+    self.content = content()
+  }
+  var body: some View {
+#if os(tvOS)
+    VStack(alignment: .leading, spacing: 10) {
+      Text(title).font(.headline)
+      content
+    }
+#else
+    DisclosureGroup(title) { content }
+#endif
+  }
+}
+
+private extension View {
+  /// The rounded text field, where the platform has one
+  @ViewBuilder func roundedBorderField() -> some View {
+#if os(tvOS)
+    self
+#else
+    textFieldStyle(.roundedBorder)
+#endif
   }
 }
 
@@ -1049,9 +1080,11 @@ private struct NetworkInvitationSheet: View {
               link.copyToClipboard()
               copied = true
             }
+#if !os(tvOS)
             if let url = URL(string: link) {
               ShareLink(item: url) { Label("Share", systemImage: "square.and.arrow.up") }
             }
+#endif
           }
           .buttonStyle(.bordered)
           Text("The link works once, for seven days. On the other device, open it or paste it into Join Network on Hub's home screen.")

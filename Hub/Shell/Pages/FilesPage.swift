@@ -100,15 +100,17 @@ struct FilesPage: View {
       if idiom != .phone && hub.hasStorage {
         KitSearchField(text: $search, prompt: "Search Files").frame(width: 180)
       }
-      if hub.hasStorage && hub.require(permissions: "s3/write") {
+      if hub.hasStorage && hub.require(permissions: "s3/write") && idiom != .tv {
         ToolGroup {
           Button("Upload", systemImage: "arrow.up.doc") { importing = true }
         }
       }
     }
+#if !os(tvOS)
     .fileImporter(isPresented: $importing, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
       if case .success(let urls) = result { upload(urls) }
     }
+#endif
     .task(id: hub.isConnected) {
       guard hub.hasStorage, !hub.isDemo else { return }
       do {

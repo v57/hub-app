@@ -124,7 +124,9 @@ struct SecurityView: View {
           }
         case .group, .key:
           TextField(subjectKind == .group ? "Group id" : "Service key (SPKI)", text: $subjectText)
+#if !os(tvOS)
             .textFieldStyle(.roundedBorder)
+#endif
         case .everyone:
           EmptyView()
         }
@@ -134,7 +136,9 @@ struct SecurityView: View {
           Text("Share").tag(ObjectKind.share)
         }.pickerStyle(.segmented)
         TextField(objectKind == .share ? "Resource id" : objectKind == .prefix ? "s3/" : "s3/read", text: $objectText)
+#if !os(tvOS)
           .textFieldStyle(.roundedBorder)
+#endif
         AsyncButton("Add Grant", systemImage: "plus") {
           guard let subject, let object else { return }
           try await hub.client.devices.addGrant(subject, object)

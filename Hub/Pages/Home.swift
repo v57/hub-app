@@ -55,7 +55,11 @@ struct HomeView: View {
       .navigationDestination(for: HubAppLink.self) { link in
         if let hub = link.hub(in: hubs.list) {
           if link.app.web != nil {
+#if canImport(WebKit)
             HubWebAppView(header: link.app).hub(hub)
+#else
+            HubAppView(header: link.app).hub(hub)
+#endif
           } else {
             HubAppView(header: link.app).hub(hub)
           }

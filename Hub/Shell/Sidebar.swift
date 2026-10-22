@@ -365,10 +365,15 @@ private struct NetworkSection: View {
 
 /// What this device does on its own: run a hub, share its services, its key, Farm
 private struct ThisDeviceSection: View {
+#if os(macOS) || os(iOS)
   @State private var farm = Farm.main
+  private var meta: [String] { [farm.isRunning ? "Farming" : "Farm off"] }
+#else
+  private var meta: [String] { [] }
+#endif
 
   var body: some View {
-    KitSection("This \(KitDevice.name)", meta: [farm.isRunning ? "Farming" : "Farm off"], systemImage: KitDevice.systemImage, hue: .gray) {
+    KitSection("This \(KitDevice.name)", meta: meta, systemImage: KitDevice.systemImage, hue: .gray) {
 #if canImport(HubServer)
       SidebarRow(value: Route.device(.localHub), "Run a Hub", systemImage: "server.rack") {
         LocalHubTrailing()
@@ -378,7 +383,7 @@ private struct ThisDeviceSection: View {
         let shared = AppServices.Service.sharedCount
         if shared > 0 { Count(shared) }
       }
-#if !os(visionOS)
+#if os(macOS) || os(iOS)
       SidebarRow(value: Route.device(.farm), "Farm", systemImage: "tree") {
         Text(farm.isRunning ? "On" : "Off").kitFont(.caption)
       }

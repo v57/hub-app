@@ -145,7 +145,11 @@ struct ServiceAppPage: View {
     if let app = badges.apps?.first(where: { $0.path == path }) {
       Group {
         if app.web != nil {
+#if canImport(WebKit)
           HubWebAppView(header: app)
+#else
+          EmptyState(systemImage: "globe", title: "A Web App", message: "\(app.name) opens in a browser on your other devices.")
+#endif
         } else {
           HubAppView(header: app)
         }

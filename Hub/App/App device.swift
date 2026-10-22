@@ -136,9 +136,15 @@ enum AppDevice {
   // MARK: Storage
   static func storage() -> (free: Int64, total: Int64)? {
     let url = URL(fileURLWithPath: NSHomeDirectory())
+#if os(tvOS)
+    guard let values = try? url.resourceValues(forKeys: [.volumeAvailableCapacityKey, .volumeTotalCapacityKey]),
+          let total = values.volumeTotalCapacity else { return nil }
+    return (Int64(values.volumeAvailableCapacity ?? 0), Int64(total))
+#else
     guard let values = try? url.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey, .volumeTotalCapacityKey]),
           let total = values.volumeTotalCapacity else { return nil }
     return (values.volumeAvailableCapacityForImportantUsage ?? 0, Int64(total))
+#endif
   }
 
   // MARK: Memory and CPU

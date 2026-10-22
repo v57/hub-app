@@ -7,8 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		C0C0A0042F9A000100C0A004 /* ComponentKit in Frameworks */ = {isa = PBXBuildFile; platformFilters = (ios, macos, xros, ); productRef = C0C0A0022F9A000100C0A002 /* ComponentKit */; };
-		C0C0A0052F9A000100C0A005 /* ComponentKit in Frameworks */ = {isa = PBXBuildFile; platformFilters = (ios, macos, xros, ); productRef = C0C0A0032F9A000100C0A003 /* ComponentKit */; };
+		C0C0A0042F9A000100C0A004 /* ComponentKit in Frameworks */ = {isa = PBXBuildFile; productRef = C0C0A0022F9A000100C0A002 /* ComponentKit */; };
+		C0C0A0052F9A000100C0A005 /* ComponentKit in Frameworks */ = {isa = PBXBuildFile; productRef = C0C0A0032F9A000100C0A003 /* ComponentKit */; };
 		4D5B0A042F90000100A0B004 /* HubServer in Frameworks */ = {isa = PBXBuildFile; productRef = 4D5B0A022F90000100A0B002 /* HubServer */; };
 		4D5B0A052F90000100A0B005 /* HubServer in Frameworks */ = {isa = PBXBuildFile; productRef = 4D5B0A032F90000100A0B003 /* HubServer */; };
 		132DD8B82F4CDDE300282A30 /* HubService in Frameworks */ = {isa = PBXBuildFile; productRef = 132DD8B72F4CDDE300282A30 /* HubService */; };
@@ -16,7 +16,7 @@
 		13B4EC572F817DF50060DAE1 /* HubUI in Frameworks */ = {isa = PBXBuildFile; productRef = 13B4EC562F817DF50060DAE1 /* HubUI */; };
 		13B4EC592F817DF80060DAE1 /* HubUI in Frameworks */ = {isa = PBXBuildFile; productRef = 13B4EC582F817DF80060DAE1 /* HubUI */; };
 		262C58D530179A8200CA8880 /* NetworkExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 262C58D430179A8200CA8880 /* NetworkExtension.framework */; };
-		262C58DD30179A8200CA8880 /* PacketTunnelExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 262C58D330179A8200CA8880 /* PacketTunnelExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		262C58DD30179A8200CA8880 /* PacketTunnelExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 262C58D330179A8200CA8880 /* PacketTunnelExtension.appex */; platformFilters = (ios, macos, ); settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		48A604013018000100604001 /* WireGuardKit in Frameworks */ = {isa = PBXBuildFile; productRef = 48A604003018000100604000 /* WireGuardKit */; };
 		48A6040B301800010060400B /* HubService in Frameworks */ = {isa = PBXBuildFile; productRef = 48A6040A301800010060400A /* HubService */; };
 /* End PBXBuildFile section */
@@ -437,6 +437,10 @@
 		};
 		262C58DC30179A8200CA8880 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
+			platformFilters = (
+				ios,
+				macos,
+			);
 			target = 262C58D230179A8200CA8880 /* PacketTunnelExtension */;
 			targetProxy = 262C58DB30179A8200CA8880 /* PBXContainerItemProxy */;
 		};
@@ -708,7 +712,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2,3,7";
-				TVOS_DEPLOYMENT_TARGET = 17.6;
+				TVOS_DEPLOYMENT_TARGET = 18.0;
 				XROS_DEPLOYMENT_TARGET = 2.0;
 			};
 			name = Debug;
@@ -768,7 +772,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2,3,7";
-				TVOS_DEPLOYMENT_TARGET = 17.6;
+				TVOS_DEPLOYMENT_TARGET = 18.0;
 				XROS_DEPLOYMENT_TARGET = 2.0;
 			};
 			name = Release;

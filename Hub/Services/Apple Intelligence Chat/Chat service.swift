@@ -5,7 +5,7 @@
 //  Created by Linux on 30.10.25.
 //
 
-#if canImport(FoundationModels)
+#if canImport(FoundationModels) && !os(tvOS)
 import Foundation
 import FoundationModels
 import HubService
