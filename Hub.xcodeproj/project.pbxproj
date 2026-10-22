@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		C0C0A0042F9A000100C0A004 /* ComponentKit in Frameworks */ = {isa = PBXBuildFile; platformFilters = (ios, macos, xros, ); productRef = C0C0A0022F9A000100C0A002 /* ComponentKit */; };
+		C0C0A0052F9A000100C0A005 /* ComponentKit in Frameworks */ = {isa = PBXBuildFile; platformFilters = (ios, macos, xros, ); productRef = C0C0A0032F9A000100C0A003 /* ComponentKit */; };
 		4D5B0A042F90000100A0B004 /* HubServer in Frameworks */ = {isa = PBXBuildFile; productRef = 4D5B0A022F90000100A0B002 /* HubServer */; };
 		4D5B0A052F90000100A0B005 /* HubServer in Frameworks */ = {isa = PBXBuildFile; productRef = 4D5B0A032F90000100A0B003 /* HubServer */; };
 		132DD8B82F4CDDE300282A30 /* HubService in Frameworks */ = {isa = PBXBuildFile; productRef = 132DD8B72F4CDDE300282A30 /* HubService */; };
@@ -128,6 +130,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				13B4EC572F817DF50060DAE1 /* HubUI in Frameworks */,
+				C0C0A0042F9A000100C0A004 /* ComponentKit in Frameworks */,
 				132DD8B82F4CDDE300282A30 /* HubService in Frameworks */,
 				4D5B0A042F90000100A0B004 /* HubServer in Frameworks */,
 			);
@@ -138,6 +141,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				13B4EC592F817DF80060DAE1 /* HubUI in Frameworks */,
+				C0C0A0052F9A000100C0A005 /* ComponentKit in Frameworks */,
 				132DD8BA2F4CDDEB00282A30 /* HubService in Frameworks */,
 				4D5B0A052F90000100A0B005 /* HubServer in Frameworks */,
 			);
@@ -252,6 +256,7 @@
 				132DD8B72F4CDDE300282A30 /* HubService */,
 				13B4EC562F817DF50060DAE1 /* HubUI */,
 				4D5B0A022F90000100A0B002 /* HubServer */,
+				C0C0A0022F9A000100C0A002 /* ComponentKit */,
 			);
 			productName = Hub;
 			productReference = 13C54C712D638AA1000C4CA5 /* Hub.app */;
@@ -277,6 +282,7 @@
 				132DD8B92F4CDDEB00282A30 /* HubService */,
 				13B4EC582F817DF80060DAE1 /* HubUI */,
 				4D5B0A032F90000100A0B003 /* HubServer */,
+				C0C0A0032F9A000100C0A003 /* ComponentKit */,
 			);
 			productName = HubAdmin;
 			productReference = 13F5738E2D68EDB4008546EB /* Hub Pro.app */;
@@ -345,6 +351,7 @@
 				132DD8B62F4CDDE300282A30 /* XCLocalSwiftPackageReference "../HubService" */,
 				4D5B0A012F90000100A0B001 /* XCLocalSwiftPackageReference "../../Core/HubServer" */,
 				48A604073018000100604007 /* XCLocalSwiftPackageReference "Vendor/wireguard-apple" */,
+				C0C0A0012F9A000100C0A001 /* XCRemoteSwiftPackageReference "Component" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 13C54C722D638AA1000C4CA5 /* Products */;
@@ -1001,6 +1008,17 @@
 		};
 /* End XCLocalSwiftPackageReference section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		C0C0A0012F9A000100C0A001 /* XCRemoteSwiftPackageReference "Component" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/v57/Component.git";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
 		4D5B0A022F90000100A0B002 /* HubServer */ = {
 			isa = XCSwiftPackageProductDependency;
@@ -1041,6 +1059,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 132DD8B62F4CDDE300282A30 /* XCLocalSwiftPackageReference "../HubService" */;
 			productName = HubService;
+		};
+		C0C0A0022F9A000100C0A002 /* ComponentKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C0C0A0012F9A000100C0A001 /* XCRemoteSwiftPackageReference "Component" */;
+			productName = ComponentKit;
+		};
+		C0C0A0032F9A000100C0A003 /* ComponentKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C0C0A0012F9A000100C0A001 /* XCRemoteSwiftPackageReference "Component" */;
+			productName = ComponentKit;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

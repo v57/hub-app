@@ -7,6 +7,9 @@
 
 import SwiftUI
 import Foundation
+#if canImport(ComponentKit)
+import ComponentKit
+#endif
 #if os(macOS)
 import AppKit
 import Combine
@@ -45,11 +48,12 @@ struct HubApp: App {
 #endif
       }
     }
+#if os(macOS)
+    .defaultSize(width: 1440, height: 900)
+#endif
   }
   @ViewBuilder private var mainContent: some View {
-    NavigationStack {
-      HomeView().page()
-    }.modifier(TranslationModifier())
+    root.modifier(TranslationModifier())
       .overlay { PairingConfirmation() }
       .onOpenURL { url in
         if !PairingRouter.main.open(url) {
@@ -66,6 +70,17 @@ struct HubApp: App {
         default: break
         }
       }
+#endif
+  }
+  @ViewBuilder private var root: some View {
+#if canImport(ComponentKit)
+    RootView()
+      .kitToasts()
+      .componentKit(accent: .hubAccent)
+#else
+    NavigationStack {
+      HomeView().page()
+    }
 #endif
   }
 }

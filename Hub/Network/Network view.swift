@@ -1,4 +1,7 @@
 import SwiftUI
+#if canImport(ComponentKit)
+import ComponentKit
+#endif
 import HubUI
 import HubService
 
@@ -686,7 +689,11 @@ private struct NetworkCard<Content: View>: View {
     }
     .padding(14)
     .frame(maxWidth: .infinity, alignment: .leading)
+#if canImport(ComponentKit)
+    .kitSurface(.card)
+#else
     .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 16))
+#endif
   }
 }
 
