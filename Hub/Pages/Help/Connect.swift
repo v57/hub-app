@@ -5,11 +5,7 @@
 //  Created by Linux on 05.06.26.
 //
 
-#if canImport(SwiftCrossUI)
-import SwiftCrossUI
-#else
 import SwiftUI
-#endif
 import HubService
 import HubUI
 

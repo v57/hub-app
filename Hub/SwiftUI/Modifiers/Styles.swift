@@ -5,11 +5,7 @@
 //  Created by Dmitry Kozlov on 12/6/25.
 //
 
-#if canImport(SwiftCrossUI)
-import SwiftCrossUI
-#else
 import SwiftUI
-#endif
 import HubUI
 
 extension View {
@@ -39,7 +35,7 @@ extension View {
 struct ContextMenuShape<S: Shape>: ViewModifier {
   let shape: S
   func body(content: Content) -> some View {
-#if canImport(SwiftCrossUI) || os(macOS)
+#if os(macOS)
     content
 #else
     content.contentShape(.contextMenuPreview, shape)
@@ -207,7 +203,7 @@ struct BorderStyle: ShapeStyle {
 
 extension ShapeStyle where Self == Color {
   static var tertiaryBackground: Color {
-#if !canImport(SwiftCrossUI) && os(macOS) || os(iOS)
+#if os(macOS) || os(iOS)
     Color(.tertiarySystemFill)
 #else
     Color.gray.opacity(0.4)
@@ -223,7 +219,7 @@ extension Shape where Self == RoundedRectangle {
 
 extension Color {
   static var tertiaryBackground: Color {
-#if !canImport(SwiftCrossUI) && os(macOS) || os(iOS)
+#if os(macOS) || os(iOS)
     Color(.tertiarySystemFill)
 #else
     Color.gray.opacity(0.4)

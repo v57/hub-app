@@ -5,11 +5,7 @@
 //  Created by Linux on 12.07.25.
 //
 
-#if canImport(SwiftCrossUI)
-import SwiftCrossUI
-#else
 import SwiftUI
-#endif
 
 struct EditApp: View {
   let app: Hub.Launcher.AppInfo

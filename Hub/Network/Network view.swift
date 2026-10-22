@@ -1,8 +1,4 @@
-#if canImport(SwiftCrossUI)
-import SwiftCrossUI
-#else
 import SwiftUI
-#endif
 import HubUI
 import HubService
 

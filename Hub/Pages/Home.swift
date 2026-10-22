@@ -5,11 +5,7 @@
 //  Created by Linux on 02.11.25.
 //
 
-#if canImport(SwiftCrossUI)
-import SwiftCrossUI
-#else
 import SwiftUI
-#endif
 import HubUI
 import HubService
 
@@ -107,7 +103,7 @@ struct HomeView: View {
               .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
           }.blockBackground().transitionSource(id: "guide", namespace: namespace)
         }.gridSize(.x21).buttonStyle(.environment)
-#if canImport(HubServer) && !canImport(SwiftCrossUI)
+#if canImport(HubServer)
         NavigationLink {
           LocalHubView()
         } label: {
@@ -122,7 +118,7 @@ struct HomeView: View {
         Button(copied ? "Copied" : "My Key", systemImage: copied ? "checkmark.circle.fill" : "key") {
           copy()
         }.labelStyle(.appIcon).buttonStyle(.environment)
-#if !os(visionOS) && !canImport(SwiftCrossUI)
+#if !os(visionOS)
         NavigationLink {
           FarmView()
             .transitionTarget(id: "farm", namespace: namespace)

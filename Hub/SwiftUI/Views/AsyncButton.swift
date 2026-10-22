@@ -5,11 +5,7 @@
 //  Created by Dmitry Kozlov on 2/6/25.
 //
 
-#if canImport(SwiftCrossUI)
-import SwiftCrossUI
-#else
 import SwiftUI
-#endif
 
 typealias SwiftUILabel = Label
 

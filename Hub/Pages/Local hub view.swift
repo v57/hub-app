@@ -5,7 +5,7 @@
 //  Turns the hub this device runs on and off, shows where others reach it, who is connected, and pairing codes.
 //
 
-#if canImport(HubServer) && !canImport(SwiftCrossUI)
+#if canImport(HubServer)
 import SwiftUI
 import HubServer
 import HubUI

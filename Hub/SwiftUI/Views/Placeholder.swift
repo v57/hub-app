@@ -5,11 +5,7 @@
 //  Created by Linux on 04.03.26.
 //
 
-#if canImport(SwiftCrossUI)
-import SwiftCrossUI
-#else
 import SwiftUI
-#endif
 
 struct Placeholder<Content: View>: View {
   let image: String

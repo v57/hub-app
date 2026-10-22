@@ -5,30 +5,15 @@
 //  Created by Dmitry Kozlov on 17/2/25.
 //
 
-#if canImport(SwiftCrossUI)
-import SwiftCrossUI
-import DefaultBackend
-#else
 import SwiftUI
 import Foundation
 #if os(macOS)
 import AppKit
 import Combine
 #endif
-#endif
 
 @main
 struct HubApp: App {
-#if canImport(SwiftCrossUI)
-  let backend = DefaultBackend()
-  var body: some Scene {
-    WindowGroup {
-      NavigationStack {
-        HomeView().page()
-      }
-    }
-  }
-#else
 #if os(macOS)
   @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 #endif
@@ -83,10 +68,9 @@ struct HubApp: App {
       }
 #endif
   }
-#endif
 }
 
-#if !canImport(SwiftCrossUI) && os(macOS)
+#if os(macOS)
 class AppDelegate: NSObject, NSApplicationDelegate {
   private var wake: AnyCancellable?
 
@@ -110,9 +94,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 }
 #endif
 
-#if !canImport(SwiftCrossUI)
 extension ProcessInfo {
   static let isPreviews: Bool = processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] != nil
   static let isScreenshot: Bool = processInfo.environment["screenshot"] != nil
 }
-#endif

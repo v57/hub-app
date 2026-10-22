@@ -5,11 +5,7 @@
 //  Created by Linux on 04.10.25.
 //
 
-#if canImport(SwiftCrossUI)
-import SwiftCrossUI
-#else
 import SwiftUI
-#endif
 import HubUI
 
 enum ImageType: String, Codable, CaseIterable {
@@ -71,7 +67,6 @@ struct ImageEncoderView: View {
         TableRow(file).draggable(ImageTransfer(file: file))
       }
     }.toolbar {
-#if !canImport(SwiftCrossUI)
       if !result.isEmpty {
         ShareLink(items: result) { item in
           SharePreview(item.name, image: item)
@@ -79,7 +74,6 @@ struct ImageEncoderView: View {
           Label("Export", systemImage: "square.and.arrow.up")
         }
       }
-#endif
     }.opacity(operations.isEmpty ? 0 : 1).overlay {
       if operations.isEmpty {
         Placeholder(image: "photo", title: "Image Encoder", description: "Compress your images to \(format.rawValue) format") {
@@ -130,11 +124,9 @@ struct ImageEncoderView: View {
         .frame(maxWidth: .infinity, alignment: .trailing)
         .padding(.horizontal).secondary()
     }.safeAreaInset(edge: .bottom) {
-#if !canImport(SwiftCrossUI)
       LibraryPickerButton(matching: .images) { url in
         add(files: [url])
       }.buttonStyle(ActionButtonStyle()).padding(.bottom, 4)
-#endif
     }
   }
   struct ImageTransfer: Transferable {

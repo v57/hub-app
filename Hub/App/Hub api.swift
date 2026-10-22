@@ -6,11 +6,7 @@
 //
 
 import Foundation
-#if canImport(SwiftCrossUI)
-import SwiftCrossUI
-#else
 import SwiftUI
-#endif
 import Observation
 import HubService
 

@@ -7,11 +7,7 @@
 
 
 #if canImport(AVFoundation) && os(macOS) || os(iOS) || os(visionOS)
-#if canImport(SwiftCrossUI)
-import SwiftCrossUI
-#else
 import SwiftUI
-#endif
 import AVFoundation
 
 struct VideoEncoderView: View {
@@ -71,13 +67,11 @@ struct VideoEncoderView: View {
       add(files: files)
       return true
     }.toolbar {
-#if !canImport(SwiftCrossUI)
       if !result.isEmpty {
         ShareLink(items: result) {
           Label("Export", systemImage: "square.and.arrow.up")
         }
       }
-#endif
     }.safeAreaInset(edge: .top) {
       HStack {
         HStack {
@@ -87,11 +81,9 @@ struct VideoEncoderView: View {
         }
       }.frame(maxWidth: .infinity, alignment: .trailing).padding(.horizontal).secondary()
     }.safeAreaInset(edge: .bottom) {
-#if !canImport(SwiftCrossUI)
       LibraryPickerButton(matching: .videos) { url in
         add(files: [url])
       }.buttonStyle(ActionButtonStyle()).padding(.bottom, 4)
-#endif
     }
   }
   func add(files: [URL]) {

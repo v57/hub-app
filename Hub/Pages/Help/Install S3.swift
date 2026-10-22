@@ -5,11 +5,7 @@
 //  Created by Linux on 05.11.25.
 //
 
-#if canImport(SwiftCrossUI)
-import SwiftCrossUI
-#else
 import SwiftUI
-#endif
 import HubUI
 
 struct InstallS3: View {

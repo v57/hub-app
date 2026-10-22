@@ -5,11 +5,7 @@
 //  Service apps on Home: icons, widgets at the size the user picks, and the ones the user hid.
 //
 
-#if canImport(SwiftCrossUI)
-import SwiftCrossUI
-#else
 import SwiftUI
-#endif
 import HubUI
 import HubService
 

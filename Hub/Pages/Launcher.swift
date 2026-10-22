@@ -5,11 +5,7 @@
 //  Created by Dmitry Kozlov on 19/2/25.
 //
 
-#if canImport(SwiftCrossUI)
-import SwiftCrossUI
-#else
 import SwiftUI
-#endif
 import HubService
 
 struct LauncherView: View {
@@ -210,13 +206,11 @@ struct LauncherView: View {
                   statusText(process: process)
                 }
               }
-#if !canImport(SwiftCrossUI)
               if (status?.processes?.count ?? 0) > 0 {
                 if let date = status?.started {
                   Text(date, style: .relative)
                 }
               }
-#endif
               Text("")
             }.secondary()
           }

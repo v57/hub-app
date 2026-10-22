@@ -7,17 +7,10 @@
 
 import Foundation
 import HubService
-#if canImport(SwiftCrossUI)
-import SwiftCrossUI
-#else
 import SwiftUI
-#endif
 import Security
 
 extension KeyChain {
-#if canImport(SwiftCrossUI)
-  static let main = KeyChain.home
-#else
   static let main: KeyChain = {
     let accessGroup = Bundle.main.object(forInfoDictionaryKey: "HubKeychainAccessGroup") as? String
     return try! KeyChain(keychain: .init(
@@ -28,7 +21,6 @@ extension KeyChain {
     ))
   }()
 
-#endif
 }
 
 @MainActor
@@ -142,12 +134,10 @@ class Hubs {
     return list.first(where: { $0.id == selected })
   }
   init() {
-#if !canImport(SwiftCrossUI)
     if ProcessInfo.screenshotType != nil {
       list.append(.test)
       return
     }
-#endif
     guard let data = UserDefaults.standard.data(forKey: "hubs") else { return }
     do {
       list = []

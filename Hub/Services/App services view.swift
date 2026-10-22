@@ -5,11 +5,7 @@
 //  Created by Linux on 17.10.25.
 //
 
-#if canImport(SwiftCrossUI)
-import SwiftCrossUI
-#else
 import SwiftUI
-#endif
 
 extension AppServices {
   struct Page: View {
@@ -17,7 +13,7 @@ extension AppServices {
     var body: some View {
       switch service {
       case .chat:
-#if !canImport(SwiftCrossUI) && os(macOS) || os(iOS)
+#if os(macOS) || os(iOS)
         if #available(macOS 26.0, iOS 26.0, *) {
           ChatView()
         } else {
@@ -39,7 +35,7 @@ extension AppServices {
         ContentUnavailableView("Service not available", systemImage: "photo.fill", description: Text("Video encoder interface is not available yet but you can still use it as a service"))
 #endif
       case .translate:
-#if !canImport(SwiftCrossUI) && os(macOS) || os(iOS)
+#if os(macOS) || os(iOS)
         if #available(macOS 15.0, iOS 18.0, *) {
           TranslateView()
         } else {

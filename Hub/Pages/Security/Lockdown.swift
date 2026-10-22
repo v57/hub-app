@@ -5,11 +5,7 @@
 //  Created by Linux on 25.02.26.
 //
 
-#if canImport(SwiftCrossUI)
-import SwiftCrossUI
-#else
 import SwiftUI
-#endif
 import HubService
 
 extension View {

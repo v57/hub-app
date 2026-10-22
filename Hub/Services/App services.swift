@@ -263,7 +263,7 @@ class AppServices {
       hub.service.group(enabled: $0).sensitiveContentService()
     } update: { $0.isEnabled = $1 }
 #endif
-#if !canImport(SwiftCrossUI) && os(macOS) || os(iOS)
+#if os(macOS) || os(iOS)
     if #available(macOS 15.0, iOS 18.0, *) {
       translation = Status(services: self, service: .translate) { _ in
         TranslationGroups()

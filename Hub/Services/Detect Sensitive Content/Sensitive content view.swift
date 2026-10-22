@@ -6,11 +6,7 @@
 //
 
 #if canImport(SensitiveContentAnalysis)
-#if canImport(SwiftCrossUI)
-import SwiftCrossUI
-#else
 import SwiftUI
-#endif
 import SensitiveContentAnalysis
 import AVKit
 import HubUI
@@ -66,11 +62,9 @@ struct SensitiveContentView: View {
       }
       return true
     }.safeAreaInset(edge: .bottom) {
-#if !canImport(SwiftCrossUI)
       LibraryPickerButton(matching: .images) { url in
         items.append(Item(url: url))
       }.buttonStyle(ActionButtonStyle()).padding(.bottom, 4)
-#endif
     }
   }
   @Observable @MainActor class Item: Identifiable {
@@ -109,7 +103,7 @@ struct SensitiveContentView: View {
           guard image == nil else { return }
           switch item.url.lastPathComponent.fileType {
           case .image:
-#if !canImport(SwiftCrossUI) && os(macOS)
+#if os(macOS)
             if let image = NSImage(contentsOf: item.url) {
               self.image = Image(nsImage: image)
             }
@@ -119,7 +113,6 @@ struct SensitiveContentView: View {
             }
 #endif
           case .video:
-#if !canImport(SwiftCrossUI)
             AVAssetImageGenerator(asset: AVURLAsset(url: item.url))
               .generateCGImageAsynchronously(for: .zero) { image, _, _ in
                 Task { @MainActor in
@@ -129,7 +122,6 @@ struct SensitiveContentView: View {
                   }
                 }
               }
-#endif
           default: break
           }
         }.transition(.scale)

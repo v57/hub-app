@@ -5,11 +5,7 @@
 //  Created by Dmitry Kozlov on 1/6/25.
 //
 
-#if canImport(SwiftCrossUI)
-import SwiftCrossUI
-#else
 import SwiftUI
-#endif
 import HubService
 
 struct UnknownValueError: Error { }

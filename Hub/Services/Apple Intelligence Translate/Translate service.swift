@@ -10,7 +10,7 @@ class TranslationGroups {
   var groups: [String: HubService.Group] = [:]
 }
 
-#if !canImport(SwiftCrossUI) && os(macOS) || os(iOS)
+#if os(macOS) || os(iOS)
 import Translation
 import Combine
 

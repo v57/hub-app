@@ -5,13 +5,9 @@
 //  Created by Linux on 29.10.25.
 //
 
-#if canImport(SwiftCrossUI)
-import SwiftCrossUI
-#else
 import SwiftUI
-#endif
 
-#if !canImport(SwiftCrossUI) && os(macOS) || os(iOS)
+#if os(macOS) || os(iOS)
 @preconcurrency import Translation
 @available(macOS 15.0, iOS 18.0, *)
 @Observable

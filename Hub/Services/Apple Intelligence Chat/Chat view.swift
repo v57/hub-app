@@ -5,7 +5,7 @@
 //  Created by Linux on 08.10.25.
 //
 
-#if !canImport(SwiftCrossUI) && canImport(FoundationModels)
+#if canImport(FoundationModels)
 import SwiftUI
 import FoundationModels
 
