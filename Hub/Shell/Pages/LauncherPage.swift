@@ -67,7 +67,7 @@ struct LauncherPage: View {
         LauncherInspector(app: app, status: statuses.apps[app.name])
       }
     }
-    .kitToolbar("Launcher", meta: PageMeta.parts(hub, [
+    .pageToolbar("Launcher", meta: PageMeta.parts(hub, [
       info.apps.count == 1 ? "1 app" : "\(info.apps.count) apps",
       updating.map { "Updating \($0)" } ?? "",
     ]), systemImage: HubPage.launcher.systemImage, hue: .gray) {
@@ -94,7 +94,7 @@ struct LauncherPage: View {
       if let app = info.apps.first(where: { $0.id == id }) {
         ScrollView { LauncherInspector(app: app, status: statuses.apps[app.name]).padding(KitMetrics.gutter) }
           .kitPane(.content)
-          .kitToolbar(app.id, meta: [app.statusLine(statuses.apps[app.name])], systemImage: "apple.terminal", hue: .gray) { }
+          .pageToolbar(app.id, meta: [app.statusLine(statuses.apps[app.name])], systemImage: "apple.terminal", hue: .gray) { }
           .hub(hub)
       }
     }

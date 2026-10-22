@@ -156,7 +156,7 @@ struct ServicesPage: View {
       }
     }
     .modifier(ConnectionStatusBar(isShown: idiom != .phone))
-    .kitToolbar("Services", meta: meta, systemImage: HubPage.services.systemImage, hue: .blue) {
+    .pageToolbar("Services", meta: meta, systemImage: HubPage.services.systemImage, hue: .blue) {
       if idiom != .phone {
         KitSearchField(text: $search, prompt: "Path or provider").frame(width: 200)
       }
@@ -171,7 +171,7 @@ struct ServicesPage: View {
       if let row = paths.first(where: { $0.id == id }) {
         ScrollView { APIInspector(row: row).padding(KitMetrics.gutter) }
           .kitPane(.content)
-          .kitToolbar(row.name, meta: [row.statusWord], systemImage: "hexagon", hue: .blue) { }
+          .pageToolbar(row.name, meta: [row.statusWord], systemImage: "hexagon", hue: .blue) { }
           .hub(hub)
       }
     }
@@ -200,7 +200,7 @@ struct ServicesPage: View {
             Text("\(row.children?.count ?? 0)").kitFont(.caption)
           }
         } else {
-          Text(row.name).font(.system(size: 12, design: .monospaced)).lineLimit(1)
+          Text(row.name).kitFont(.mono).lineLimit(1)
         }
       },
       KitGridColumn("Status", width: 120, content: { row in

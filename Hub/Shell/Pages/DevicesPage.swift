@@ -83,7 +83,7 @@ struct DevicesPage: View {
         DeviceInspector(device: device)
       }
     }
-    .kitToolbar("Devices", meta: meta, systemImage: HubPage.devices.systemImage, hue: .blue) {
+    .pageToolbar("Devices", meta: meta, systemImage: HubPage.devices.systemImage, hue: .blue) {
       if idiom != .phone {
         ListStyleSwitch(style: $style)
         KitSearchField(text: $search, prompt: "Name or kind").frame(width: 200)
@@ -98,7 +98,7 @@ struct DevicesPage: View {
       if let device = devices.first(where: { $0.id == id }) {
         ScrollView { DeviceInspector(device: device).padding(KitMetrics.gutter) }
           .kitPane(.content)
-          .kitToolbar(device.name, meta: [device.statusText], systemImage: Device.symbol(platform: device.platform), hue: .blue) { }
+          .pageToolbar(device.name, meta: [device.statusText], systemImage: Device.symbol(platform: device.platform), hue: .blue) { }
           .hub(hub)
       }
     }

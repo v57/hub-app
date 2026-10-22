@@ -18,7 +18,7 @@ struct DevicePageView: View {
     case .localHub:
 #if canImport(HubServer)
       NavigationStack { LocalHubView() }.kitPane(.content)
-        .kitToolbar("Run a Hub", meta: ["on this \(KitDevice.name)"], systemImage: "server.rack", hue: .gray) { }
+        .pageToolbar("Run a Hub", meta: ["on this \(KitDevice.name)"], systemImage: "server.rack", hue: .gray) { }
 #else
       EmptyState(systemImage: "server.rack", title: "Not on This Device")
 #endif
@@ -27,7 +27,7 @@ struct DevicePageView: View {
     case .farm:
 #if os(macOS) || os(iOS)
       NavigationStack { FarmView() }.kitPane(.content)
-        .kitToolbar("Farm", meta: [Farm.main.isRunning ? "Farming" : "Off"], systemImage: "tree", hue: .green) { }
+        .pageToolbar("Farm", meta: [Farm.main.isRunning ? "Farming" : "Off"], systemImage: "tree", hue: .green) { }
 #else
       EmptyState(systemImage: "tree", title: "Not on This Device")
 #endif
@@ -73,7 +73,7 @@ struct SharedServicesPage: View {
       .padding(.bottom, 24)
     }
     .kitPane(.content)
-    .kitToolbar("Shared Services", meta: ["what this \(KitDevice.name) runs for its hubs", "\(AppServices.Service.sharedCount) shared"], systemImage: "square.and.arrow.up", hue: .purple) { }
+    .pageToolbar("Shared Services", meta: ["what this \(KitDevice.name) runs for its hubs", "\(AppServices.Service.sharedCount) shared"], systemImage: "square.and.arrow.up", hue: .purple) { }
     .navigationDestination(item: idiom == .phone ? $trying : .constant(nil)) { service in
       tryPage(service)
     }
@@ -85,7 +85,7 @@ struct SharedServicesPage: View {
   private func tryPage(_ service: AppServices.Service) -> some View {
     AppServices.Page(service: service)
       .kitPane(.content)
-      .kitToolbar(service.name, meta: ["on this \(KitDevice.name)"], systemImage: service.image, hue: .purple) {
+      .pageToolbar(service.name, meta: ["on this \(KitDevice.name)"], systemImage: service.image, hue: .purple) {
         if idiom != .phone {
           Button("Done") { trying = nil }.buttonStyle(.kit)
         }

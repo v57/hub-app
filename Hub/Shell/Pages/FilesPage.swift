@@ -96,7 +96,7 @@ struct FilesPage: View {
         }
       }
     }
-    .kitToolbar("Files", meta: PageMeta.parts(hub, [places.count > 1 ? "\(places.count) storage places" : ""]), systemImage: HubPage.files.systemImage, hue: .blue) {
+    .pageToolbar("Files", meta: PageMeta.parts(hub, [places.count > 1 ? "\(places.count) storage places" : ""]), systemImage: HubPage.files.systemImage, hue: .blue) {
       if idiom != .phone && hub.hasStorage {
         KitSearchField(text: $search, prompt: "Search Files").frame(width: 180)
       }

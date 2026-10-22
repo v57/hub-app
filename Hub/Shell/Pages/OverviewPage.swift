@@ -49,7 +49,7 @@ struct OverviewPage: View {
     }
     .kitPane(.content)
     .onChange(of: status.requests, initial: true) { _, requests in rates.add(requests) }
-    .kitToolbar(hub.settings.name, title: {
+    .pageToolbar(hub.settings.name, title: {
       RichHeader(Text(hub.settings.name), size: .title) {
         HubTile(hub: hub, size: 28)
       } meta: {
@@ -188,17 +188,18 @@ private struct WidgetCard: View {
 struct AppsCard: View {
   let apps: [AppHeader]
   @Environment(Hub.self) private var hub
+  @Environment(\.kitIdiom) private var idiom
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
       RichHeader("Apps", meta: ["service apps on \(hub.settings.name)"], systemImage: "square.grid.3x3", hue: .purple)
-      LazyVGrid(columns: [GridItem(.adaptive(minimum: 72), spacing: 4)], spacing: 8) {
+      LazyVGrid(columns: [GridItem(.adaptive(minimum: 72 * idiom.scale), spacing: 4)], spacing: 8) {
         ForEach(apps) { app in
           Button { Navigator.main.route = .app(hub.id, path: app.path) } label: {
             Label {
               Text(app.name)
             } icon: {
-              AppTileIcon(app: app, size: 36)
+              AppTileIcon(app: app, size: 36 * idiom.scale)
             }
           }
           .labelStyle(HubTileLabelStyle(badge: app.isOnline ? nil : "Offline"))

@@ -11,6 +11,43 @@ import SwiftUI
 import ComponentKit
 import HubService
 
+extension EnvironmentValues {
+  /// Pages leave out their title bar: Apple TV's hub tab names the page in its own header
+  @Entry var hidesPageToolbar = false
+}
+
+extension View {
+  /// The page's title bar (the kit's toolbar), unless the page sits under a header of its own (`hidesPageToolbar`)
+  func pageToolbar(
+    _ title: String, meta: [String] = [], systemImage: String, hue: Hue = .accent, status: WorkStatus = .idle,
+    @ToolbarSlotBuilder tools: () -> [ToolbarSlot]
+  ) -> some View {
+    modifier(PageToolbar(windowTitle: title, title: KitTitle(title, meta: meta, systemImage: systemImage, hue: hue, status: status), tools: tools()))
+  }
+
+  /// The page's title bar with any title view
+  func pageToolbar<Title: View>(
+    _ windowTitle: String, @ViewBuilder title: () -> Title, @ToolbarSlotBuilder tools: () -> [ToolbarSlot]
+  ) -> some View {
+    modifier(PageToolbar(windowTitle: windowTitle, title: title(), tools: tools()))
+  }
+}
+
+private struct PageToolbar<Title: View>: ViewModifier {
+  let windowTitle: String
+  let title: Title
+  let tools: [ToolbarSlot]
+  @Environment(\.hidesPageToolbar) private var hides
+
+  func body(content: Content) -> some View {
+    if hides {
+      content
+    } else {
+      content.pageToolbar(windowTitle, title: { title }) { tools }
+    }
+  }
+}
+
 /// The page's main area and, beside it, the selected thing's inspector. On iPhone there's no room beside it: the
 /// page pushes the inspector instead.
 struct PageWithInspector<Main: View, Inspector: View>: View {
@@ -115,7 +152,7 @@ struct KeyValueLine: View {
     HStack {
       Text(key).kitFont(.caption)
       Spacer(minLength: 8)
-      Text(value).font(mono ? .system(size: 11, design: .monospaced) : .system(size: 11)).foregroundStyle(.kitLabel)
+      Text(value).kitFont(mono ? .monoSmall : .caption).foregroundStyle(.kitLabel)
         .lineLimit(1).truncationMode(.middle).textSelection(.enabled)
     }
   }

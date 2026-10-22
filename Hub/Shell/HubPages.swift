@@ -123,7 +123,7 @@ struct AppsPage: View {
       .padding(KitMetrics.gutter)
     }
     .kitPane(.content)
-    .kitToolbar("Apps", meta: PageMeta.parts(hub, [apps.count == 1 ? "1 app" : "\(apps.count) apps"]), systemImage: HubPage.apps.systemImage, hue: .purple) { }
+    .pageToolbar("Apps", meta: PageMeta.parts(hub, [apps.count == 1 ? "1 app" : "\(apps.count) apps"]), systemImage: HubPage.apps.systemImage, hue: .purple) { }
   }
 }
 
@@ -131,7 +131,7 @@ struct NetworkPage: View {
   @Environment(Hub.self) private var hub
   var body: some View {
     HubNetworkView().kitPane(.content)
-      .kitToolbar("Hub Network", meta: PageMeta.parts(hub, []), systemImage: "globe", hue: .teal) { }
+      .pageToolbar("Hub Network", meta: PageMeta.parts(hub, []), systemImage: "globe", hue: .teal) { }
   }
 }
 
@@ -156,7 +156,7 @@ struct ServiceAppPage: View {
       }
       .hubCardStyle { $0.kitSurface(.card) }
       .kitPane(.content)
-      .kitToolbar(app.name, meta: PageMeta.parts(hub, [app.isOnline ? "" : "Offline"]), systemImage: app.icon ?? "app", hue: StableHue.pick(app.name)) { }
+      .pageToolbar(app.name, meta: PageMeta.parts(hub, [app.isOnline ? "" : "Offline"]), systemImage: app.icon ?? "app", hue: StableHue.pick(app.name)) { }
     } else {
       EmptyState(systemImage: "app.dashed", title: "Loading the App…", status: .working)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -184,7 +184,7 @@ struct HubPagesList: View {
       .padding(.bottom, 24)
     }
     .kitPane(.content)
-    .kitToolbar(hub.settings.name, title: {
+    .pageToolbar(hub.settings.name, title: {
       RichHeader(Text(hub.settings.name), size: .title) {
         HubTile(hub: hub, size: 28)
       } meta: {

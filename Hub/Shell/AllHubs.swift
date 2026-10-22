@@ -276,7 +276,7 @@ struct HubTileLabelStyle: LabelStyle {
           }
         }
       configuration.title
-        .font(.system(size: 11)).lineLimit(1).truncationMode(.tail)
+        .kitFont(.caption).lineLimit(1).truncationMode(.tail)
         .foregroundStyle(.kitLabel)
     }
     .frame(maxWidth: .infinity)
@@ -367,7 +367,7 @@ private struct LauncherStrip: View {
               Text(app.id).kitFont(.caption).fontWeight(.semibold).lineLimit(1)
               if app.updateAvailable { Chip("Update", hue: .red, style: .solid).controlSize(.small) }
             }
-            Text(app.statusLine(status)).font(.system(size: 10)).foregroundStyle(.kitSecondary).lineLimit(1)
+            Text(app.statusLine(status)).kitFont(.caption).foregroundStyle(.kitSecondary).lineLimit(1)
               .monospacedDigit()
           }
           Spacer(minLength: 0)

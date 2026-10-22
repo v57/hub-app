@@ -73,7 +73,10 @@ struct HubApp: App {
 #endif
   }
   @ViewBuilder private var root: some View {
-#if canImport(ComponentKit)
+#if canImport(ComponentKit) && os(tvOS)
+    TVRootView()
+      .componentKit(accent: .hubAccent)
+#elseif canImport(ComponentKit)
     RootView()
       .kitToasts()
       .componentKit(accent: .hubAccent)

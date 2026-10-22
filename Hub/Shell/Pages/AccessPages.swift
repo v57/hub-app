@@ -84,7 +84,7 @@ struct ConnectionsPage: View {
         ConnectionInspector(user: user)
       }
     }
-    .kitToolbar("Connections", meta: PageMeta.parts(hub, ["\(users.filter { $0.key != nil }.count) connected", pending.list.isEmpty ? "" : "\(pending.list.count) requests"]), systemImage: HubPage.connections.systemImage, hue: .teal) {
+    .pageToolbar("Connections", meta: PageMeta.parts(hub, ["\(users.filter { $0.key != nil }.count) connected", pending.list.isEmpty ? "" : "\(pending.list.count) requests"]), systemImage: HubPage.connections.systemImage, hue: .teal) {
       if idiom != .phone {
         ListStyleSwitch(style: $style)
       }
@@ -101,7 +101,7 @@ struct ConnectionsPage: View {
       if let user = users.first(where: { $0.id == id }) {
         ScrollView { ConnectionInspector(user: user).padding(KitMetrics.gutter) }
           .kitPane(.content)
-          .kitToolbar(user.name, meta: [user.group?.capitalized ?? "No group"], systemImage: user.icon.symbol?.name ?? "hexagon", hue: .gray) { }
+          .pageToolbar(user.name, meta: [user.group?.capitalized ?? "No group"], systemImage: user.icon.symbol?.name ?? "hexagon", hue: .gray) { }
           .hub(hub)
       }
     }
@@ -148,7 +148,7 @@ private struct ConnectionCard: View {
         RichHeader(Text(user.name.isEmpty ? "Unauthorized" : user.name)) {
           Tile(systemImage: user.icon.symbol?.name ?? "hexagon", hue: .gray, size: 24)
         } meta: {
-          Text(user.key.map { "…" + $0.suffix(8) } ?? "no key").font(.system(size: 11, design: .monospaced)).foregroundStyle(.kitSecondary)
+          Text(user.key.map { "…" + $0.suffix(8) } ?? "no key").kitFont(.monoSmall).foregroundStyle(.kitSecondary)
         } accessory: {
           HStack(spacing: 5) {
             if isTrusted { Image(systemName: "checkmark.shield").font(.system(size: 11)).foregroundStyle(Hue.red.text) }
@@ -330,7 +330,7 @@ struct RequestsPage: View {
         }
       }
     }
-    .kitToolbar("Requests", meta: PageMeta.parts(hub, ["\(pending.list.count + devices.count) waiting", "services that want to post APIs"]), systemImage: HubPage.requests.systemImage, hue: .orange) { }
+    .pageToolbar("Requests", meta: PageMeta.parts(hub, ["\(pending.list.count + devices.count) waiting", "services that want to post APIs"]), systemImage: HubPage.requests.systemImage, hue: .orange) { }
   }
 
   private var selected: PendingList.Item? {
@@ -405,7 +405,7 @@ struct LockdownPage: View {
       guard isOn != whitelist.enabled else { return }
       Task { try? await hub.lockdown(SetLockdown(enabled: isOn)) }
     }
-    .kitToolbar("Lockdown", meta: PageMeta.parts(hub, [whitelist.enabled ? "On" : "Off", "\(trusted.count) of \(keyed.count) trusted"]), systemImage: HubPage.lockdown.systemImage, hue: .blue) {
+    .pageToolbar("Lockdown", meta: PageMeta.parts(hub, [whitelist.enabled ? "On" : "Off", "\(trusted.count) of \(keyed.count) trusted"]), systemImage: HubPage.lockdown.systemImage, hue: .blue) {
       if idiom != .phone {
         KitSearchField(text: $search, prompt: "Name or key").frame(width: 180)
       }
@@ -502,7 +502,7 @@ struct PermissionsPage: View {
         GroupInspector(group: group, edits: $edits)
       }
     }
-    .kitToolbar("Permissions", meta: PageMeta.parts(hub, [
+    .pageToolbar("Permissions", meta: PageMeta.parts(hub, [
       groups.groups.count == 1 ? "1 group" : "\(groups.groups.count) groups",
       "\(permissions.sections.reduce(0) { $0 + $1.permissions.count }) permissions",
       edits.isEmpty ? "" : "\(edits.count) unsaved",
@@ -596,7 +596,7 @@ struct PermissionsPage: View {
     let path = section.path(of: permission)
     return GridRow {
       Text(permission).padding(.leading, 22).frame(width: 200, alignment: .leading).lineLimit(1)
-      Text(path).font(.system(size: 11, design: .monospaced)).foregroundStyle(.kitTertiary).frame(width: 220, alignment: .leading).lineLimit(1)
+      Text(path).kitFont(.monoSmall).foregroundStyle(.kitTertiary).frame(width: 220, alignment: .leading).lineLimit(1)
       ForEach(groups.groups) { group in
         let isOn = granted(group).contains(path)
         check(isOn ? .on : .off) {
