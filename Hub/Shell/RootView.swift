@@ -67,6 +67,21 @@ struct RootView: View {
       Hubs.main.remove(with: hub.settings)
     }
     .onChange(of: navigator.route) { _, _ in compactColumn = .detail }
+    .onChange(of: NetworkInvitationRouter.main.pendingInput) { _, input in
+      if !input.isEmpty { shell.sheet = .joinNetwork }
+    }
+#if DEBUG
+    // `--connect ws://127.0.0.1:2097 --code ABC-123`: pairs with a hub at launch, for checks against a real hub
+    .task {
+      let arguments = CommandLine.arguments
+      guard let index = arguments.firstIndex(of: "--connect"), index + 1 < arguments.count,
+            let url = URL(hubAddress: arguments[index + 1]) else { return }
+      let code = arguments.firstIndex(of: "--code").flatMap { $0 + 1 < arguments.count ? arguments[$0 + 1] : nil } ?? ""
+      if let hub = await Hubs.main.connect(.init(name: url.name ?? url.absoluteString, address: url), code: code, named: false, pairing: HubPairing()) {
+        navigator.open(hub)
+      }
+    }
+#endif
   }
 }
 

@@ -121,6 +121,39 @@ struct KeyValueLine: View {
   }
 }
 
+/// Views in lines that wrap at the container's width: chips, tokens
+struct FlowLayout: Layout {
+  var spacing: CGFloat = 4
+
+  func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+    let frames = frames(width: proposal.width ?? .infinity, subviews: subviews)
+    return CGSize(width: proposal.width ?? frames.map(\.maxX).max() ?? 0, height: frames.map(\.maxY).max() ?? 0)
+  }
+
+  func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+    for (frame, subview) in zip(frames(width: bounds.width, subviews: subviews), subviews) {
+      subview.place(at: CGPoint(x: bounds.minX + frame.minX, y: bounds.minY + frame.minY), proposal: ProposedViewSize(frame.size))
+    }
+  }
+
+  private func frames(width: CGFloat, subviews: Subviews) -> [CGRect] {
+    var frames = [CGRect]()
+    var x: CGFloat = 0, y: CGFloat = 0, line: CGFloat = 0
+    for subview in subviews {
+      let size = subview.sizeThatFits(.unspecified)
+      if x > 0 && x + size.width > width {
+        x = 0
+        y += line + spacing
+        line = 0
+      }
+      frames.append(CGRect(origin: CGPoint(x: x, y: y), size: size))
+      x += size.width + spacing
+      line = max(line, size.height)
+    }
+    return frames
+  }
+}
+
 /// Grid, list or nothing yet: a page's first load draws quiet placeholder cards, then its content
 struct LoadingCards: View {
   var count = 3

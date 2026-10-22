@@ -53,7 +53,7 @@ struct ConnectionsPage: View {
           ForEach(sections, id: \.name) { section in
             GroupHeader(name: section.name, count: section.users.count, permissions: groups.groups.first { $0.name == section.name }?.permissions.count)
             if style == .grid || idiom == .phone {
-              LazyVGrid(columns: [GridItem(.adaptive(minimum: idiom == .phone ? 150 : 180), spacing: KitMetrics.gutter)], spacing: KitMetrics.gutter) {
+              LazyVGrid(columns: [GridItem(.adaptive(minimum: idiom == .phone ? 150 : 180), spacing: KitMetrics.gutter, alignment: .top)], spacing: KitMetrics.gutter) {
                 ForEach(section.users) { user in
                   ConnectionCard(user: user, isMe: user.key == hub.key, isTrusted: user.key.map(whitelist.users.contains) ?? false, isSelected: selection == user.id) {
                     select(user.id)
@@ -291,7 +291,7 @@ struct RequestsPage: View {
             )
             .padding(.top, 80)
           }
-          LazyVGrid(columns: [GridItem(.adaptive(minimum: idiom == .phone ? 280 : 300), spacing: KitMetrics.gutter)], spacing: KitMetrics.gutter) {
+          LazyVGrid(columns: [GridItem(.adaptive(minimum: idiom == .phone ? 280 : 300), spacing: KitMetrics.gutter, alignment: .top)], spacing: KitMetrics.gutter) {
             ForEach(pending.list) { item in
               GridCard(isSelected: selection == item.id, action: { withAnimation(.kit) { selection = selection == item.id ? nil : item.id } }) {
                 VStack(alignment: .leading, spacing: 8) {
@@ -342,7 +342,7 @@ struct RequestsPage: View {
 struct ChipFlow: View {
   let items: [String]
   var body: some View {
-    LazyVGrid(columns: [GridItem(.adaptive(minimum: 90), spacing: 4, alignment: .leading)], alignment: .leading, spacing: 4) {
+    FlowLayout(spacing: 4) {
       ForEach(items, id: \.self) { item in
         Chip(Text(item).monospaced(), hue: .orange).controlSize(.small)
       }
@@ -420,7 +420,7 @@ struct LockdownPage: View {
         Text(MetaLine.join(["\(users.count)", meta])).kitFont(.caption)
       }
       .padding(.horizontal, 4).padding(.top, 4)
-      LazyVGrid(columns: [GridItem(.adaptive(minimum: idiom == .phone ? 280 : 260), spacing: KitMetrics.gutter)], spacing: KitMetrics.gutter) {
+      LazyVGrid(columns: [GridItem(.adaptive(minimum: idiom == .phone ? 280 : 260), spacing: KitMetrics.gutter, alignment: .top)], spacing: KitMetrics.gutter) {
         ForEach(users) { user in
           GridCard {
             VStack(alignment: .leading, spacing: 6) {
@@ -474,6 +474,19 @@ struct PermissionsPage: View {
   var body: some View {
     PageWithInspector(name: "permissions", showsInspector: selectedGroup != nil) {
       ScrollView([.vertical, .horizontal]) {
+        if groups.groups.isEmpty && !permissions.sections.isEmpty {
+          Banner(
+            "No permission groups yet",
+            message: "A group gives its connections the permissions you tick. Owners always have every permission.",
+            systemImage: "person.2", hue: .purple
+          ) {
+            if canEdit {
+              Button("New Group…") { isAdding = true }.buttonStyle(.kitPrimary)
+            }
+          }
+          .frame(maxWidth: 720)
+          .padding([.horizontal, .top], KitMetrics.gutter)
+        }
         Grid(alignment: .leading, horizontalSpacing: 0, verticalSpacing: 2) {
           headerRow
           ForEach(permissions.sections) { section in

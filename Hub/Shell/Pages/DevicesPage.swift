@@ -63,7 +63,7 @@ struct DevicesPage: View {
           .frame(maxHeight: .infinity)
         } else if style == .grid || idiom == .phone {
           ScrollView {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: idiom == .phone ? 150 : 232), spacing: KitMetrics.gutter)], spacing: KitMetrics.gutter) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: idiom == .phone ? 150 : 232), spacing: KitMetrics.gutter, alignment: .top)], spacing: KitMetrics.gutter) {
               ForEach(shown) { device in
                 DeviceCard(device: device, isSelected: selection == device.id) {
                   select(device.id)

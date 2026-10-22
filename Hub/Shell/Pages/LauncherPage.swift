@@ -36,7 +36,7 @@ struct LauncherPage: View {
               .padding(.top, 60)
             }
           } else if style == .grid || idiom == .phone {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: idiom == .phone ? 150 : 240), spacing: KitMetrics.gutter)], spacing: KitMetrics.gutter) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: idiom == .phone ? 150 : 240), spacing: KitMetrics.gutter, alignment: .top)], spacing: KitMetrics.gutter) {
               ForEach(info.apps) { app in
                 LauncherCard(app: app, status: statuses.apps[app.name], isSelected: selection == app.id) { select(app.id) }
               }
