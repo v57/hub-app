@@ -77,7 +77,7 @@ private struct HubsSection: View {
     let shown = sorted.filter { !$0.reach.isHidden || showsAll || !search.isEmpty }
     let hidden = sorted.count - sorted.filter { !$0.reach.isHidden }.count
     KitSection(
-      "Hubs", meta: ["\(shown.count) of \(hubs.list.count)", navigator.sort.title], systemImage: "hexagon"
+      "Hubs", meta: hubs.list.isEmpty ? ["None yet"] : ["\(shown.count) of \(hubs.list.count)", navigator.sort.title], systemImage: "hexagon"
     ) {
       SidebarRow(value: Route.allHubs, "All Hubs") {
         Tile(systemImage: "square.grid.2x2.fill", hue: .accent, style: .solid)

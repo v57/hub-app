@@ -20,20 +20,27 @@ struct AllHubsView: View {
   @Environment(\.kitIdiom) private var idiom
 
   var body: some View {
+    if hubs.list.isEmpty {
+      // Nothing set up yet: the welcome is the main screen
+      HubWelcome()
+        .kitPane(.content)
+        .kitToolbar("Hub", meta: [], systemImage: "hexagon") { }
+    } else {
+      grid
+    }
+  }
+
+  private var grid: some View {
     let listed = navigator.sorted(hubs.list).sorted { ($0.reach.isHidden ? 1 : 0) < ($1.reach.isHidden ? 1 : 0) }
-    ScrollView {
-      if hubs.list.isEmpty {
-        NoHubsYet().padding(.top, 80)
-      } else {
-        KitPackedGrid(unit: idiom == .phone ? 280 : 320) {
-          ForEach(listed) { hub in
-            HubCard(hub: hub, search: search).hub(hub)
-          }
+    return ScrollView {
+      KitPackedGrid(unit: idiom == .phone ? 280 : 320) {
+        ForEach(listed) { hub in
+          HubCard(hub: hub, search: search).hub(hub)
         }
-        .padding(KitMetrics.gutter)
-        .padding(.bottom, 24)
-        .animation(.kit, value: hubs.list.map(\.reach))
       }
+      .padding(KitMetrics.gutter)
+      .padding(.bottom, 24)
+      .animation(.kit, value: hubs.list.map(\.reach))
     }
     .kitPane(.content)
     .kitToolbar("All Hubs", meta: meta, systemImage: "square.grid.2x2.fill") {
@@ -57,17 +64,36 @@ struct AllHubsView: View {
   }
 }
 
-/// Before the first hub: what a hub is and the two ways to one
-private struct NoHubsYet: View {
+/// Hub's welcome, the main screen until a hub is set up: connect to one, join with an invitation, or run one here,
+/// with the hubs this app knows as its list
+struct HubWelcome: View {
+  @State private var hubs = Hubs.main
   @Environment(ShellModel.self) private var shell
+
   var body: some View {
-    EmptyState(
-      systemImage: "hexagon", title: "No Hubs Yet",
-      message: "A hub connects your devices and the services they run. Connect to one with its address and pairing code, or run one on this \(KitDevice.name)."
+    KitWelcome(
+      emptyTitle: "No Hub Yet",
+      emptyMessage: "Hub connects to hubs you run: hub-server on a Mac, a home server or a VPS, or this \(KitDevice.name) itself. Nothing is contacted until you connect."
     ) {
-      Button("Run a Hub Here") { Navigator.main.route = .device(.localHub) }.buttonStyle(.kit)
-      Button("Connect…") { shell.sheet = .connect }.buttonStyle(.kitPrimary)
+      WelcomeAction("Connect to a Hub…", detail: "Its address, and the pairing code of a new hub", systemImage: "plus") {
+        shell.sheet = .connect
+      }
+      WelcomeAction("Join with an Invitation…", detail: "A Hub Network invite code", systemImage: "link") {
+        shell.sheet = .joinNetwork
+      }
+#if canImport(HubServer)
+      WelcomeAction("Run a Hub on This \(KitDevice.name)", detail: "This app is the hub; your devices pair with it", systemImage: "server.rack") {
+        Navigator.main.route = .device(.localHub)
+      }
+#endif
+    } recents: {
+      ForEach(hubs.list) { hub in
+        RecentItem(hub.settings.name, subtitle: hub.settings.address.absoluteString, systemImage: "hexagon") {
+          Navigator.main.open(hub)
+        }
+      }
     }
+    .listTitle("Your Hubs")
   }
 }
 

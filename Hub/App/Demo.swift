@@ -15,7 +15,9 @@ enum HubDemo {
   static let isOn = ProcessInfo.processInfo.arguments.contains("--demo")
 
   static func hubs() -> [Hub] {
-    [
+    // `--demo --empty`: no hubs yet, the welcome
+    guard !ProcessInfo.processInfo.arguments.contains("--empty") else { return [] }
+    return [
       hub("Home", services: 102, role: "owners", host: "studio-mac.local", security: 2, apps: [
         app("Pulse", "waveform.path.ecg", widget: ["2x1", "1x1"]), app("Weather", "cloud.sun"), app("Tasks", "checklist"),
         app("Monitor", nil), app("Fleet Control", "point.3.connected.trianglepath.dotted"), app("Pulse Admin", nil, web: true),

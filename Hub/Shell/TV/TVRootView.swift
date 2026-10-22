@@ -46,6 +46,8 @@ struct TVRootView: View {
           Spacer(minLength: 0)
         }
         switch tab {
+        case .allHubs where hubs.list.isEmpty:
+          HubWelcome()
         case .allHubs:
           TVAllHubs { hub, page in open(hub, page) }
         case .hub(let id):
@@ -66,6 +68,12 @@ struct TVRootView: View {
       }
     }
     .environment(shell)
+    .kitSheet(item: $shell.sheet) { sheet in
+      switch sheet {
+      case .connect: ConnectSheet()
+      case .joinNetwork: JoinNetworkSheet()
+      }
+    }
 #if DEBUG
     // `--open Home/devices`: that hub's tab on that page, for captures
     .onAppear {

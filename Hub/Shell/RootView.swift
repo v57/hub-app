@@ -71,14 +71,18 @@ struct RootView: View {
     .onChange(of: NetworkInvitationRouter.main.pendingInput) { _, input in
       if !input.isEmpty { shell.sheet = .joinNetwork }
     }
-#if DEBUG
-    // `--open` on iPhone: the page, not the root list; `--sheet connect|join`: that sheet at launch
     .onAppear {
+      // iPhone: until a hub is set up, the welcome is the first screen
+      if Hubs.main.list.isEmpty { compactColumn = .detail }
+#if DEBUG
+      // `--open` on iPhone: the page, not the root list; `--sheet connect|join`: that sheet at launch
       if CommandLine.arguments.contains("--open") && navigator.route != .allHubs { compactColumn = .detail }
       if let index = CommandLine.arguments.firstIndex(of: "--sheet"), index + 1 < CommandLine.arguments.count {
         shell.sheet = CommandLine.arguments[index + 1] == "join" ? .joinNetwork : .connect
       }
+#endif
     }
+#if DEBUG
     // `--connect ws://127.0.0.1:2097 --code ABC-123`: pairs with a hub at launch, for checks against a real hub
     .task {
       let arguments = CommandLine.arguments
