@@ -20,6 +20,7 @@ struct OverviewPage: View {
   @State private var homeApps = HomeApps.main
   @State private var rates = RequestRates()
   @State private var showsMenu = false
+  @State private var width: CGFloat = 1000
   @Environment(\.kitIdiom) private var idiom
 
   var body: some View {
@@ -44,6 +45,7 @@ struct OverviewPage: View {
       }
       .padding(KitMetrics.gutter)
       .padding(.bottom, 24)
+      .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
     }
     .kitPane(.content)
     .onChange(of: status.requests, initial: true) { _, requests in rates.add(requests) }
@@ -71,7 +73,7 @@ struct OverviewPage: View {
     let online = status.services.filter { $0.services > 0 }.count
     let waiting = hostPending.list.reduce(0) { $0 + $1.pending.count }
     let devices = facts.devices.filter { $0.approved && !$0.revoked }
-    return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: KitMetrics.gutter), count: idiom == .phone ? 2 : 4), spacing: KitMetrics.gutter) {
+    return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: KitMetrics.gutter), count: width < 640 ? 2 : 4), spacing: KitMetrics.gutter) {
       KitStatCard(
         "APIs", value: "\(status.services.count)", systemImage: "hexagon", hue: .blue,
         detail: MetaLine.join(["\(online) online", waiting > 0 ? "\(waiting) waiting" : ""])
@@ -101,6 +103,7 @@ struct OverviewPage: View {
 struct NeedsYouBanner: View {
   let updates: [Hub.Launcher.AppInfo]
   @Environment(Hub.self) private var hub
+  @Environment(\.kitIdiom) private var idiom
   var facts = HubFacts()
   @HubState(\.hostPending) private var hostPending
 
@@ -108,13 +111,17 @@ struct NeedsYouBanner: View {
     let requests = facts.requests
     if requests > 0 || !updates.isEmpty {
       Banner(title, message: message, systemImage: "clock", hue: .orange) {
-        if updates.count == 1, let app = updates.first {
-          AsyncButton("Update \(app.id)") { try await hub.client.send("launcher/app/update", app.id) }
+        if idiom == .phone {
+          // No room for two buttons: Review opens what waits first
+          Button("Review") { Navigator.main.open(hub, requests > 0 ? (facts.pendingDevices.isEmpty ? .requests : .devices) : .launcher) }
+            .buttonStyle(.kitPrimary)
+        } else if updates.count == 1, let app = updates.first {
+          AsyncButton(idiom == .mac ? "Update \(app.id)" : "Update") { try await hub.client.send("launcher/app/update", app.id) }
             .buttonStyle(.kit)
         } else if updates.count > 1 {
           AsyncButton("Update All") { try await hub.launcher.updateAll() }.buttonStyle(.kit)
         }
-        if requests > 0 {
+        if requests > 0 && idiom != .phone {
           Button("Review Requests") {
             Navigator.main.open(hub, facts.pendingDevices.isEmpty ? .requests : .devices)
           }

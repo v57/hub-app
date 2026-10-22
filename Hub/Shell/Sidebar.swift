@@ -180,7 +180,7 @@ private struct HubSwitcherMenu: View {
     Divider()
     ForEach(sorted.filter { !$0.reach.isHidden }) { hub in
       Toggle(isOn: Binding { navigator.route?.hubID == hub.id } set: { _ in navigator.open(hub) }) {
-        Label(hub.settings.name, systemImage: "hexagon")
+        Label { Text(hub.settings.name) } icon: { HubTile(hub: hub, size: 22) }
       }
     }
     if !hidden.isEmpty {
@@ -213,6 +213,16 @@ struct OpenHubSections: View {
 
   var body: some View {
     let pages = HubPage.allCases.filter { hub.canOpen($0) }
+    if open != nil {
+      // iPhone's list of a hub's pages: the toolbar already names the hub
+      VStack(spacing: 2) {
+        ForEach(pages.filter { $0.group == .hub }, id: \.self) { page in
+          row(page)
+        }
+      }
+      .padding(KitMetrics.cardPadding)
+      .kitSurface(.card)
+    } else {
     KitSection(Text(hub.settings.name)) {
       ForEach(pages.filter { $0.group == .hub }, id: \.self) { page in
         row(page)
@@ -233,6 +243,7 @@ struct OpenHubSections: View {
       }
     }
     .kitSticky(top: .none, bottom: sticky(.hub))
+    }
     let access = pages.filter { $0.group == .access }
     if !access.isEmpty {
       KitSection("Access", meta: accessMeta, systemImage: "shield", hue: .orange) {

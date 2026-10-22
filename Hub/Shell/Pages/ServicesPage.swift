@@ -125,7 +125,10 @@ struct ServicesPage: View {
                     SidebarRow(row.name, subtitle: "\(row.service?.requests ?? 0) requests") {
                       EmptyView()
                     } trailing: {
-                      Chip(row.statusWord, hue: row.statusHue).controlSize(.small)
+                      HStack(spacing: 8) {
+                        Chip(row.statusWord, hue: row.statusHue).controlSize(.small)
+                        Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold)).foregroundStyle(.kitTertiary)
+                      }
                     }
                     .title(Text(row.name).monospaced())
                     .action { pushed = row.id }
@@ -152,14 +155,7 @@ struct ServicesPage: View {
         APIInspector(row: row)
       }
     }
-    .kitStatusBar {
-      if idiom != .phone {
-        HStack(spacing: 6) {
-          StatusDot(hue: hub.isConnected ? .green : .gray)
-          Text(MetaLine.join(["Connected to \(hub.settings.address.absoluteString)", "your key …\(hub.key.suffix(8))"]))
-        }
-      }
-    }
+    .modifier(ConnectionStatusBar(isShown: idiom != .phone))
     .kitToolbar("Services", meta: meta, systemImage: HubPage.services.systemImage, hue: .blue) {
       if idiom != .phone {
         KitSearchField(text: $search, prompt: "Path or provider").frame(width: 200)
@@ -222,6 +218,24 @@ struct ServicesPage: View {
         }
       }),
     ]
+  }
+}
+
+/// The hub's address and this app's key under the table (Mac and iPad)
+private struct ConnectionStatusBar: ViewModifier {
+  let isShown: Bool
+  @Environment(Hub.self) private var hub
+  func body(content: Content) -> some View {
+    if isShown {
+      content.kitStatusBar {
+        HStack(spacing: 6) {
+          StatusDot(hue: hub.isConnected ? .green : .gray)
+          Text(MetaLine.join(["Connected to \(hub.settings.address.absoluteString)", "your key …\(hub.key.suffix(8))"]))
+        }
+      }
+    } else {
+      content
+    }
   }
 }
 

@@ -71,6 +71,8 @@ struct RootView: View {
       if !input.isEmpty { shell.sheet = .joinNetwork }
     }
 #if DEBUG
+    // `--open` on iPhone: the page, not the root list
+    .onAppear { if CommandLine.arguments.contains("--open") && navigator.route != .allHubs { compactColumn = .detail } }
     // `--connect ws://127.0.0.1:2097 --code ABC-123`: pairs with a hub at launch, for checks against a real hub
     .task {
       let arguments = CommandLine.arguments

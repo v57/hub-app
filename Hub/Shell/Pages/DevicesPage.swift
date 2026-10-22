@@ -200,6 +200,23 @@ struct DeviceCard: View {
 
   var body: some View {
     GridCard(isSelected: isSelected, action: action) {
+      if idiom == .phone {
+        // iPhone: two across, the tile over the name
+        VStack(alignment: .leading, spacing: 6) {
+          HStack(alignment: .top) {
+            Tile(systemImage: Device.symbol(platform: device.platform), hue: device.online ? .blue : .gray, size: 30)
+            Spacer()
+            if let battery = data?.battery {
+              Text("\(Int(battery * 100))%").kitFont(.caption)
+            }
+            StatusDot(hue: device.online ? .green : .gray, isHollow: !device.online)
+          }
+          Text(device.name).kitFont(.headline).lineLimit(1)
+          Text(MetaLine.join(device.cardLine(isThisDevice: device.key == hub.client.device?.key.publicKey, compact: true)))
+            .kitFont(.caption).lineLimit(1)
+        }
+        .padding(6)
+      } else {
       VStack(alignment: .leading, spacing: 8) {
         RichHeader(Text(device.name)) {
           Tile(systemImage: Device.symbol(platform: device.platform), hue: device.online ? .blue : .gray, size: idiom == .phone ? 30 : 24)
@@ -230,6 +247,7 @@ struct DeviceCard: View {
           KeyValueLine(key: "Hub Network", value: device.overlay?.address ?? "–", mono: true)
             .padding(.horizontal, 6)
         }
+      }
       }
     }
     .task(id: device.online) {
