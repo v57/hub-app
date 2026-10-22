@@ -241,3 +241,15 @@ extension Color {
       .buttonStyle(TabButtonStyle(selected: true))
   }.frame(maxWidth: .infinity, maxHeight: .infinity).test()
 }
+
+extension View {
+  /// A service page's actions (Export, Refresh) in a strip above it, which also shows inside a kit sheet, where a
+  /// toolbar doesn't
+  func serviceActions<Actions: View>(@ViewBuilder _ actions: () -> Actions) -> some View {
+    safeAreaInset(edge: .top, alignment: .trailing) {
+      HStack { actions() }
+        .buttonStyle(.bordered)
+        .padding(8)
+    }
+  }
+}

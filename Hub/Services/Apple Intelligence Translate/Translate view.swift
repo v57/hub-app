@@ -43,7 +43,7 @@ struct TranslateView: View {
           }
         }
       }.animation(.smooth, value: task.text.isEmpty)
-    }.toolbar {
+    }.serviceActions {
       Button("Refresh", systemImage: "arrow.clockwise") {
         Task {
           isRefreshing = true

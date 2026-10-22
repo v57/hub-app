@@ -66,7 +66,7 @@ struct ImageEncoderView: View {
       ForEach(operations) { file in
         TableRow(file).draggable(ImageTransfer(file: file))
       }
-    }.toolbar {
+    }.serviceActions {
       if !result.isEmpty {
         ShareLink(items: result) { item in
           SharePreview(item.name, image: item)

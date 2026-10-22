@@ -66,7 +66,7 @@ struct VideoEncoderView: View {
     }.animation(.smooth, value: operations.isEmpty).dropFiles { (files: [URL], point: CGPoint) -> Bool in
       add(files: files)
       return true
-    }.toolbar {
+    }.serviceActions {
       if !result.isEmpty {
         ShareLink(items: result) {
           Label("Export", systemImage: "square.and.arrow.up")
