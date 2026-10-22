@@ -364,7 +364,8 @@ private struct ThisDeviceSection: View {
       }
 #endif
       SidebarRow(value: Route.device(.sharedServices), "Shared Services", systemImage: "square.and.arrow.up") {
-        Count(AppServices.Service.allCases.count)
+        let shared = AppServices.Service.sharedCount
+        if shared > 0 { Count(shared) }
       }
 #if !os(visionOS)
       SidebarRow(value: Route.device(.farm), "Farm", systemImage: "tree") {

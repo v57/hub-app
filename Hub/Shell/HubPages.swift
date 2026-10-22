@@ -161,39 +161,6 @@ struct ServiceAppPage: View {
   }
 }
 
-/// This device's own pages
-struct DevicePageView: View {
-  let page: DevicePage
-  var body: some View {
-    switch page {
-    case .localHub:
-#if canImport(HubServer)
-      NavigationStack { LocalHubView() }.kitPane(.content)
-        .kitToolbar("Run a Hub", meta: ["on this \(KitDevice.name)"], systemImage: "server.rack", hue: .gray) { }
-#else
-      EmptyState(systemImage: "server.rack", title: "Not on This Device")
-#endif
-    case .sharedServices:
-      ScrollView {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 120))]) {
-          ForEach(AppServices.Service.allCases, id: \.self) { item in
-            HomeView.ServiceContent(item: item)
-          }
-        }
-        .labelStyle(.appIcon).buttonStyle(.environment).padding()
-      }
-      .kitPane(.content)
-      .kitToolbar("Shared Services", meta: ["what this \(KitDevice.name) serves to hubs"], systemImage: "square.and.arrow.up", hue: .gray) { }
-    case .farm:
-#if !os(visionOS)
-      NavigationStack { FarmView() }.kitPane(.content)
-        .kitToolbar("Farm", meta: [], systemImage: "tree", hue: .green) { }
-#else
-      EmptyState(systemImage: "tree", title: "Not on This Device")
-#endif
-    }
-  }
-}
 #endif
 
 #if canImport(ComponentKit)
