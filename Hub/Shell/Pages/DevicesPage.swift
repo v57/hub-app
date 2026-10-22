@@ -393,12 +393,8 @@ struct DeviceInspector: View {
     ) {
       Task { try? await hub.client.devices.revoke(device.id) }
     }
-    .alert("Rename Device", isPresented: $isRenaming) {
-      TextField("Name", text: $name)
-      Button("Cancel", role: .cancel) { }
-      Button("Rename") {
-        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty else { return }
+    .kitSheet(isPresented: $isRenaming) {
+      NameSheet(title: "Rename \(device.name)", systemImage: Device.symbol(platform: device.platform), hue: .blue, confirm: "Rename", name: device.name) { name in
         Task { _ = try? await hub.client.devices.rename(device.id, to: name) }
       }
     }

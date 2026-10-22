@@ -84,11 +84,16 @@ struct LauncherPage: View {
         }
       }
     }
-    .sheet(isPresented: $creating) {
-      NewAppSheet().hub(hub).componentKit(accent: .hubAccent)
+    .kitSheet(isPresented: $creating) {
+      NewAppSheet()
     }
-    .sheet(isPresented: $showsStore) {
-      NavigationStack { StoreView() }.hub(hub).frame(minWidth: 560, minHeight: 480).componentKit(accent: .hubAccent)
+    .kitSheet(isPresented: $showsStore) {
+      KitSheet(title: "Get More", meta: "Apps hub-launcher can install", systemImage: "bag", hue: .gray, width: 720) {
+        StoreView().frame(minHeight: 420)
+      } footer: {
+        Spacer()
+        Button("Done") { showsStore = false }.buttonStyle(.kitPrimary).keyboardShortcut(.defaultAction)
+      }
     }
     .navigationDestination(item: $pushed) { id in
       if let app = info.apps.first(where: { $0.id == id }) {
@@ -285,7 +290,7 @@ private struct LauncherInspector: View {
 struct NewAppSheet: View {
   enum Kind: String, CaseIterable, Hashable { case shell, bun }
   @Environment(Hub.self) private var hub
-  @Environment(\.dismiss) private var dismiss
+  @Environment(\.kitDismiss) private var dismiss
   @State private var kind = Kind.bun
   @State private var name = ""
   @State private var repo = ""

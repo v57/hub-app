@@ -1,7 +1,5 @@
 import SwiftUI
-#if canImport(ComponentKit)
 import ComponentKit
-#endif
 import HubUI
 import HubService
 
@@ -131,15 +129,15 @@ struct HubNetworkView: View {
     .toolbarTitleDisplayMode(.inline)
     .animation(.home, value: hub.net.isJoined)
     .animation(.home, value: membershipBusy)
-    .sheet(item: $invitation) { invitation in
+    .kitSheet(item: $invitation) { invitation in
       NetworkInvitationSheet(link: invitation.link)
     }
-    .confirmationDialog("Leave Hub Network?", isPresented: $confirmsLeaving, titleVisibility: .visible) {
-      Button("Leave", role: .destructive) {
-        Task { await updateMembership(false) }
-      }
-    } message: {
-      Text("This device stops sharing its ports and internet, and your other devices can't reach it until it joins again.")
+    .kitConfirmation(
+      "Leave Hub Network?", isPresented: $confirmsLeaving,
+      message: "This device stops sharing its ports and internet, and your other devices can't reach it until it joins again.",
+      systemImage: "network.slash", confirm: "Leave"
+    ) {
+      Task { await updateMembership(false) }
     }
     .task {
       await hub.net.restoreIfActive()
@@ -720,11 +718,7 @@ private struct NetworkCard<Content: View>: View {
     }
     .padding(14)
     .frame(maxWidth: .infinity, alignment: .leading)
-#if canImport(ComponentKit)
     .kitSurface(.card)
-#else
-    .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 16))
-#endif
   }
 }
 
@@ -865,19 +859,26 @@ private struct NetworkResourceRow: View {
       initial: [],
       to: $providers
     )
-    .sheet(isPresented: $isEditingPolicy) {
+    .kitSheet(isPresented: $isEditingPolicy) {
       NetworkPolicyEditor(resource: resource)
     }
-    .alert("Connect Directly", isPresented: $isConnectingDirectly) {
-      TextField("host:port", text: $peerEndpoint)
-        .autocorrectionDisabled()
-      Button("Cancel", role: .cancel) { }
-      Button("Connect") {
-        guard let provider = providers.first else { return }
-        Task { await connect(provider: provider) }
+    .kitSheet(isPresented: $isConnectingDirectly) {
+      KitSheet(title: "Connect Directly", meta: "The UDP endpoint of the device that provides \(resource.shareName).", systemImage: "point.3.connected.trianglepath.dotted", hue: .teal) {
+        FormCard {
+          FormRow("Endpoint", systemImage: "network") {
+            TextField("host:port", text: $peerEndpoint).kitField(mono: true).autocorrectionDisabled().frame(maxWidth: 220)
+          }
+        }
+      } footer: {
+        Spacer()
+        Button("Cancel") { isConnectingDirectly = false }.keyboardShortcut(.cancelAction)
+        Button("Connect") {
+          isConnectingDirectly = false
+          guard let provider = providers.first else { return }
+          Task { await connect(provider: provider) }
+        }
+        .buttonStyle(.kitPrimary).keyboardShortcut(.defaultAction)
       }
-    } message: {
-      Text("Enter the UDP endpoint of the device that provides \(resource.shareName).")
     }
   }
 
@@ -914,7 +915,7 @@ private struct NetworkResourceRow: View {
 
 private struct NetworkPolicyEditor: View {
   @Environment(Hub.self) private var hub
-  @Environment(\.dismiss) private var dismiss
+  @Environment(\.kitDismiss) private var dismiss
   let resource: HubNetworkResource
 
   @State private var mode: HubNetworkPolicyMode
@@ -932,9 +933,9 @@ private struct NetworkPolicyEditor: View {
   }
 
   var body: some View {
-    NavigationStack {
-      Form {
-        Section {
+    KitSheet(title: resource.shareName, meta: "Owned by \(resource.ownerKey.shortNetworkKey)", systemImage: "lock.shield", hue: .teal, status: isSaving ? .working : .idle) {
+      FormCard {
+        FormRow("Who can connect", systemImage: "person.2") {
           Picker("Who can connect", selection: $mode) {
             Text("Everyone on this Hub").tag(HubNetworkPolicyMode.hub)
             Text("A permission group").tag(HubNetworkPolicyMode.group)
@@ -942,58 +943,41 @@ private struct NetworkPolicyEditor: View {
             Text("Only its owner").tag(HubNetworkPolicyMode.private)
             Text("No one").tag(HubNetworkPolicyMode.disabled)
           }
-
-          if mode == .group {
-            TextField("Group name", text: $group)
-          } else if mode == .keys {
-            TextField("One key per line", text: $keys, axis: .vertical)
-              .lineLimit(4...10)
-          }
-        } footer: {
-          Text("Owned by \(resource.ownerKey.shortNetworkKey)")
+          .labelsHidden()
+          .fixedSize()
         }
-
-        Section {
-          Button("Disconnect Everyone Now", systemImage: "bolt.shield", role: .destructive) {
-            confirmsRevocation = true
+        if mode == .group {
+          FormRow("Group", systemImage: "person.3") {
+            TextField("Group name", text: $group).kitField().frame(maxWidth: 220)
           }
-        } footer: {
-          Text("Ends every connection to \(resource.shareName). Devices that are still allowed reconnect with new access.")
-        }
-
-        if let errorMessage {
-          Section {
-            Text(errorMessage).foregroundStyle(.red)
+        } else if mode == .keys {
+          FormRow("Keys", help: "One key per line", systemImage: "key") {
+            TextField("Keys", text: $keys, axis: .vertical).lineLimit(4...10).kitField(mono: true).frame(maxWidth: 260)
           }
         }
       }
-      .formStyle(.grouped)
-      .navigationTitle(resource.shareName)
-      .toolbar {
-        ToolbarItem(placement: .cancellationAction) {
-          Button("Cancel") { dismiss() }
-        }
-        ToolbarItem(placement: .confirmationAction) {
-          Button("Save") {
-            Task { await save() }
-          }
-          .disabled(isSaving || !isValid)
+      FormCard(footer: "Ends every connection to \(resource.shareName). Devices that are still allowed reconnect with new access.") {
+        FormRow("Disconnect Everyone Now", systemImage: "bolt.shield", hue: .red) {
+          Button("Disconnect…", role: .destructive) { confirmsRevocation = true }.buttonStyle(.kit)
         }
       }
-      .confirmationDialog(
-        "Disconnect everyone from \(resource.shareName)?",
-        isPresented: $confirmsRevocation,
-        titleVisibility: .visible
-      ) {
-        Button("Disconnect", role: .destructive) {
-          Task { await revoke() }
-        }
-      } message: {
-        Text("Devices that are still allowed can connect again.")
+      if let errorMessage {
+        Text(errorMessage).kitFont(.caption).foregroundStyle(Hue.red.text)
       }
+    } footer: {
+      Spacer()
+      Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
+      Button("Save") { Task { await save() } }
+        .buttonStyle(.kitPrimary).keyboardShortcut(.defaultAction)
+        .disabled(isSaving || !isValid)
     }
-    .frame(minWidth: 420, minHeight: 360)
-    .interactiveDismissDisabled(isSaving)
+    .kitSheetDismissDisabled(isSaving)
+    .kitConfirmation(
+      "Disconnect everyone from \(resource.shareName)?", isPresented: $confirmsRevocation,
+      message: "Devices that are still allowed can connect again.", systemImage: "bolt.shield", confirm: "Disconnect"
+    ) {
+      Task { await revoke() }
+    }
   }
 
   private var isValid: Bool {
@@ -1053,57 +1037,38 @@ private struct NetworkPolicyEditor: View {
 
 /// The invitation just made: a code to scan, the link to copy or share, and how the other device uses it
 private struct NetworkInvitationSheet: View {
-  @Environment(\.dismiss) private var dismiss
+  @Environment(\.kitDismiss) private var dismiss
   let link: String
   @State private var copied = false
 
   var body: some View {
-    NavigationStack {
-      ScrollView {
-        VStack(spacing: 20) {
-#if canImport(HubServer)
-          QRCodeView(text: link)
-            .frame(width: 200, height: 200)
-            .padding(12)
-            .background(.white, in: .rect(cornerRadius: 20))
-#endif
-          Text("Scan this with your other device's camera, or send it the link.")
-            .multilineTextAlignment(.center)
-          Text(link)
-            .font(.caption.monospaced())
-            .foregroundStyle(.secondary)
-            .lineLimit(2)
-            .truncationMode(.middle)
-            .textSelection(.enabled)
-          HStack {
-            Button(copied ? "Copied" : "Copy Link", systemImage: copied ? "checkmark" : "doc.on.doc") {
-              link.copyToClipboard()
-              copied = true
-            }
+    KitSheet(title: "Invite a Device", meta: "Scan the code with the other device's camera, or send it the link.", systemImage: "person.badge.plus", hue: .teal) {
+      VStack(spacing: 16) {
+        KitQRCode(link, size: 200)
+        Text(link)
+          .kitFont(.monoSmall)
+          .lineLimit(2)
+          .truncationMode(.middle)
+          .textSelection(.enabled)
+        Text("The link works once, for seven days. On the other device, open it or paste it into Join Network.")
+          .kitFont(.caption)
+          .multilineTextAlignment(.center)
+      }
+      .frame(maxWidth: .infinity)
+    } footer: {
 #if !os(tvOS)
-            if let url = URL(string: link) {
-              ShareLink(item: url) { Label("Share", systemImage: "square.and.arrow.up") }
-            }
+      if let url = URL(string: link) {
+        ShareLink(item: url) { Label("Share", systemImage: "square.and.arrow.up") }.buttonStyle(.kit)
+      }
 #endif
-          }
-          .buttonStyle(.bordered)
-          Text("The link works once, for seven days. On the other device, open it or paste it into Join Network on Hub's home screen.")
-            .secondary()
-            .multilineTextAlignment(.center)
-        }
-        .padding()
-        .frame(maxWidth: 420)
-        .frame(maxWidth: .infinity)
+      Spacer()
+      Button(copied ? "Copied" : "Copy Link", systemImage: copied ? "checkmark" : "doc.on.doc") {
+        link.copyToClipboard()
+        copied = true
       }
-      .navigationTitle("Invite a Device")
-      .toolbarTitleDisplayMode(.inline)
-      .toolbar {
-        ToolbarItem(placement: .confirmationAction) {
-          Button("Done") { dismiss() }
-        }
-      }
+      .buttonStyle(.kit)
+      Button("Done") { dismiss() }.buttonStyle(.kitPrimary).keyboardShortcut(.defaultAction)
     }
-    .frame(minWidth: 400, minHeight: 540)
   }
 }
 

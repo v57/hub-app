@@ -516,13 +516,8 @@ struct PermissionsPage: View {
         }
       }
     }
-    .alert("New Group", isPresented: $isAdding) {
-      TextField("Name", text: $newName)
-      Button("Cancel", role: .cancel) { newName = "" }
-      Button("Create") {
-        let name = newName.trimmingCharacters(in: .whitespaces)
-        newName = ""
-        guard !name.isEmpty else { return }
+    .kitSheet(isPresented: $isAdding) {
+      NameSheet(title: "New Group", meta: "Its connections get the permissions you tick for it.", systemImage: "person.2", hue: .purple, confirm: "Create", name: "") { name in
         Task {
           try? await hub.client.send("hub/group/update", PermissionGroups.UpdateGroup(group: name, set: []))
           selectedGroup = name

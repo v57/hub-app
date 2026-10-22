@@ -54,7 +54,9 @@ struct HubApp: App {
   }
   @ViewBuilder private var mainContent: some View {
     root.modifier(TranslationModifier())
+#if !canImport(ComponentKit)
       .overlay { PairingConfirmation() }
+#endif
       .onOpenURL { url in
         if !PairingRouter.main.open(url) {
           NetworkInvitationRouter.main.open(url)

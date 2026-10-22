@@ -102,27 +102,34 @@ struct StoreView: View {
           }.transition(.blurReplace)
         }
       }
-    }.navigationTitle("Store").toolbar {
-      Picker("Filter", selection: $filter) {
-        Text("All").tag(Optional<ServiceType>.none)
-        ForEach(ServiceType.allCases, id: \.rawValue) { type in
-          Text(type.name).tag(type)
-        }
-      }.pickerStyle(.main).labelsHidden().task(id: attempt + (allowed ? 1 : 0)) {
-        guard allowed else { return }
-        guard self.allItems.isEmpty else { return }
-        do {
-          fetchStatus = .loading
-          allItems = try await StoreView.fetch(url: url)
-          fetchStatus = .loaded
-        } catch {
-          fetchStatus = .failed
+    }
+    // The filter and the store's address sit above the list (no toolbar inside a kit sheet)
+    .safeAreaInset(edge: .top) {
+      HStack {
+        Picker("Filter", selection: $filter) {
+          Text("All").tag(Optional<ServiceType>.none)
+          ForEach(ServiceType.allCases, id: \.rawValue) { type in
+            Text(type.name).tag(type)
+          }
+        }.pickerStyle(.segmented).labelsHidden().fixedSize()
+        Spacer()
+        if !customLink {
+          Button("Change Store", systemImage: "storefront") {
+            customLink = true
+          }
         }
       }
-      if !customLink {
-        Button("Change Store", systemImage: "storefront.fill") {
-          customLink = true
-        }.buttonStyle(.borderedProminent)
+      .padding(.bottom, 8)
+    }
+    .task(id: attempt + (allowed ? 1 : 0)) {
+      guard allowed else { return }
+      guard self.allItems.isEmpty else { return }
+      do {
+        fetchStatus = .loading
+        allItems = try await StoreView.fetch(url: url)
+        fetchStatus = .loaded
+      } catch {
+        fetchStatus = .failed
       }
     }.animation(.smooth, value: fetchStatus)
   }

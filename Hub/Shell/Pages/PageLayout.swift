@@ -158,6 +158,37 @@ struct KeyValueLine: View {
   }
 }
 
+/// A name to type in a kit sheet: New Group, Rename Device
+struct NameSheet: View {
+  let title: String
+  var meta: String?
+  let systemImage: String
+  var hue: Hue = .accent
+  let confirm: String
+  @State var name: String
+  let action: (String) -> Void
+  @Environment(\.kitDismiss) private var dismiss
+
+  var body: some View {
+    let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+    KitSheet(title: title, meta: meta, systemImage: systemImage, hue: hue) {
+      FormCard {
+        FormRow("Name", systemImage: "textformat") {
+          TextField("Name", text: $name).kitField().frame(maxWidth: 240)
+        }
+      }
+    } footer: {
+      Spacer()
+      Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
+      Button(confirm) {
+        action(trimmed)
+        dismiss()
+      }
+      .buttonStyle(.kitPrimary).keyboardShortcut(.defaultAction).disabled(trimmed.isEmpty)
+    }
+  }
+}
+
 /// Views in lines that wrap at the container's width: chips, tokens
 struct FlowLayout: Layout {
   var spacing: CGFloat = 4

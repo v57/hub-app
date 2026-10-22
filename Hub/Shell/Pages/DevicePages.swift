@@ -75,21 +75,18 @@ struct SharedServicesPage: View {
     .kitPane(.content)
     .pageToolbar("Shared Services", meta: ["what this \(KitDevice.name) runs for its hubs", "\(AppServices.Service.sharedCount) shared"], systemImage: "square.and.arrow.up", hue: .purple) { }
     .navigationDestination(item: idiom == .phone ? $trying : .constant(nil)) { service in
-      tryPage(service)
+      AppServices.Page(service: service)
+        .kitPane(.content)
+        .pageToolbar(service.name, meta: ["on this \(KitDevice.name)"], systemImage: service.image, hue: .purple) { }
     }
-    .sheet(item: idiom == .phone ? .constant(nil) : $trying) { service in
-      tryPage(service).frame(minWidth: 640, minHeight: 520).componentKit(accent: .hubAccent)
-    }
-  }
-
-  private func tryPage(_ service: AppServices.Service) -> some View {
-    AppServices.Page(service: service)
-      .kitPane(.content)
-      .pageToolbar(service.name, meta: ["on this \(KitDevice.name)"], systemImage: service.image, hue: .purple) {
-        if idiom != .phone {
-          Button("Done") { trying = nil }.buttonStyle(.kit)
-        }
+    .kitSheet(item: idiom == .phone ? .constant(nil) : $trying) { service in
+      KitSheet(title: service.name, meta: "On this \(KitDevice.name)", systemImage: service.image, hue: .purple, width: 720) {
+        AppServices.Page(service: service).frame(minHeight: 460)
+      } footer: {
+        Spacer()
+        Button("Done") { trying = nil }.buttonStyle(.kitPrimary).keyboardShortcut(.defaultAction)
       }
+    }
   }
 }
 

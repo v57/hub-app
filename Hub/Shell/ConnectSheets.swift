@@ -13,7 +13,7 @@ import HubService
 import HubUI
 
 struct ConnectSheet: View {
-  @Environment(\.dismiss) private var dismiss
+  @Environment(\.kitDismiss) private var dismiss
   @State private var address = ""
   @State private var code = ""
   @State private var pairing = HubPairing()
@@ -66,8 +66,62 @@ struct ConnectSheet: View {
   }
 }
 
+/// A pairing link opened from outside, as the sheet's item
+struct PendingPairing: Identifiable {
+  let link: PairingLink
+  var id: String { link.address + link.code }
+}
+
+/// Pair with the hub a hub://pair link names: this device becomes its owner
+struct PairingSheet: View {
+  let link: PairingLink
+  @State private var pairing = HubPairing()
+  @Environment(\.kitDismiss) private var dismiss
+
+  var body: some View {
+    let url = URL(hubAddress: link.address)
+    KitSheet(
+      title: "Pair with this hub?", meta: "This \(KitDevice.name) becomes the hub's owner.",
+      systemImage: "hexagon", hue: .accent, status: pairing.state.isWorking ? .working : .idle
+    ) {
+      FormCard {
+        FormRow("Address", systemImage: "network") {
+          Text(url?.absoluteString ?? link.address).kitFont(.mono).lineLimit(1).truncationMode(.middle)
+        }
+        FormRow("Pairing code", systemImage: "number") {
+          Text(PairingCode.format(link.code)).kitFont(.mono)
+        }
+      }
+      if pairing.state != .idle {
+        PairingStatusView(pairing).kitFont(.caption)
+      }
+    } footer: {
+      Spacer()
+      if case .paired = pairing.state {
+        Button("Done") { dismiss() }.buttonStyle(.kitPrimary).keyboardShortcut(.defaultAction)
+      } else {
+        Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction).disabled(pairing.state.isWorking)
+        Button(pairing.state.isFailed ? "Try Again" : "Pair") { Task { await pair(url) } }
+          .buttonStyle(.kitPrimary).keyboardShortcut(.defaultAction)
+          .disabled(url == nil || pairing.state.isWorking)
+      }
+    }
+    .kitSheetDismissDisabled(pairing.state.isWorking)
+  }
+
+  private func pair(_ url: URL?) async {
+    guard let url else { return }
+    let settings = Hub.Settings(name: url.name ?? link.address, address: url)
+    guard let hub = await Hubs.main.connect(settings, code: link.code, named: false, pairing: pairing) else { return }
+    Navigator.main.open(hub)
+    // Leaves the result on screen for a moment
+    try? await Task.sleep(for: .seconds(1.5))
+    if case .paired = pairing.state { dismiss() }
+  }
+}
+
 struct JoinNetworkSheet: View {
-  @Environment(\.dismiss) private var dismiss
+  @Environment(\.kitDismiss) private var dismiss
   @State private var input = NetworkInvitationRouter.main.pendingInput.isEmpty ? "" : NetworkInvitationRouter.main.consume()
   @State private var joining = false
   @State private var error: String?
