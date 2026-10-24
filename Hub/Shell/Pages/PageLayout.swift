@@ -178,7 +178,6 @@ struct NameSheet: View {
         }
       }
     } footer: {
-      Spacer()
       Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
       Button(confirm) {
         action(trimmed)

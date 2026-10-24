@@ -91,7 +91,6 @@ struct LauncherPage: View {
       KitSheet(title: "Get More", meta: "Apps hub-launcher can install", systemImage: "bag", hue: .gray, width: 720) {
         StoreView().frame(minHeight: 420)
       } footer: {
-        Spacer()
         Button("Done") { showsStore = false }.buttonStyle(.kitPrimary).keyboardShortcut(.defaultAction)
       }
     }
@@ -341,7 +340,6 @@ struct NewAppSheet: View {
       }
       if let error { Text(error).kitFont(.caption).foregroundStyle(Hue.red.text) }
     } footer: {
-      Spacer()
       Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
       AsyncButton("Create") {
         guard let defaultName else { return }

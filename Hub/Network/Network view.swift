@@ -870,7 +870,6 @@ private struct NetworkResourceRow: View {
           }
         }
       } footer: {
-        Spacer()
         Button("Cancel") { isConnectingDirectly = false }.keyboardShortcut(.cancelAction)
         Button("Connect") {
           isConnectingDirectly = false
@@ -965,7 +964,6 @@ private struct NetworkPolicyEditor: View {
         Text(errorMessage).kitFont(.caption).foregroundStyle(Hue.red.text)
       }
     } footer: {
-      Spacer()
       Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
       Button("Save") { Task { await save() } }
         .buttonStyle(.kitPrimary).keyboardShortcut(.defaultAction)

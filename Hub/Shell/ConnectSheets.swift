@@ -100,7 +100,6 @@ struct ConnectSheet: View {
         PairingStatusView(pairing).kitFont(.caption)
       }
     } footer: {
-      Spacer()
       Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction).disabled(isWorking)
       Button(action) { Task { await go() } }
         .buttonStyle(.kitPrimary).keyboardShortcut(.defaultAction)
@@ -211,7 +210,6 @@ struct PairingSheet: View {
         PairingStatusView(pairing).kitFont(.caption)
       }
     } footer: {
-      Spacer()
       if case .paired = pairing.state {
         Button("Done") { dismiss() }.buttonStyle(.kitPrimary).keyboardShortcut(.defaultAction)
       } else {

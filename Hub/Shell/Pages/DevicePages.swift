@@ -83,7 +83,6 @@ struct SharedServicesPage: View {
       KitSheet(title: service.name, meta: "On this \(KitDevice.name)", systemImage: service.image, hue: .purple, width: 720) {
         AppServices.Page(service: service).frame(minHeight: 460)
       } footer: {
-        Spacer()
         Button("Done") { trying = nil }.buttonStyle(.kitPrimary).keyboardShortcut(.defaultAction)
       }
     }
