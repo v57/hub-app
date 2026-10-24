@@ -57,9 +57,7 @@ struct ConnectSheet: View {
 
   var body: some View {
     KitSheet(
-      title: "Connect to a Hub",
-      meta: "A hub's address and, for a new hub, its pairing code, or an invitation to a hub's network from its owner.",
-      systemImage: "hexagon", hue: .accent, status: isWorking ? .working : .idle
+      title: "Connect to a Hub", systemImage: "hexagon", hue: .accent, status: isWorking ? .working : .idle
     ) {
       QRScanCard(
         title: "Scan Code", scanning: $scanning, error: scanError
