@@ -2,8 +2,8 @@
 //  ConnectSheets.swift
 //  Hub
 //
-//  Connect to a Hub (an address, and for a new hub-server its pairing code, which makes this device its first owner)
-//  and Join Network (an invitation to a hub's private network).
+//  Connect to a Hub: an address, and for a new hub-server its pairing code, which makes this device its first owner,
+//  or an invitation to a hub's private network, in one field. On iOS it scans the QR code the other device shows.
 //
 
 #if canImport(ComponentKit)
@@ -12,44 +12,134 @@ import ComponentKit
 import HubService
 import HubUI
 
+/// One field for what the other side gave you: a hub's address (with, for a new hub, the pairing code that makes
+/// this device its first owner), a hub://pair link that carries both, or a Hub Network invitation (hub://join/… or
+/// its code), which puts this device on the hub's private network
 struct ConnectSheet: View {
   @Environment(\.kitDismiss) private var dismiss
-  @State private var address = ""
+  @State private var input = NetworkInvitationRouter.main.pendingInput.isEmpty ? "" : NetworkInvitationRouter.main.consume()
   @State private var code = ""
   @State private var pairing = HubPairing()
-  private var url: URL? { URL(hubAddress: address) }
+  @State private var nets = HubNets.main
+  @State private var joining = false
+  @State private var joinError: String?
+  @State private var scanning = false
+  @State private var scanError: String?
+
+  /// What the field holds
+  private enum Entry {
+    case empty, address(URL), invitation, badInvitation(String), unknown
+  }
+
+  private var entry: Entry {
+    let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !text.isEmpty else { return .empty }
+    do {
+      _ = try NetworkInvitationParser.decode(text)
+      return .invitation
+    } catch let error as NetworkInvitationError {
+      // A hub://join link, or a code that decoded far enough to be one (an address never has its key and signature)
+      if text.hasPrefix(NetworkInvitationParser.urlPrefix) || [.expired, .invalidTime, .invalidSignature].contains(error.code) {
+        return .badInvitation(error.message)
+      }
+    } catch {}
+    return URL(hubAddress: text).map(Entry.address) ?? .unknown
+  }
+
+  private var isInvitation: Bool {
+    switch entry {
+    case .invitation, .badInvitation: true
+    default: false
+    }
+  }
+
+  private var isWorking: Bool { joining || pairing.state.isWorking }
 
   var body: some View {
     KitSheet(
       title: "Connect to a Hub",
-      meta: "A hub on a Mac, a home server or a VPS. A new hub-server shows its pairing code in hub-launcher or `hub pair`.",
-      systemImage: "hexagon", hue: .accent, status: pairing.state.isWorking ? .working : .idle
+      meta: "A hub's address and, for a new hub, its pairing code, or an invitation to a hub's network from its owner.",
+      systemImage: "hexagon", hue: .accent, status: isWorking ? .working : .idle
     ) {
-      FormCard {
-        FormRow("Address", help: "mac.local, 192.168.1.5:1997 or wss://hub.example.com", systemImage: "network") {
-          TextField("Address", text: $address).kitField(mono: true).frame(maxWidth: 240)
-            .onChange(of: address) { acceptLink(address) }
-        }
-        FormRow("Pairing code", help: "New hubs only: makes this \(KitDevice.name) an owner", systemImage: "number") {
-          TextField("ABC-123", text: $code).kitField(mono: true).frame(maxWidth: 140)
-            .onChange(of: code) { if case .failed = pairing.state { pairing.reset() } }
+      QRScanCard(
+        title: "Scan Code", help: "The pairing code a hub shows, or an invitation", scanning: $scanning, error: scanError
+      ) { text in
+        if accept(text) {
+          scanning = false
+          scanError = nil
+        } else {
+          scanError = "Not a pairing code or an invitation"
         }
       }
-      if pairing.state != .idle {
+      FormCard(footer: isInvitation ? "Invitations work once, for seven days." : nil) {
+        FormRow(
+          isInvitation ? "Invitation" : "Address",
+          help: isInvitation ? "Puts this \(KitDevice.name) on the hub's private network" : "mac.local, 192.168.1.5:1997 or an invitation",
+          systemImage: isInvitation ? "person.badge.plus" : "network", hue: isInvitation ? .teal : .accent, error: inputError,
+          field: TextField("Address or invitation", text: $input)
+            .kitFont(.mono).autocorrectionDisabled()
+            .onChange(of: input) {
+              joinError = nil
+              accept(input)
+            }
+        )
+        if !isInvitation {
+          FormRow("Pairing code", help: "New hubs only: makes this \(KitDevice.name) an owner", systemImage: "number") {
+            TextField("ABC-123", text: $code).kitField(mono: true).frame(maxWidth: 140)
+              .onChange(of: code) { if case .failed = pairing.state { pairing.reset() } }
+          }
+        }
+      }
+      if joining {
+        Text(NativeJoinPresentation.progress(nets.joinProgress?.state)).kitFont(.caption)
+      } else if pairing.state != .idle {
         PairingStatusView(pairing).kitFont(.caption)
       }
     } footer: {
       Spacer()
-      Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
-      Button(code.isEmpty ? "Connect" : "Pair") { Task { await connect() } }
+      Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction).disabled(isWorking)
+      Button(action) { Task { await go() } }
         .buttonStyle(.kitPrimary).keyboardShortcut(.defaultAction)
-        .disabled(url == nil || pairing.state.isWorking)
+        .disabled(!canGo || isWorking)
+    }
+    .kitSheetDismissDisabled(isWorking)
+    // An invitation link opened while the sheet is up
+    .onChange(of: NetworkInvitationRouter.main.pendingInput) { _, pending in
+      if !pending.isEmpty, !isWorking { input = NetworkInvitationRouter.main.consume() }
     }
   }
 
-  private func connect() async {
-    guard let url else { return }
-    let settings = Hub.Settings(name: url.name ?? address, address: url)
+  private var inputError: String? {
+    if let joinError { return joinError }
+    switch entry {
+    case .badInvitation(let message): return message
+    case .unknown: return "Not an address or an invitation"
+    default: return nil
+    }
+  }
+
+  private var action: String {
+    if isInvitation { return joining ? "Joining…" : "Join" }
+    return code.isEmpty ? "Connect" : "Pair"
+  }
+
+  private var canGo: Bool {
+    switch entry {
+    case .address, .invitation: true
+    default: false
+    }
+  }
+
+  private func go() async {
+    switch entry {
+    case .address(let url): await connect(url)
+    case .invitation: await join()
+    default: break
+    }
+  }
+
+  private func connect(_ url: URL) async {
+    let settings = Hub.Settings(name: url.name ?? input, address: url)
     guard let hub = await Hubs.main.connect(settings, code: code, named: false, pairing: pairing) else { return }
     if !code.isEmpty {
       // Leaves the result on screen for a moment
@@ -59,10 +149,31 @@ struct ConnectSheet: View {
     dismiss()
   }
 
-  private func acceptLink(_ text: String) {
-    guard let link = PairingLink(text) else { return }
-    address = link.address
-    code = PairingCode.format(link.code)
+  private func join() async {
+    joining = true
+    joinError = nil
+    defer { joining = false }
+    do {
+      let hub = try await HubNets.main.join(link: input.trimmingCharacters(in: .whitespacesAndNewlines))
+      Navigator.main.open(hub, .network)
+      dismiss()
+    } catch {
+      joinError = NativeJoinPresentation.error(error)
+    }
+  }
+
+  /// Takes a hub://pair link (typed, pasted or scanned) apart into the address and code; keeps an invitation whole.
+  /// False when the text is neither.
+  @discardableResult
+  private func accept(_ text: String) -> Bool {
+    if let link = PairingLink(text) {
+      input = link.address
+      code = PairingCode.format(link.code)
+      return true
+    }
+    guard (try? NetworkInvitationParser.decode(text)) != nil else { return false }
+    if input != text { input = text }
+    return true
   }
 }
 
@@ -120,61 +231,26 @@ struct PairingSheet: View {
   }
 }
 
-struct JoinNetworkSheet: View {
-  @Environment(\.kitDismiss) private var dismiss
-  @State private var input = NetworkInvitationRouter.main.pendingInput.isEmpty ? "" : NetworkInvitationRouter.main.consume()
-  @State private var joining = false
-  @State private var error: String?
-  @State private var nets = HubNets.main
-
-  private var validationError: String? {
-    guard !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
-    do {
-      _ = try NetworkInvitationParser.decode(input)
-      return nil
-    } catch let invitationError as NetworkInvitationError {
-      return invitationError.message
-    } catch {
-      return "Invalid invitation."
-    }
-  }
+/// A row that opens the camera to read a QR code, on iOS; nothing elsewhere. `onScan` gets each new code and closes
+/// the camera itself once it took one.
+struct QRScanCard: View {
+  let title: String
+  let help: String
+  @Binding var scanning: Bool
+  var error: String?
+  let onScan: (String) -> Void
 
   var body: some View {
-    KitSheet(
-      title: "Join Network", meta: "An invitation from a hub's owner puts this \(KitDevice.name) on the hub's private network.",
-      systemImage: "person.badge.plus", hue: .teal, status: joining ? .working : .idle
-    ) {
-      FormCard(footer: "Invitations work once, for seven days.") {
-        FormRow("Invitation", systemImage: "link") {
-          TextField("Invite code or hub:// link", text: $input).kitField(mono: true).frame(maxWidth: 280)
-            .onChange(of: input) { error = nil }
-        }
+#if os(iOS)
+    FormCard {
+      FormRow(title, help: help, systemImage: "qrcode.viewfinder", error: error) {
+        Button(scanning ? "Close" : "Scan") { scanning.toggle() }.buttonStyle(.kit)
       }
-      if joining {
-        Text(NativeJoinPresentation.progress(nets.joinProgress?.state)).kitFont(.caption)
-      } else if let message = error ?? validationError {
-        Text(message).kitFont(.caption).foregroundStyle(Hue.red.text)
-      }
-    } footer: {
-      Spacer()
-      Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
-      Button(joining ? "Joining…" : "Join") { Task { await join() } }
-        .buttonStyle(.kitPrimary).keyboardShortcut(.defaultAction)
-        .disabled(joining || input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || validationError != nil)
     }
-  }
-
-  private func join() async {
-    joining = true
-    error = nil
-    defer { joining = false }
-    do {
-      let hub = try await HubNets.main.join(link: input)
-      Navigator.main.open(hub, .network)
-      dismiss()
-    } catch {
-      self.error = NativeJoinPresentation.error(error)
+    if scanning {
+      KitQRScanner(onScan: onScan).frame(height: 260)
     }
+#endif
   }
 }
 #endif

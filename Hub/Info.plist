@@ -17,6 +17,8 @@
 			</array>
 		</dict>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Hub reads the QR code another device shows to pair with a hub or join its network.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Hub connects to hubs on your network and, when this device runs a hub, lets your other devices connect to it.</string>
 	<key>NSAppTransportSecurity</key>

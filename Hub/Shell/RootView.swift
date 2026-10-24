@@ -18,7 +18,7 @@ final class ShellModel {
   /// The hub whose removal waits for a confirmation
   var removing: Hub?
   enum Sheet: Identifiable, Hashable {
-    case connect, joinNetwork
+    case connect
     var id: Self { self }
   }
 }
@@ -50,7 +50,6 @@ struct RootView: View {
     .kitSheet(item: $shell.sheet) { sheet in
       switch sheet {
       case .connect: ConnectSheet()
-      case .joinNetwork: JoinNetworkSheet()
       }
     }
     // A hub://pair link opened from outside: pair with that hub
@@ -69,16 +68,16 @@ struct RootView: View {
     }
     .onChange(of: navigator.route) { _, _ in compactColumn = .detail }
     .onChange(of: NetworkInvitationRouter.main.pendingInput) { _, input in
-      if !input.isEmpty { shell.sheet = .joinNetwork }
+      if !input.isEmpty { shell.sheet = .connect }
     }
     .onAppear {
       // iPhone: until a hub is set up, the welcome is the first screen
       if Hubs.main.list.isEmpty { compactColumn = .detail }
 #if DEBUG
-      // `--open` on iPhone: the page, not the root list; `--sheet connect|join`: that sheet at launch
+      // `--open` on iPhone: the page, not the root list; `--sheet connect`: Connect to a Hub at launch
       if CommandLine.arguments.contains("--open") && navigator.route != .allHubs { compactColumn = .detail }
-      if let index = CommandLine.arguments.firstIndex(of: "--sheet"), index + 1 < CommandLine.arguments.count {
-        shell.sheet = CommandLine.arguments[index + 1] == "join" ? .joinNetwork : .connect
+      if CommandLine.arguments.contains("--sheet") {
+        shell.sheet = .connect
       }
 #endif
     }

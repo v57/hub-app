@@ -48,7 +48,6 @@ struct AllHubsView: View {
         KitSearchField(text: $search, prompt: "Hubs, apps, devices").frame(width: 220)
       }
       ToolGroup {
-        Button("Join Network", systemImage: "person.badge.plus") { shell.sheet = .joinNetwork }
         Button("Connect", systemImage: "plus") { shell.sheet = .connect }
       }
     }
@@ -64,7 +63,7 @@ struct AllHubsView: View {
   }
 }
 
-/// Hub's welcome, the main screen until a hub is set up: connect to one, join with an invitation, or run one here,
+/// Hub's welcome, the main screen until a hub is set up: connect to one (by address or invitation) or run one here,
 /// with the hubs this app knows as its list
 struct HubWelcome: View {
   @State private var hubs = Hubs.main
@@ -75,11 +74,8 @@ struct HubWelcome: View {
       emptyTitle: "No Hub Yet",
       emptyMessage: "Hub connects to hubs you run: hub-server on a Mac, a home server or a VPS, or this \(KitDevice.name) itself. Nothing is contacted until you connect."
     ) {
-      WelcomeAction("Connect to a Hub…", detail: "Its address, and the pairing code of a new hub", systemImage: "plus") {
+      WelcomeAction("Connect to a Hub…", detail: "Its address and pairing code, or an invitation", systemImage: "plus") {
         shell.sheet = .connect
-      }
-      WelcomeAction("Join with an Invitation…", detail: "A Hub Network invite code", systemImage: "link") {
-        shell.sheet = .joinNetwork
       }
 #if canImport(HubServer)
       WelcomeAction("Run a Hub on This \(KitDevice.name)", detail: "This app is the hub; your devices pair with it", systemImage: "server.rack") {

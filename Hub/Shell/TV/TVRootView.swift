@@ -71,7 +71,6 @@ struct TVRootView: View {
     .kitSheet(item: $shell.sheet) { sheet in
       switch sheet {
       case .connect: ConnectSheet()
-      case .joinNetwork: JoinNetworkSheet()
       }
     }
 #if DEBUG
