@@ -62,7 +62,7 @@ struct ConnectSheet: View {
       systemImage: "hexagon", hue: .accent, status: isWorking ? .working : .idle
     ) {
       QRScanCard(
-        title: "Scan Code", help: "The pairing code a hub shows, or an invitation", scanning: $scanning, error: scanError
+        title: "Scan Code", scanning: $scanning, error: scanError
       ) { text in
         if accept(text) {
           scanning = false
@@ -237,7 +237,6 @@ struct PairingSheet: View {
 /// the camera itself once it took one.
 struct QRScanCard: View {
   let title: String
-  let help: String
   @Binding var scanning: Bool
   var error: String?
   let onScan: (String) -> Void
@@ -245,7 +244,7 @@ struct QRScanCard: View {
   var body: some View {
 #if os(iOS)
     FormCard {
-      FormRow(title, help: help, systemImage: "qrcode.viewfinder", error: error) {
+      FormRow(title, systemImage: "qrcode.viewfinder", error: error) {
         Button(scanning ? "Close" : "Scan") { scanning.toggle() }.buttonStyle(.kit)
       }
     }
