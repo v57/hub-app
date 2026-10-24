@@ -84,12 +84,16 @@ struct ConnectSheet: View {
             }
         )
         if !isInvitation {
-          FormRow("Pairing code", help: "New hubs only: makes this \(KitDevice.name) an owner", systemImage: "number") {
-            TextField("ABC-123", text: $code).kitField(mono: true).frame(maxWidth: 140)
+          FormRow(
+            "Pairing code", help: "New hubs only: makes this \(KitDevice.name) an owner", systemImage: "number",
+            field: TextField("ABC-123", text: $code)
+              .kitFont(.mono).autocorrectionDisabled()
               .onChange(of: code) { if case .failed = pairing.state { pairing.reset() } }
-          }
+          )
         }
       }
+      // The fields explain themselves while they're edited
+      .kitFormHelpWhileEditing()
       if joining {
         Text(NativeJoinPresentation.progress(nets.joinProgress?.state)).kitFont(.caption)
       } else if pairing.state != .idle {
