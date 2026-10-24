@@ -27,7 +27,9 @@ struct HubApp: App {
         ScreenshotsModeView()
       } else if !ProcessInfo.isPreviews {
 #if DEBUG
-        if ProcessInfo.processInfo.environment["HUB_HN9XX_OWNER_ACCEPTANCE"] != nil
+        if HubReset.isRequested {
+          Text("Resetting Hub…").task { await HubReset.run() }
+        } else if ProcessInfo.processInfo.environment["HUB_HN9XX_OWNER_ACCEPTANCE"] != nil
             || ProcessInfo.processInfo.environment["HUB_HN9XX_JOINER_ACCEPTANCE"] != nil {
           HN9xxAcceptanceView()
         } else if ProcessInfo.processInfo.environment["HUBTESTENV"] != nil {
