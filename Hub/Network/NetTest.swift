@@ -35,6 +35,7 @@ enum NetTest {
     log("hub \(hub.settings.name) \(hub.settings.address.absoluteString) onHubMachine=\(hub.isOnHubMachine)")
     if action == "links" {
       // Also away from the hub: the link to its machine is what this checks
+      await hub.net.restoreIfActive()
       return await links(hub)
     }
     guard await wait("connected", seconds: 30, { hub.isConnected ? true : nil }) != nil else { return fail("not connected") }
