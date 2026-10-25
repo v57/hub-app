@@ -74,6 +74,41 @@ class PacketTunnelSettingsGenerator {
         return (wgSettings, resolutionResults)
     }
 
+    /// The changes from `previous` only: removed peers go, the rest are set in place. Unlike `uapiConfiguration`, it
+    /// never sends `replace_peers` (which drops every peer's session and the endpoints WireGuard learned) and sends
+    /// the private key and listen port only when they changed (a listen port rebinds the socket).
+    func incrementalUapiConfiguration(from previous: TunnelConfiguration) -> (String, [EndpointResolutionResult?]) {
+        var resolutionResults = [EndpointResolutionResult?]()
+        var wgSettings = ""
+        if previous.interface.privateKey != tunnelConfiguration.interface.privateKey {
+            wgSettings.append("private_key=\(tunnelConfiguration.interface.privateKey.hexKey)\n")
+        }
+        if let listenPort = tunnelConfiguration.interface.listenPort, listenPort != previous.interface.listenPort {
+            wgSettings.append("listen_port=\(listenPort)\n")
+        }
+        let keys = Set(tunnelConfiguration.peers.map(\.publicKey))
+        for peer in previous.peers where !keys.contains(peer.publicKey) {
+            wgSettings.append("public_key=\(peer.publicKey.hexKey)\nremove=true\n")
+        }
+        assert(tunnelConfiguration.peers.count == resolvedEndpoints.count)
+        for (peer, resolvedEndpoint) in zip(self.tunnelConfiguration.peers, self.resolvedEndpoints) {
+            wgSettings.append("public_key=\(peer.publicKey.hexKey)\n")
+            if let preSharedKey = peer.preSharedKey?.hexKey {
+                wgSettings.append("preshared_key=\(preSharedKey)\n")
+            }
+            let result = resolvedEndpoint.map(Self.reresolveEndpoint)
+            if case .success((_, let resolvedEndpoint)) = result {
+                if case .name = resolvedEndpoint.host { assert(false, "Endpoint is not resolved") }
+                wgSettings.append("endpoint=\(resolvedEndpoint.stringRepresentation)\n")
+            }
+            resolutionResults.append(result)
+            wgSettings.append("persistent_keepalive_interval=\(peer.persistentKeepAlive ?? 0)\n")
+            wgSettings.append("replace_allowed_ips=true\n")
+            peer.allowedIPs.forEach { wgSettings.append("allowed_ip=\($0.stringRepresentation)\n") }
+        }
+        return (wgSettings, resolutionResults)
+    }
+
     func generateNetworkSettings() -> NEPacketTunnelNetworkSettings {
         /* iOS requires a tunnel endpoint, whereas in WireGuard it's valid for
          * a tunnel to have no endpoint, or for there to be many endpoints, in

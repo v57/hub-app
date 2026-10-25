@@ -54,7 +54,8 @@ func (l CLogger) Printf(format string, args ...interface{}) {
 type tunnelHandle struct {
 	*device.Device
 	*device.Logger
-	bind conn.Bind
+	bind   conn.Bind
+	filter *filteredTUN
 }
 
 var tunnelHandles = make(map[int32]tunnelHandle)
@@ -101,7 +102,7 @@ func wgTurnOn(settings *C.char, tunFd int32) int32 {
 		unix.Close(dupTunFd)
 		return -1
 	}
-	tun, err := tun.CreateTUNFromFile(os.NewFile(uintptr(dupTunFd), "/dev/tun"), 0)
+	systemTUN, err := tun.CreateTUNFromFile(os.NewFile(uintptr(dupTunFd), "/dev/tun"), 0)
 	if err != nil {
 		logger.Errorf("Unable to create new tun device from fd: %v", err)
 		unix.Close(dupTunFd)
@@ -109,7 +110,8 @@ func wgTurnOn(settings *C.char, tunFd int32) int32 {
 	}
 	logger.Verbosef("Attaching to interface")
 	bind := conn.NewStdNetBind()
-	dev := device.NewDevice(tun, bind, logger)
+	filter := newFilteredTUN(systemTUN)
+	dev := device.NewDevice(filter, bind, logger)
 
 	err = dev.IpcSet(C.GoString(settings))
 	if err != nil {
@@ -131,7 +133,7 @@ func wgTurnOn(settings *C.char, tunFd int32) int32 {
 		unix.Close(dupTunFd)
 		return -1
 	}
-	tunnelHandles[i] = tunnelHandle{Device: dev, Logger: logger, bind: bind}
+	tunnelHandles[i] = tunnelHandle{Device: dev, Logger: logger, bind: bind, filter: filter}
 	return i
 }
 
@@ -149,6 +151,25 @@ func wgSendDatagram(tunnelHandle int32, endpoint *C.char, payload unsafe.Pointer
 	if err := handle.bind.Send(C.GoBytes(payload, C.int(payloadLen)), parsed); err != nil {
 		handle.Errorf("Unable to send probe datagram: %v", err)
 		return -3
+	}
+	return 0
+}
+
+// wgSetInboundFilter sets which packets from peers reach the system (hubtun.go); an empty string passes everything.
+//
+//export wgSetInboundFilter
+func wgSetInboundFilter(tunnelHandle int32, settings *C.char) int32 {
+	handle, ok := tunnelHandles[tunnelHandle]
+	if !ok || settings == nil {
+		return -1
+	}
+	config, err := parseInboundFilter(C.GoString(settings))
+	if err == nil {
+		err = handle.filter.SetConfig(config)
+	}
+	if err != nil {
+		handle.Errorf("Unable to set the inbound filter: %v", err)
+		return -2
 	}
 	return 0
 }

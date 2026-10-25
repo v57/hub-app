@@ -27,6 +27,9 @@ public enum WireGuardAdapterError: Error {
 
     /// Failure to send a bounded rendezvous probe from backend UDP socket.
     case sendBackendDatagram(Int32)
+
+    /// The inbound filter's rules were rejected.
+    case setInboundFilter(Int32)
 }
 
 /// Enum representing internal state of the `WireGuardAdapter`
@@ -58,6 +61,9 @@ public class WireGuardAdapter {
 
     /// Adapter state.
     private var state: State = .stopped
+
+    /// The inbound filter (`hubtun.go`), applied again whenever the backend restarts.
+    private var inboundFilter = ""
 
     /// Tunnel device file descriptor.
     private var tunnelFileDescriptor: Int32? {
@@ -190,6 +196,22 @@ public class WireGuardAdapter {
         }
     }
 
+    /// Sets which packets from peers reach the system, as `{"sources":[{"prefix","ports":[{"protocol","port"}]}]}`
+    /// (`hubtun.go`): a linked device reaches only its granted ports. `nil` passes everything.
+    public func setInboundFilter(_ settings: String?, completionHandler: @escaping (WireGuardAdapterError?) -> Void) {
+        workQueue.async {
+            let previous = self.inboundFilter
+            self.inboundFilter = settings ?? ""
+            guard case .started(let handle, _) = self.state else {
+                completionHandler(nil)
+                return
+            }
+            let result = wgSetInboundFilter(handle, self.inboundFilter)
+            if result != 0 { self.inboundFilter = previous }
+            completionHandler(result == 0 ? nil : .setInboundFilter(result))
+        }
+    }
+
     /// Start the tunnel tunnel.
     /// - Parameters:
     ///   - tunnelConfiguration: tunnel configuration.
@@ -313,20 +335,17 @@ public class WireGuardAdapter {
     /// excluded routes, or gateway settings.
     public func updateBackend(tunnelConfiguration: TunnelConfiguration, completionHandler: @escaping (WireGuardAdapterError?) -> Void) {
         workQueue.async {
-            guard case .started(let handle, _) = self.state else {
+            guard case .started(let handle, let previous) = self.state else {
                 completionHandler(.invalidState)
                 return
             }
 
             do {
                 let settingsGenerator = try self.makeSettingsGenerator(with: tunnelConfiguration)
-                var (wgConfig, resolutionResults) = settingsGenerator.uapiConfiguration()
-                // PacketTunnelSettingsGenerator omits replace_peers for an
-                // empty peer list. Backend-only removal of the final temporary
-                // peer must still clear it.
-                if tunnelConfiguration.peers.isEmpty {
-                    wgConfig.append("replace_peers=true\n")
-                }
+                // Only what changed, so the other peers keep their sessions and learned endpoints
+                let (wgConfig, resolutionResults) = settingsGenerator.incrementalUapiConfiguration(
+                    from: previous.tunnelConfiguration
+                )
                 self.logEndpointResolutionResults(resolutionResults)
                 wgSetConfig(handle, wgConfig)
                 #if os(iOS)
@@ -437,6 +456,10 @@ public class WireGuardAdapter {
         #if os(iOS)
         wgDisableSomeRoamingForBrokenMobileSemantics(handle)
         #endif
+        if !inboundFilter.isEmpty, wgSetInboundFilter(handle, inboundFilter) != 0 {
+            wgTurnOff(handle)
+            throw WireGuardAdapterError.setInboundFilter(-2)
+        }
         return handle
     }
 
