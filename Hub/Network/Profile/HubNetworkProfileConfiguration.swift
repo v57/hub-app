@@ -299,7 +299,9 @@ struct HubNetworkProfileStore: Sendable {
       at: fileURL.deletingLastPathComponent(),
       withIntermediateDirectories: true
     )
-    try data.write(to: fileURL, options: [.atomic, .completeFileProtection])
+    // The extension reads it when the tunnel starts, also while the device is locked: complete protection would
+    // hide it then (and macOS refuses to raise an existing file's class with EPERM)
+    try data.write(to: fileURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
   }
 
   func load() throws -> HubNetworkProfileConfiguration {
