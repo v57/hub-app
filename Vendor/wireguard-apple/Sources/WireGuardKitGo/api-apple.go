@@ -14,6 +14,7 @@ package main
 import "C"
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"os"
@@ -54,8 +55,9 @@ func (l CLogger) Printf(format string, args ...interface{}) {
 type tunnelHandle struct {
 	*device.Device
 	*device.Logger
-	bind   conn.Bind
-	filter *filteredTUN
+	bind    conn.Bind
+	filter  *filteredTUN
+	gateway *gatewayTUN
 }
 
 var tunnelHandles = make(map[int32]tunnelHandle)
@@ -111,7 +113,8 @@ func wgTurnOn(settings *C.char, tunFd int32) int32 {
 	logger.Verbosef("Attaching to interface")
 	bind := conn.NewStdNetBind()
 	filter := newFilteredTUN(systemTUN)
-	dev := device.NewDevice(filter, bind, logger)
+	gateway := newGatewayTUN(filter)
+	dev := device.NewDevice(gateway, bind, logger)
 
 	err = dev.IpcSet(C.GoString(settings))
 	if err != nil {
@@ -133,7 +136,7 @@ func wgTurnOn(settings *C.char, tunFd int32) int32 {
 		unix.Close(dupTunFd)
 		return -1
 	}
-	tunnelHandles[i] = tunnelHandle{Device: dev, Logger: logger, bind: bind, filter: filter}
+	tunnelHandles[i] = tunnelHandle{Device: dev, Logger: logger, bind: bind, filter: filter, gateway: gateway}
 	return i
 }
 
@@ -172,6 +175,40 @@ func wgSetInboundFilter(tunnelHandle int32, settings *C.char) int32 {
 		return -2
 	}
 	return 0
+}
+
+// wgSetGateway turns this device's internet gateway on (gateway.go) with `{"addresses":[…]}`, or off with "".
+//
+//export wgSetGateway
+func wgSetGateway(tunnelHandle int32, settings *C.char) int32 {
+	handle, ok := tunnelHandles[tunnelHandle]
+	if !ok || settings == nil {
+		return -1
+	}
+	config, err := parseGateway(C.GoString(settings))
+	if err == nil {
+		err = handle.gateway.SetConfig(config)
+	}
+	if err != nil {
+		handle.Errorf("Unable to set the gateway: %v", err)
+		return -2
+	}
+	return 0
+}
+
+// wgGatewayStats is the gateway's counters as JSON (GatewayStats); the caller frees it.
+//
+//export wgGatewayStats
+func wgGatewayStats(tunnelHandle int32) *C.char {
+	handle, ok := tunnelHandles[tunnelHandle]
+	if !ok {
+		return nil
+	}
+	data, err := json.Marshal(handle.gateway.Stats())
+	if err != nil {
+		return nil
+	}
+	return C.CString(string(data))
 }
 
 //export wgTurnOff

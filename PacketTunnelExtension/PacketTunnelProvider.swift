@@ -72,7 +72,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     reset()
     do {
       let profile = try Profile.decode()
-      Self.writeDiagnostics("startTunnel: profile decoded")
+      Self.writeDiagnostics("startTunnel: profile decoded, peer endpoint \(profile.peerEndpoint ?? "-")")
       gatewayServingState = profile.servesGateway ? .enabling : .disabled
       if profile.usesGateway {
         exitState = .blocking
@@ -96,6 +96,14 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
       Self.writeDiagnostics("adapter start begin")
       try await wireGuardAdapter.start(profile: profile)
       Self.writeDiagnostics("adapter started")
+      if profile.servesGateway {
+        // Members' internet flows end here and leave from this device's sockets; DNS to its overlay addresses too
+        let addresses = [profile.overlayIPv4Address, profile.overlayIPv6Address].compactMap {
+          $0.split(separator: "/").first.map(String.init)
+        }
+        try await wireGuardAdapter.setGateway(addresses: addresses)
+        Self.writeDiagnostics("gateway serving, DNS on \(addresses.joined(separator: ", "))")
+      }
       let dnsServer: Address
       if let remoteDNS = profile.dnsServerAddress {
         dnsServer = try Address(remoteDNS)
@@ -402,6 +410,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     let coordinator: String
     let linkUps: Int
     let peers: [Peer]
+    let wireGuard: [PacketTunnelWireGuardAdapter.RuntimePeer]
   }
 
   private func linkStatus() async -> LinkStatus {
@@ -415,7 +424,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     }
     return LinkStatus(
       present: coordinatorClient?.registered ?? false, coordinator: coordinatorClient?.nodeEndpointValue ?? "",
-      linkUps: await linkManager?.linkUps ?? 0, peers: peers
+      linkUps: await linkManager?.linkUps ?? 0, peers: peers, wireGuard: await wireGuardAdapter.runtimePeers()
     )
   }
 
@@ -450,10 +459,23 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     } else {
       do {
         let message = try JSONDecoder().decode(GatewayProviderMessage.self, from: messageData)
-        guard ["gatewayStatus", "exitStatus", "keychainProof", "inviterStatus", "memberPeers", "linkStatus"].contains(message.command) else { return nil }
+        guard ["gatewayStatus", "gatewayStats", "gatewayRenewed", "exitStatus", "keychainProof", "inviterStatus", "memberPeers", "linkStatus"].contains(message.command) else { return nil }
         switch message.command {
         case "gatewayStatus":
           return try JSONEncoder().encode(StateResponse(state: gatewayServingState))
+        case "gatewayStats":
+          return await wireGuardAdapter.gatewayStats().map { Data($0.utf8) }
+        case "gatewayRenewed":
+          // The app saved a newer grant for the same gateway: only the expiry moves, the tunnel keeps its flows
+          let renewed = try Profile.load()
+          guard let active = activeBootstrapProfile, let grant = renewed.gatewayGrant, let current = active.gatewayGrant,
+                grant.gatewayWireGuardKey == current.gatewayWireGuardKey, grant.ipv4 == current.ipv4,
+                grant.ipv6 == current.ipv6, renewed.overlayIPv4Address == active.overlayIPv4Address else { return nil }
+          activeBootstrapProfile = renewed
+          exitState = .connected
+          scheduleGatewayHealth(renewed)
+          Self.writeDiagnostics("gateway grant renewed until \(grant.expiresAt)")
+          return try JSONEncoder().encode(MemberPeersResponse(ok: true))
         case "exitStatus":
           return try JSONEncoder().encode(StateResponse(state: exitState))
         #if DEBUG

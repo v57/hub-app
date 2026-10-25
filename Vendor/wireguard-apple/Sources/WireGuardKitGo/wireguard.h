@@ -17,6 +17,8 @@ extern void wgTurnOff(int handle);
 extern int64_t wgSetConfig(int handle, const char *settings);
 extern int32_t wgSendDatagram(int handle, const char *endpoint, const void *payload, int32_t payload_len);
 extern int32_t wgSetInboundFilter(int handle, const char *settings);
+extern int32_t wgSetGateway(int handle, const char *settings);
+extern char *wgGatewayStats(int handle);
 extern char *wgGetConfig(int handle);
 extern void wgBumpSockets(int handle);
 extern void wgDisableSomeRoamingForBrokenMobileSemantics(int handle);

@@ -30,6 +30,9 @@ public enum WireGuardAdapterError: Error {
 
     /// The inbound filter's rules were rejected.
     case setInboundFilter(Int32)
+
+    /// The gateway's settings were rejected.
+    case setGateway(Int32)
 }
 
 /// Enum representing internal state of the `WireGuardAdapter`
@@ -64,6 +67,9 @@ public class WireGuardAdapter {
 
     /// The inbound filter (`hubtun.go`), applied again whenever the backend restarts.
     private var inboundFilter = ""
+
+    /// The internet gateway (`gateway.go`), applied again whenever the backend restarts.
+    private var gateway = ""
 
     /// Tunnel device file descriptor.
     private var tunnelFileDescriptor: Int32? {
@@ -209,6 +215,34 @@ public class WireGuardAdapter {
             let result = wgSetInboundFilter(handle, self.inboundFilter)
             if result != 0 { self.inboundFilter = previous }
             completionHandler(result == 0 ? nil : .setInboundFilter(result))
+        }
+    }
+
+    /// Turns this device's internet gateway on with `{"addresses":[…]}` (`gateway.go`): members' internet flows are
+    /// opened again from this device's sockets. `nil` turns it off.
+    public func setGateway(_ settings: String?, completionHandler: @escaping (WireGuardAdapterError?) -> Void) {
+        workQueue.async {
+            let previous = self.gateway
+            self.gateway = settings ?? ""
+            guard case .started(let handle, _) = self.state else {
+                completionHandler(nil)
+                return
+            }
+            let result = wgSetGateway(handle, self.gateway)
+            if result != 0 { self.gateway = previous }
+            completionHandler(result == 0 ? nil : .setGateway(result))
+        }
+    }
+
+    /// The gateway's counters as JSON (`GatewayStats` in `gateway.go`), nil while the backend is down.
+    public func gatewayStats(completionHandler: @escaping (String?) -> Void) {
+        workQueue.async {
+            guard case .started(let handle, _) = self.state, let stats = wgGatewayStats(handle) else {
+                completionHandler(nil)
+                return
+            }
+            completionHandler(String(cString: stats))
+            free(stats)
         }
     }
 
@@ -459,6 +493,10 @@ public class WireGuardAdapter {
         if !inboundFilter.isEmpty, wgSetInboundFilter(handle, inboundFilter) != 0 {
             wgTurnOff(handle)
             throw WireGuardAdapterError.setInboundFilter(-2)
+        }
+        if !gateway.isEmpty, wgSetGateway(handle, gateway) != 0 {
+            wgTurnOff(handle)
+            throw WireGuardAdapterError.setGateway(-2)
         }
         return handle
     }

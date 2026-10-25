@@ -42,6 +42,7 @@ final class PacketTunnelWireGuardAdapter {
     do {
       try await adapter.start(tunnelConfiguration: configuration)
       isStarted = true
+      extensionDiagnostics("wireguard peers \(Self.describe(configuration.peers))")
       baseConfiguration = configuration
       bootstrapPeers.removeAll()
       bootstrapOrder.removeAll()
@@ -69,6 +70,8 @@ final class PacketTunnelWireGuardAdapter {
         logger.error("probe failed: backend code \(code, privacy: .public)")
       case .setInboundFilter(let code):
         logger.error("start failed: inbound filter code \(code, privacy: .public)")
+      case .setGateway(let code):
+        logger.error("start failed: gateway code \(code, privacy: .public)")
       case nil:
         logger.error("start failed: \(String(reflecting: error), privacy: .public)")
       }
@@ -294,13 +297,16 @@ final class PacketTunnelWireGuardAdapter {
       peer.persistentKeepAlive = 25
       peers = [peer]
     } else if let grant = profile.gatewayGrant,
-              let endpointValue = profile.peerEndpoint,
-              let endpoint = Endpoint(from: endpointValue),
               let peerKeyData = Data(base64Encoded: grant.gatewayWireGuardKey),
               let peerKey = PublicKey(rawValue: peerKeyData)
     {
       var peer = PeerConfiguration(publicKey: peerKey)
-      peer.endpoint = endpoint
+      // A gateway that names itself (`mac.local:51820`) and didn't resolve where the app chose it, or resolved to an
+      // address WireGuard can't take (a scoped link-local one), is reached through the link to it
+      // (`applyBootstrapPeers`): WireGuard can't start with a name it can't resolve
+      if let endpoint = profile.peerEndpoint.flatMap(Endpoint.init(from:)) {
+        if case .name = endpoint.host {} else { peer.endpoint = endpoint }
+      }
       var allowedIPs = [IPAddressRange]()
       if grant.ipv4, let route = IPAddressRange(from: "0.0.0.0/0") {
         allowedIPs.append(route)
@@ -328,6 +334,8 @@ final class PacketTunnelWireGuardAdapter {
       }
       if let index = peers.firstIndex(where: { $0.publicKey == key }) {
         peers[index].allowedIPs += allowedIPs.filter { !peers[index].allowedIPs.contains($0) }
+        // The hub host is the gateway: its address on this network serves until a link sets another
+        if peers[index].endpoint == nil { peers[index].endpoint = endpoint }
       } else {
         var peer = PeerConfiguration(publicKey: key)
         peer.endpoint = endpoint
@@ -587,6 +595,19 @@ final class PacketTunnelWireGuardAdapter {
     try await adapter.setInboundFilter(Self.inboundFilter(peers))
   }
 
+  /// Serves this device's internet to the members (`gateway.go`), answering DNS on `addresses`, this device's overlay
+  /// addresses; nil stops it.
+  func setGateway(addresses: [String]?) async throws {
+    struct Gateway: Encodable { let addresses: [String] }
+    let settings = try addresses.map { String(decoding: try JSONEncoder().encode(Gateway(addresses: $0)), as: UTF8.self) }
+    try await adapter.setGateway(settings)
+  }
+
+  /// The gateway's counters as JSON, nil while WireGuard is down
+  func gatewayStats() async -> String? {
+    await adapter.gatewayStats()
+  }
+
   /// `{"sources":[{"prefix","ports":[{"protocol","port"}]}]}`, or nil (everything passes) without links
   static func inboundFilter(_ peers: [LinkManager.Peer]) -> String? {
     struct Port: Encodable { let `protocol`: String; let port: UInt16 }
@@ -690,7 +711,13 @@ final class PacketTunnelWireGuardAdapter {
       semaphore.signal()
     }
     semaphore.wait()
+    extensionDiagnostics("wireguard peers \(Self.describe(configuration.peers))\(result.map { " failed: \($0)" } ?? "")")
     return result
+  }
+
+  private static func describe(_ peers: [PeerConfiguration]) -> String {
+    peers.map { "\($0.publicKey.base64Key.prefix(10)) \($0.endpoint.map { "\($0)" } ?? "-") \($0.allowedIPs.map(\.stringRepresentation))" }
+      .joined(separator: "; ")
   }
 
   private static func bootstrapHostRoute(_ value: String) -> IPAddressRange? {
@@ -749,6 +776,36 @@ final class PacketTunnelWireGuardAdapter {
       }
     }
     return nil
+  }
+
+  /// WireGuard's view of each peer: endpoint, allowed IPs and byte counts
+  struct RuntimePeer: Encodable {
+    var wireGuardKey = ""
+    var endpoint: String?
+    var allowedIPs: [String] = []
+    var rxBytes = 0
+    var txBytes = 0
+  }
+
+  func runtimePeers() async -> [RuntimePeer] {
+    guard let configuration = await adapter.getRuntimeConfiguration() else { return [] }
+    var peers: [RuntimePeer] = []
+    for line in configuration.split(separator: "\n") {
+      guard let equals = line.firstIndex(of: "=") else { continue }
+      let name = line[..<equals], value = String(line[line.index(after: equals)...])
+      if name == "public_key" {
+        peers.append(RuntimePeer(wireGuardKey: PublicKey(hexKey: value)?.base64Key ?? value))
+      } else if !peers.isEmpty {
+        switch name {
+        case "endpoint": peers[peers.count - 1].endpoint = value
+        case "allowed_ip": peers[peers.count - 1].allowedIPs.append(value)
+        case "rx_bytes": peers[peers.count - 1].rxBytes = Int(value) ?? 0
+        case "tx_bytes": peers[peers.count - 1].txBytes = Int(value) ?? 0
+        default: break
+        }
+      }
+    }
+    return peers
   }
 
   func sendObservationProbe(
@@ -907,6 +964,20 @@ extension WireGuardAdapter {
       setInboundFilter(settings) { error in
         if let error { continuation.resume(throwing: error) } else { continuation.resume() }
       }
+    }
+  }
+
+  func setGateway(_ settings: String?) async throws {
+    try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+      setGateway(settings) { error in
+        if let error { continuation.resume(throwing: error) } else { continuation.resume() }
+      }
+    }
+  }
+
+  func gatewayStats() async -> String? {
+    await withCheckedContinuation { continuation in
+      gatewayStats { continuation.resume(returning: $0) }
     }
   }
 
