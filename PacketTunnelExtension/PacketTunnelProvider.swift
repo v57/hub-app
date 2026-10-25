@@ -456,6 +456,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
           return try JSONEncoder().encode(StateResponse(state: gatewayServingState))
         case "exitStatus":
           return try JSONEncoder().encode(StateResponse(state: exitState))
+        #if DEBUG
         case "keychainProof":
           let key = try KeyChain.hubIdentity()
           let signature = key.sign(text: "hub-network/readiness-keychain-proof/v1")
@@ -463,6 +464,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
             KeychainProof(publicKey: key.publicKey(), signature: signature)
           )
           return encoded
+        #endif
         case "inviterStatus":
           let key = try? KeyChain.hubIdentity()
           let status = InviterStatus(
