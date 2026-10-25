@@ -141,6 +141,8 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
   }
 
   override func stopTunnel(with reason: NEProviderStopReason) async {
+    // The system says why it stops the tunnel only here; the diagnostics file keeps it for NetTest
+    Self.writeDiagnostics("stopTunnel: \(reason.name) (\(reason.rawValue))")
     gatewayServingState = .disabled
     gatewayExpiryTask?.cancel()
     gatewayExpiryTask = nil
@@ -1162,4 +1164,31 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     let signature: String
   }
   #endif
+}
+
+extension NEProviderStopReason {
+  /// The reason's case name, for diagnostics
+  var name: String {
+    switch self {
+    case .none: "none"
+    case .userInitiated: "userInitiated"
+    case .providerFailed: "providerFailed"
+    case .noNetworkAvailable: "noNetworkAvailable"
+    case .unrecoverableNetworkChange: "unrecoverableNetworkChange"
+    case .providerDisabled: "providerDisabled"
+    case .authenticationCanceled: "authenticationCanceled"
+    case .configurationFailed: "configurationFailed"
+    case .idleTimeout: "idleTimeout"
+    case .configurationDisabled: "configurationDisabled"
+    case .configurationRemoved: "configurationRemoved"
+    case .superceded: "superceded"
+    case .userLogout: "userLogout"
+    case .userSwitch: "userSwitch"
+    case .connectionFailed: "connectionFailed"
+    case .sleep: "sleep"
+    case .appUpdate: "appUpdate"
+    case .internalError: "internalError"
+    @unknown default: "unknown"
+    }
+  }
 }
