@@ -322,13 +322,30 @@ final class PacketTunnelController: PacketTunnelControlling {
   }
 
   /// The extension's links: presence at the coordinator and each linked device (NETTEST)
+  /// Saves a renewed gateway grant and hands it to the running extension, which keeps its tunnel and flows; false
+  /// when the extension doesn't take it (another gateway, not running), and the caller restarts the tunnel instead
+  func renewGateway(configuration: HubNetworkProfileConfiguration) async -> Bool {
+    guard await status == .connected, (try? store.load())?.gatewayGrant?.gatewayKey == configuration.gatewayGrant?.gatewayKey,
+          (try? store.save(configuration)) != nil else { return false }
+    return (try? await providerData("gatewayRenewed")) != nil
+  }
+
+  /// The extension's gateway counters (`GatewayStats` in `gateway.go`) while this device serves its internet
+  func gatewayStats() async throws -> Data {
+    try await providerData("gatewayStats")
+  }
+
   func linkStatus() async throws -> Data {
+    try await providerData("linkStatus")
+  }
+
+  private func providerData(_ command: String) async throws -> Data {
     guard let manager = try await loadManager(),
           manager.connection.status == .connected,
           let session = manager.connection as? NETunnelProviderSession else {
       throw PacketTunnelControllerError.notConnected
     }
-    let request = try JSONEncoder().encode(GatewayProviderMessage(command: "linkStatus"))
+    let request = try JSONEncoder().encode(GatewayProviderMessage(command: command))
     return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Data, Error>) in
       do {
         try session.sendProviderMessage(request) { data in

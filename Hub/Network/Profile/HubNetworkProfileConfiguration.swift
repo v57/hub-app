@@ -93,6 +93,26 @@ struct HubNetworkProfileConfiguration: Codable, Equatable, Sendable {
     self.hubPeer = hubPeer
   }
 
+  /// The membership alone, without the gateway this device used: its routes, DNS and grant
+  func withoutGateway() -> Self {
+    HubNetworkProfileConfiguration(
+      version: version,
+      hubURL: hubURL,
+      hubNetworkID: hubNetworkID,
+      profilePublicKey: profilePublicKey,
+      overlayIPv4Address: overlayIPv4Address,
+      overlayIPv6Address: overlayIPv6Address,
+      dnsSuffix: dnsSuffix,
+      overlayIPv4Route: overlayIPv4Route,
+      overlayIPv6Route: overlayIPv6Route,
+      trustedHubKey: trustedHubKey,
+      gatewayServingEnabled: servesGateway,
+      servesInviter: inviterEnabled,
+      nodeEndpoint: nodeEndpoint,
+      hubPeer: hubPeer
+    )
+  }
+
   /// A copy with only gateway serving changed.
   func withGatewayServing(_ enabled: Bool) -> Self {
     var copy = self
@@ -306,8 +326,16 @@ struct HubNetworkProfileStore: Sendable {
 
   func load() throws -> HubNetworkProfileConfiguration {
     let configuration = try loadWithoutValidation()
-    try configuration.validate()
-    return configuration
+    do {
+      try configuration.validate()
+      return configuration
+    } catch HubNetworkGrantValidationError.invalidLifetime where configuration.usesGateway {
+      // A gateway grant lapses within minutes unless the app renews it. The membership stays, so the tunnel can start
+      // and reach the hub, where the app chooses the gateway again (`HubNet.resumeGateway`)
+      let membership = configuration.withoutGateway()
+      try save(membership)
+      return membership
+    }
   }
 
   /// Decodes persisted state for fail-closed migration only. Callers must

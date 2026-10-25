@@ -46,8 +46,8 @@ extension PacketTunnelController {
     // error — fall back to a fresh authorize-and-install below.
     let current: HubNetworkProfileConfiguration
     do {
-      current = try installedConfigurationForMigration()
-      try current.validate()
+      // A lapsed gateway grant leaves the membership (`HubNetworkProfileStore.load`), which stays
+      current = try installedConfiguration()
     } catch {
       try await authorizeAndInstallLocalHub(hub: hub)
       return
@@ -104,7 +104,8 @@ extension PacketTunnelController {
           controlPlaneIPv6Hosts: current.controlPlaneIPv6Hosts ?? [],
           gatewayServingEnabled: current.servesGateway,
           servesInviter: !nodeEndpoint.isEmpty,
-          nodeEndpoint: nodeEndpoint.isEmpty ? nil : nodeEndpoint
+          nodeEndpoint: nodeEndpoint.isEmpty ? nil : nodeEndpoint,
+          hubPeer: current.hubPeer
         )
       )
       // Stop so the caller's `start()` re-activates the updated profile in the

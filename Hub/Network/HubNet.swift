@@ -112,6 +112,12 @@ final class HubNet {
   let hub: Hub
   private var nets: HubNets { .main }
   private var vpnRenewalTask: Task<Void, Never>?
+  private var isResumingGateway = false
+  /// The device whose internet this device chose last on this hub, kept until it stops using it
+  private var chosenGateway: String? {
+    get { UserDefaults.standard.string(forKey: "HubNet.gateway.\(hub.settings.address.absoluteString)") }
+    set { UserDefaults.standard.set(newValue, forKey: "HubNet.gateway.\(hub.settings.address.absoluteString)") }
+  }
   private var inviterAgentWatcherTask: Task<Void, Never>?
   private var linksWatcherTask: Task<Void, Never>?
   private var reconnectTask: Task<Void, Never>?
@@ -279,12 +285,15 @@ final class HubNet {
       overlayAddress: device.overlayAddress,
       peerEndpoint: device.endpoint
     )
-    try await GatewaySelectionController().select(
-      reachable,
-      hub: hub,
-      tunnel: PacketTunnelController()
-    )
+    let tunnel = try PacketTunnelController()
+    if (try? tunnel.installedConfiguration())?.gatewayGrant?.gatewayKey == device.key {
+      // Already through it (a relaunch): a new grant is enough, the tunnel and its flows stay
+      try await GatewaySelectionController().renew(reachable, hub: hub, tunnel: tunnel)
+    } else {
+      try await GatewaySelectionController().select(reachable, hub: hub, tunnel: tunnel)
+    }
     vpn = device
+    chosenGateway = device.key
     vpnRenewalTask?.cancel()
     vpnRenewalTask = Task { [weak self] in
       while !Task.isCancelled {
@@ -318,6 +327,7 @@ final class HubNet {
     print("HubNet.disableVpn")
     vpnRenewalTask?.cancel()
     vpnRenewalTask = nil
+    chosenGateway = nil
     let tunnel = try PacketTunnelController()
     try await GatewaySelectionController().disable(tunnel: tunnel)
     vpn = nil
@@ -334,9 +344,14 @@ final class HubNet {
   /// cellular when `address` is a LAN address.
   static func alternateURLs(for address: URL) async -> [URL] {
     guard let tunnel = try? PacketTunnelController(),
-          let profile = try? tunnel.installedConfiguration(), profile.hubURL == address,
-          let data = try? await tunnel.linkStatus(),
-          let status = try? JSONDecoder().decode(LinkedMachines.self, from: data) else { return [] }
+          let profile = try? tunnel.installedConfiguration(), profile.hubURL == address else { return [] }
+    let status: LinkedMachines
+    do {
+      status = try JSONDecoder().decode(LinkedMachines.self, from: try await tunnel.linkStatus())
+    } catch {
+      print("[HubNet] no links to try for \(address): \(error)")
+      return []
+    }
     // A member opens its link to the hub's machine; the routes are that machine's overlay addresses
     return status.peers.filter(\.opens).compactMap { peer in
       guard let ipv4 = peer.routes.first(where: { !$0.contains(":") })?.split(separator: "/").first,
@@ -421,6 +436,29 @@ final class HubNet {
         print("HubNet: couldn't offer this device's internet again:", error)
       }
     }
+    // Apart from this reconnection: choosing the gateway restarts the tunnel, and with it the connection
+    Task { [weak self] in await self?.resumeGateway() }
+  }
+
+  /// After a relaunch, or once the grant lapsed while the app wasn't running (`HubNetworkProfileStore.load`): uses the
+  /// internet of the device chosen last again as soon as the hub lists it, which renews the grant and keeps renewing it
+  private func resumeGateway() async {
+    guard vpnRenewalTask == nil, !isResumingGateway, let key = chosenGateway else { return }
+    isResumingGateway = true
+    defer { isResumingGateway = false }
+    for _ in 0..<20 {
+      if let device = devices.first(where: { $0.key == key }) {
+        do {
+          try await vpn(through: device)
+          print("[HubNet] using \(device.name ?? key.prefix(12).description)'s internet again")
+        } catch {
+          print("HubNet: couldn't use the chosen device's internet again:", error)
+        }
+        return
+      }
+      try? await Task.sleep(for: .seconds(1))
+    }
+    print("[HubNet] the device chosen for internet isn't offering it")
   }
 
   /// Registers this device's membership on the hub again (it forgets it with each connection), keeping the profile's

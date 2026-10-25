@@ -92,6 +92,17 @@ final class GatewaySelectionController {
     tunnel: PacketTunnelController,
     controlPlaneHosts: [String] = []
   ) async throws {
+    try await tunnel.replaceAndStart(
+      configuration: configuration(gateway, hub: hub, controlPlaneHosts: controlPlaneHosts)
+    )
+  }
+
+  /// The profile that sends this device's traffic through `gateway`, with a grant the hub issues for it now
+  private func configuration(
+    _ gateway: ReachableGateway,
+    hub: Hub,
+    controlPlaneHosts: [String]
+  ) async throws -> HubNetworkProfileConfiguration {
     let wireGuardKey = try HubNetworkWireGuardKeyStore().publicKeyBase64()
     let current = try HubNetworkProfileStore().load()
     guard current.profilePublicKey == hub.key,
@@ -144,53 +155,7 @@ final class GatewaySelectionController {
     let ipv4Hosts = Array(Set(allControlHosts.filter { IPv4Address($0) != nil })).sorted()
     let ipv6Hosts = Array(Set(allControlHosts.filter { IPv6Address($0) != nil })).sorted()
 
-    try await tunnel.replaceAndStart(
-      configuration: HubNetworkProfileConfiguration(
-        version: current.version,
-        hubURL: current.hubURL,
-        hubNetworkID: current.hubNetworkID,
-        profilePublicKey: current.profilePublicKey,
-        overlayIPv4Address: current.overlayIPv4Address,
-        overlayIPv6Address: current.overlayIPv6Address,
-        dnsSuffix: current.dnsSuffix,
-        overlayIPv4Route: current.overlayIPv4Route,
-        overlayIPv6Route: current.overlayIPv6Route,
-        dnsRecords: [
-          HubNetworkDNSRecord(
-            authority: "gateway.\(current.dnsSuffix)",
-            address: gateway.overlayAddress
-          )
-        ],
-        dnsServerAddress: gateway.overlayAddress,
-        trustedHubKey: current.trustedHubKey,
-        wireGuardPublicKey: wireGuardKey,
-        gatewayGrant: grant,
-        peerEndpoint: peerEndpoint,
-        controlPlaneIPv4Hosts: ipv4Hosts,
-        controlPlaneIPv6Hosts: ipv6Hosts,
-        gatewayServingEnabled: current.servesGateway
-      )
-    )
-  }
-
-  func renew(
-    _ gateway: ReachableGateway,
-    hub: Hub,
-    tunnel: PacketTunnelController,
-    controlPlaneHosts: [String] = []
-  ) async throws {
-    try await select(
-      gateway,
-      hub: hub,
-      tunnel: tunnel,
-      controlPlaneHosts: controlPlaneHosts
-    )
-  }
-
-  func disable(tunnel: PacketTunnelController) async throws {
-    print("GatewaySelectionController.disable")
-    let current = try HubNetworkProfileStore().load()
-    let overlayOnly = HubNetworkProfileConfiguration(
+    return HubNetworkProfileConfiguration(
       version: current.version,
       hubURL: current.hubURL,
       hubNetworkID: current.hubNetworkID,
@@ -200,10 +165,44 @@ final class GatewaySelectionController {
       dnsSuffix: current.dnsSuffix,
       overlayIPv4Route: current.overlayIPv4Route,
       overlayIPv6Route: current.overlayIPv6Route,
+      dnsRecords: [
+        HubNetworkDNSRecord(
+          authority: "gateway.\(current.dnsSuffix)",
+          address: gateway.overlayAddress
+        )
+      ],
+      dnsServerAddress: gateway.overlayAddress,
       trustedHubKey: current.trustedHubKey,
-      gatewayServingEnabled: current.servesGateway
+      wireGuardPublicKey: wireGuardKey,
+      gatewayGrant: grant,
+      peerEndpoint: peerEndpoint,
+      controlPlaneIPv4Hosts: ipv4Hosts,
+      controlPlaneIPv6Hosts: ipv6Hosts,
+      gatewayServingEnabled: current.servesGateway,
+      // The links, the inviter and the hub host stay as they were: a gateway away from this device's network is
+      // reached through the link to it
+      servesInviter: current.inviterEnabled,
+      nodeEndpoint: current.nodeEndpoint,
+      hubPeer: current.hubPeer
     )
-    try await tunnel.replaceAndStart(configuration: overlayOnly)
+  }
+
+  /// A new grant for the gateway in use: the running tunnel takes it in place, so its flows go on; a tunnel that
+  /// can't (stopped, another gateway) starts again with it
+  func renew(
+    _ gateway: ReachableGateway,
+    hub: Hub,
+    tunnel: PacketTunnelController,
+    controlPlaneHosts: [String] = []
+  ) async throws {
+    let configuration = try await configuration(gateway, hub: hub, controlPlaneHosts: controlPlaneHosts)
+    guard await !tunnel.renewGateway(configuration: configuration) else { return }
+    try await tunnel.replaceAndStart(configuration: configuration)
+  }
+
+  func disable(tunnel: PacketTunnelController) async throws {
+    print("GatewaySelectionController.disable")
+    try await tunnel.replaceAndStart(configuration: try HubNetworkProfileStore().load().withoutGateway())
   }
 
   private static func endpointHost(_ endpoint: String) -> String? {
@@ -232,7 +231,8 @@ final class GatewaySelectionController {
     if let ipv4 = addresses.filter({ IPv4Address($0) != nil }).sorted().first(where: { !$0.hasPrefix("169.254.") }) {
       return "\(ipv4):\(port)"
     }
-    return addresses.first { IPv6Address($0) != nil }.map { "[\($0)]:\(port)" }
+    // A scoped link-local address (`fe80::1%awdl0`) only reaches the gateway from this device's own link
+    return addresses.first { IPv6Address($0) != nil && !$0.contains("%") }.map { "[\($0)]:\(port)" }
   }
 
   private static func resolve(_ host: String) -> [String] {
