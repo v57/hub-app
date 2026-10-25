@@ -71,7 +71,7 @@ extension Hub {
 }
 
 /// The Hub Network of one hub: whether this device is on it, the devices on it and inviting more, what this device
-/// shares, internet through another device, services, problems and, folded away, the technical details
+/// shares, internet through another device, services, problems and the details, its coordinator first
 struct HubNetworkView: View {
   @Environment(Hub.self) private var hub
   @HubState(\.networkResources) private var resources
@@ -83,6 +83,7 @@ struct HubNetworkView: View {
   @HubState(\.hubNetAgents) private var hubNetAgents
   @HubState(\.hubNetNode) private var node
   @HubState(\.devices) private var hubDevices
+  @HubState(\.networkGateways) private var gatewayStatuses
   @State private var membershipBusy = false
   @State private var confirmsLeaving = false
   @State private var membershipError: String?
@@ -94,25 +95,21 @@ struct HubNetworkView: View {
   @State private var portError: String?
   @State private var gatewayBusy = false
   @State private var gatewayError: String?
-  @State private var gatewayUseError: String?
-  @State private var nodeInput = ""
-  @State private var nodeError: String?
-  @State private var isEditingNode = false
+  @State private var editsCoordinator = false
+  /// `hub/info`'s `host`: `app` when the Hub app runs the hub
+  @State private var hubHost: String?
 
   var body: some View {
     ScrollView {
-      VStack(alignment: .leading, spacing: 32) {
-        status
-        if needsNodeSetup {
-          nodeSetup
+      VStack(alignment: .leading, spacing: KitMetrics.gutter) {
+        if let hubNetState {
+          hubNetNotice(hubNetState)
         }
-        devices
+        membership
         if hub.net.isJoined {
           sharing
         }
-        if showsInternet {
-          internet
-        }
+        devices
         if hub.api.contains("network/resource/list") && !resources.isEmpty {
           services
         }
@@ -121,16 +118,19 @@ struct HubNetworkView: View {
         }
         details
       }
-      .padding()
+      .padding(KitMetrics.gutter)
       .frame(maxWidth: 640, alignment: .leading)
       .frame(maxWidth: .infinity)
     }
     .navigationTitle("Hub Network")
     .toolbarTitleDisplayMode(.inline)
-    .animation(.home, value: hub.net.isJoined)
-    .animation(.home, value: membershipBusy)
+    .animation(.kit, value: hub.net.isJoined)
+    .animation(.kit, value: membershipBusy)
     .kitSheet(item: $invitation) { invitation in
       NetworkInvitationSheet(link: invitation.link)
+    }
+    .kitSheet(isPresented: $editsCoordinator) {
+      CoordinatorSheet(current: hasNode ? node : nil)
     }
     .kitConfirmation(
       "Leave Hub Network?", isPresented: $confirmsLeaving,
@@ -142,51 +142,107 @@ struct HubNetworkView: View {
     .task {
       await hub.net.restoreIfActive()
     }
+    .task {
+      struct Info: Decodable { let host: String? }
+      let info: Info? = try? await hub.client.send("hub/info")
+      hubHost = info?.host
+    }
   }
 
-  // MARK: Status
+  // MARK: Hub-net
 
-  private var status: some View {
-    VStack(spacing: 16) {
-      Placeholder(
-        image: "network",
-        title: "Hub Network",
-        description: hub.net.isJoined
-          ? nil
-          : "A private network for your devices. They reach each other directly and securely, at home or away.",
-        isEnabled: hub.net.isJoined
-      ) {
-        if hub.net.isJoined {
-          Label("Connected to \(hub.settings.name)", systemImage: "checkmark.circle")
-          if let address = hub.net.address {
-            Label("This device is \(address.ipv4)", systemImage: "location")
-              .textSelection(.enabled)
-          }
+  private enum HubNetState {
+    /// No agent runs the hub's network on its machine
+    case off
+    /// Its agent is set up, but not connected now (the Mac asleep, hub-net stopped)
+    case offline
+  }
+
+  /// Why this device can't join, while the hub's machine runs no Hub Network agent: the Hub app there, or hub-net
+  /// beside a hub-server. A device elsewhere never stands in for it. `nil` while it runs, or before the hub tells.
+  private var hubNetState: HubNetState? {
+    guard !hub.isOnHubMachine, hub.api.contains("hub/net/local-agent"), !localAgent.updatedAt.isEmpty else { return nil }
+    // This device bound itself earlier, before only the hub's machine could
+    if localAgent.key == hub.key { return .off }
+    switch localAgent.state {
+    case .available: return nil
+    case .unavailable: return .offline
+    case .unbound: return .off
+    }
+  }
+
+  @ViewBuilder
+  private func hubNetNotice(_ state: HubNetState) -> some View {
+    let name = hub.settings.name
+    switch (state, hubHost == "app") {
+    case (.off, true):
+      Banner("Hub Network is off on \(name)", message: "Turn it on there: Run a Hub › Open Hub Network › Join Network.",
+             systemImage: "network.slash", hue: .orange)
+    case (.offline, true):
+      Banner("\(name) is offline", message: "Open Hub on that Mac, or wake it, to bring the network back.",
+             systemImage: "network.slash", hue: .orange)
+    case (.offline, false):
+      Banner("hub-net on \(name) is offline", message: "Start it again on the hub's machine.",
+             systemImage: "network.slash", hue: .orange)
+    case (.off, false):
+      if hub.hasLauncher {
+        Banner("\(name) has no hub-net", message: "Install it there with Hub Launcher, or open Hub on that Mac and join.",
+               systemImage: "network.slash", hue: .orange) {
+          Button("Open Launcher") { Navigator.main.open(hub, .launcher) }
         }
-      }
-      if membershipBusy {
-        ProgressView(hub.net.isJoined ? "Leaving…" : "Joining…")
-          .controlSize(.small)
-          .frame(height: 32)
-      } else if hub.net.isJoined {
-        Button("Leave Network") { confirmsLeaving = true }
-          .buttonStyle(.bordered)
       } else {
-        Button {
-          Task { await updateMembership(true) }
-        } label: {
-          Text("Join Network").frame(minWidth: 160)
+        Banner("\(name) has no hub-net", message: "Install it on the hub's machine, or open Hub on that Mac and join.",
+               systemImage: "network.slash", hue: .orange)
+        KitSection("Install hub-net", meta: ["Linux"], systemImage: "terminal", hue: .gray) {
+          Text("Install Hub Launcher and add hub-net with it, or build it in Terminal:").networkNote()
+          Text("git clone https://github.com/v57/hub-net\ncd hub-net/agent\nmake && sudo make install")
+            .kitFont(.monoSmall)
+            .textSelection(.enabled)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(10)
+            .background(.kitFill, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
-        .buttonStyle(.borderedProminent)
-        .controlSize(.large)
-        Text("The first time, Hub asks to add a VPN configuration.")
-          .secondary()
-      }
-      if let message = membershipError ?? hub.networkAppAgent.errorMessage {
-        Text(message).error().multilineTextAlignment(.center)
       }
     }
-    .frame(maxWidth: .infinity)
+  }
+
+  // MARK: This device
+
+  private var membershipMeta: [String] {
+    if membershipBusy { return [hub.net.isJoined ? String(localized: "Leaving…") : String(localized: "Joining…")] }
+    guard hub.net.isJoined else { return [String(localized: "Not on the network")] }
+    return [String(localized: "On the network")] + (hub.net.address.map { [$0.ipv4] } ?? [])
+  }
+
+  private var membership: some View {
+    KitSection(
+      "This Device", meta: membershipMeta, systemImage: "network", hue: .teal,
+      status: membershipBusy ? .working : hub.net.isJoined ? .done : .idle
+    ) {
+      if hub.net.isJoined {
+        if let address = hub.net.address {
+          InspectorRow("Address", value: address.ipv4)
+        }
+      } else if hubNetState != nil {
+        Text("Join once Hub Network is on at \(hub.settings.name).").networkNote()
+      } else {
+        Text("A private network for your devices: they reach each other directly and securely, at home or away. The first time, Hub asks to add a VPN configuration.")
+          .networkNote()
+      }
+      if let message = membershipError ?? (hubNetState == nil ? hub.networkAppAgent.errorMessage : nil) {
+        Text(message).networkError()
+      }
+    } accessory: {
+      if hub.net.isJoined {
+        Button("Leave", role: .destructive) { confirmsLeaving = true }
+          .buttonStyle(.kit).controlSize(.small)
+          .disabled(membershipBusy)
+      } else if hubNetState == nil {
+        Button("Join") { Task { await updateMembership(true) } }
+          .buttonStyle(.kitPrimary).controlSize(.small)
+          .disabled(membershipBusy)
+      }
+    }
   }
 
   @MainActor
@@ -201,59 +257,16 @@ struct HubNetworkView: View {
     }
   }
 
-  // MARK: Node
+  // MARK: Coordinator
 
   private var canSetNode: Bool { hub.api.contains("hub/net/node/set") }
 
   private var hasNode: Bool { node?.isEmpty == false }
 
-  /// Invitations carry the hub's node and there is no default one, so an owner sets it before anything else
-  private var needsNodeSetup: Bool {
-    hub.api.contains("hub/net/node") && canSetNode && !hasNode
-  }
-
-  private var nodeSetup: some View {
-    VStack(alignment: .leading, spacing: 10) {
-      sectionHeader(
-        "Set up the network",
-        "Devices find each other through a node, a small server they can all reach. Invitations include it."
-      )
-      nodeField
-    }
-  }
-
-  private var nodeField: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      HStack {
-        TextField(node ?? "node.example.com:7000", text: $nodeInput)
-          .roundedBorderField()
-          .autocorrectionDisabled()
-#if os(iOS)
-          .textInputAutocapitalization(.never)
-          .keyboardType(.URL)
-#endif
-          .onSubmit { Task { await saveNode() } }
-        AsyncButton("Save") { await saveNode() }
-          .buttonStyle(.bordered)
-          .disabled(nodeInput.trimmingCharacters(in: .whitespaces).isEmpty)
-      }
-      if let nodeError {
-        Text(nodeError).error()
-      }
-    }
-  }
-
-  @MainActor
-  private func saveNode() async {
-    guard !nodeInput.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-    nodeError = nil
-    do {
-      try await hub.net.setNode(nodeInput)
-      nodeInput = ""
-      isEditingNode = false
-    } catch {
-      nodeError = error.networkMessage
-    }
+  /// The coordinator's host, `v57.dev` for `wss://v57.dev:1964`
+  private var coordinatorName: String {
+    guard hasNode, let node else { return String(localized: "Not set") }
+    return HubNetworkNodeEndpoint.host(from: node) ?? node
   }
 
   // MARK: Devices
@@ -277,7 +290,8 @@ struct HubNetworkView: View {
   }
 
   private func isThisDevice(_ key: String) -> Bool {
-    if let local = localAgent.key, local == key { return true }
+    // The hub's own agent is this device only on the hub's machine
+    if hub.isOnHubMachine, let local = localAgent.key, local == key { return true }
     guard let device = agents.first(where: { $0.key == key })?.deviceId else { return false }
     return device == hub.client.device?.key.id
   }
@@ -301,62 +315,62 @@ struct HubNetworkView: View {
   private var inviteHint: String? {
     guard canInvite, !canCreateInvitation else { return nil }
     if !hasNode {
-      return canSetNode ? "Set up the network above to invite devices." : "An owner of this Hub needs to set up the network before you can invite devices."
+      return canSetNode
+        ? String(localized: "Set a coordinator in Details to invite devices.")
+        : String(localized: "An owner of this hub needs to set a coordinator before you can invite devices.")
     }
     if !hub.net.isJoined {
-      return "Join the network on this device to invite others."
+      return String(localized: "Join the network on this device to invite others.")
     }
     if let message = localAgent.error?.message, !message.isEmpty {
       return String(message.prefix(240))
     }
-    return "This device is still connecting to the network. Invite becomes available in a moment."
+    return String(localized: "This device is still connecting to the network. Invite becomes available in a moment.")
   }
 
   @ViewBuilder
   private var devices: some View {
     if canSeeDevices || canInvite {
-      VStack(alignment: .leading, spacing: 10) {
-        HStack(alignment: .firstTextBaseline) {
-          sectionHeader("Devices", nil)
-          Spacer()
-          if canInvite {
-            Button {
-              Task { await createInvitation() }
-            } label: {
-              if isCreatingInvitation {
-                ProgressView().controlSize(.small)
-              } else {
-                Label("Invite", systemImage: "plus")
-              }
-            }
-            .buttonStyle(.bordered)
-            .disabled(!canCreateInvitation || isCreatingInvitation)
-          }
-        }
-        let keys = memberKeys
+      let keys = memberKeys
+      KitSection(
+        "Devices", meta: [keys.count == 1 ? String(localized: "1 device") : String(localized: "\(keys.count) devices")],
+        systemImage: "laptopcomputer.and.iphone", hue: .blue, status: isCreatingInvitation ? .working : .idle
+      ) {
         if let invitationError {
-          Text(invitationError).error()
+          Text(invitationError).networkError()
         } else if let inviteHint {
-          Text(inviteHint).secondary()
+          Text(inviteHint).networkNote()
         } else if keys.isEmpty {
           Text(hub.net.isJoined
                ? "Only this device so far. Invite your other devices to reach them from anywhere."
                : "No devices have joined yet.")
-            .secondary()
+            .networkNote()
         }
-        if !keys.isEmpty {
-          NetworkCard {
-            ForEach(Array(keys.enumerated()), id: \.element) { index, key in
-              if index > 0 { Divider() }
-              NetworkMemberRow(
-                name: memberName(key),
-                platform: memberDevice(key)?.platform ?? agents.first { $0.key == key }?.platform,
-                agent: agents.first { $0.key == key },
-                status: agentStatuses.first { $0.key == key },
-                isThisDevice: isThisDevice(key)
-              )
-            }
+        ForEach(keys, id: \.self) { key in
+          NetworkMemberRow(
+            name: memberName(key),
+            platform: memberDevice(key)?.platform ?? agents.first { $0.key == key }?.platform,
+            agent: agents.first { $0.key == key },
+            status: agentStatuses.first { $0.key == key },
+            isThisDevice: isThisDevice(key)
+          )
+          // Its internet, right under it: a gateway belongs to the device that offers it
+          if canUseGateways, let gateway = gateway(of: key) {
+            InternetGatewayRow(gateway: gateway, title: String(localized: "Internet"))
+              .padding(.leading, 24)
           }
+        }
+        // A gateway whose device isn't listed above
+        if canUseGateways {
+          ForEach(gateways.filter { gateway in !keys.contains { self.gateway(of: $0)?.id == gateway.id } }, id: \.id) { gateway in
+            InternetGatewayRow(gateway: gateway, title: gateway.name ?? gateway.key.shortNetworkKey)
+          }
+        }
+      } accessory: {
+        if canInvite {
+          Button("Invite", systemImage: "plus") { Task { await createInvitation() } }
+            .buttonStyle(.kit).controlSize(.small)
+            .disabled(!canCreateInvitation || isCreatingInvitation)
         }
       }
     }
@@ -370,8 +384,8 @@ struct HubNetworkView: View {
     do {
       invitation = NetworkInvitation(link: try await hub.net.createInviteCode())
     } catch is CancellationError {
-      // The hub gives up when this device's inviter isn't registered with the node
-      invitationError = String(localized: "The node at \(node ?? "") didn't confirm this device in time. Check that the node is running and reachable, then try again.")
+      // The hub gives up when this device's inviter isn't registered with the coordinator
+      invitationError = String(localized: "The coordinator at \(coordinatorName) didn't confirm this device in time. Check that it's running and reachable, then try again.")
     } catch {
       invitationError = error.networkMessage
     }
@@ -385,71 +399,52 @@ struct HubNetworkView: View {
   }
 
   private var sharing: some View {
-    VStack(alignment: .leading, spacing: 10) {
-      sectionHeader(
-        "Shared from this device",
-        hub.net.address.map { "Your other devices reach these ports at \($0.ipv4)." }
-          ?? "Your other devices reach these ports over the network."
-      )
-      NetworkCard {
-        ForEach(sharedPorts.sorted()) { shared in
-          HStack {
-            Text(shared.protocol.title).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-              .frame(width: 36, alignment: .leading)
-            Text(String(shared.port)).monospacedDigit()
-            Spacer()
-            Button("Stop Sharing", systemImage: "xmark.circle.fill") {
-              Task { await setShared(shared.port, shared.protocol, false) }
-            }
-            .labelStyle(.iconOnly)
-            .buttonStyle(.borderless)
-            .foregroundStyle(.secondary)
+    KitSection(
+      "Shared from This Device",
+      meta: [hub.net.address.map { String(localized: "Reached at \($0.ipv4)") } ?? String(localized: "Ports your devices reach")],
+      systemImage: "arrow.up.forward.circle", hue: .green, status: gatewayBusy ? .working : .idle
+    ) {
+      ForEach(sharedPorts.sorted()) { shared in
+        SidebarRow(String(shared.port), subtitle: shared.protocol.title, systemImage: "number", hue: .green) {
+          Button("Stop Sharing", systemImage: "xmark") {
+            Task { await setShared(shared.port, shared.protocol, false) }
           }
-          Divider()
-        }
-        HStack {
-          Picker("Protocol", selection: $portProtocol) {
-            ForEach(NetworkPortProtocol.allCases, id: \.self) { value in
-              Text(value.title).tag(value)
-            }
-          }
-          .pickerStyle(.segmented)
-          .labelsHidden()
-          .fixedSize()
-          TextField("Port", text: $portText)
-            .roundedBorderField()
-            .monospacedDigit()
-#if os(iOS)
-            .keyboardType(.numberPad)
-#endif
-            .onSubmit { shareTypedPort() }
-          Button("Share") { shareTypedPort() }
-            .buttonStyle(.bordered)
-            .disabled(typedPort == nil)
-        }
-        if let portError {
-          Text(portError).error()
+          .buttonStyle(.kitIcon)
         }
       }
+      HStack(spacing: 8) {
+        KitSegmented(selection: $portProtocol, options: NetworkPortProtocol.allCases.map { ($0.title, $0) })
+          .fixedSize()
+        TextField("Port", text: $portText)
+          .kitField(mono: true)
+#if os(iOS)
+          .keyboardType(.numberPad)
+#endif
+          .onSubmit { shareTypedPort() }
+        Button("Share") { shareTypedPort() }
+          .buttonStyle(.kit)
+          .disabled(typedPort == nil)
+      }
+      .controlSize(.small)
+      .padding(.vertical, 4)
+      if let portError {
+        Text(portError).networkError()
+      }
       if hub.api.contains("network/gateway/advertise") && hub.api.contains("network/gateway/remove") {
-        NetworkCard {
-          HStack {
-            VStack(alignment: .leading, spacing: 2) {
-              Text("Share this device's internet")
-              Text("Devices you allow can browse through this device's connection.").secondary()
-            }
-            Spacer()
-            Toggle("Share this device's internet", isOn: Binding(
-              get: { hub.net.isSharing },
-              set: { enabled in Task { await updateGatewayServing(enabled) } }
-            ))
-            .labelsHidden()
-            .toggleStyle(.switch)
-            .disabled(gatewayBusy)
-          }
-          if let gatewayError {
-            Text(gatewayError).error()
-          }
+        SidebarRow(
+          String(localized: "Share This Device's Internet"),
+          subtitle: String(localized: "Devices you allow browse through its connection"),
+          systemImage: "globe", hue: .indigo
+        ) {
+          Toggle("Share this device's internet", isOn: Binding(
+            get: { hub.net.isSharing },
+            set: { enabled in Task { await updateGatewayServing(enabled) } }
+          ))
+          .toggleStyle(.kitSwitch).kitLabelsHidden().controlSize(.small)
+          .disabled(gatewayBusy)
+        }
+        if let gatewayError {
+          Text(gatewayError).networkError()
         }
       }
     }
@@ -495,87 +490,37 @@ struct HubNetworkView: View {
 
   // MARK: Internet
 
+  /// The other devices that offer their internet. Reading the gateway list here subscribes the page to it, which
+  /// `HubNet` builds its devices from.
   private var gateways: [HubNet.Device] {
-    hub.net.devices.sorted { ($0.name ?? $0.key) < ($1.name ?? $1.key) }
+    guard !gatewayStatuses.isEmpty else { return [] }
+    return hub.net.devices.filter { $0.key != hub.key }.sorted { ($0.name ?? $0.key) < ($1.name ?? $1.key) }
   }
 
-  /// Only once a device offers its internet, or one is in use
-  private var showsInternet: Bool {
+  private var canUseGateways: Bool {
     hub.api.contains("network/gateway/list") && hub.api.contains("network/gateway/grant")
-      && (!gateways.isEmpty || hub.net.vpn != nil)
   }
 
-  private var internet: some View {
-    VStack(alignment: .leading, spacing: 10) {
-      sectionHeader("Internet through another device", "Your internet traffic goes through the device you choose, like a VPN.")
-      NetworkCard {
-        ForEach(Array(gateways.enumerated()), id: \.element.id) { index, device in
-          if index > 0 { Divider() }
-          let inUse = hub.net.vpn?.id == device.id
-          HStack(spacing: 12) {
-            Image(systemName: Device.symbol(platform: device.platform))
-              .font(.title3).frame(width: 28)
-            VStack(alignment: .leading, spacing: 2) {
-              Text(device.name ?? device.key.shortNetworkKey)
-              Text(gatewaySubtitle(device, inUse: inUse)).secondary()
-            }
-            Spacer()
-            Button(inUse ? "Stop" : "Use") {
-              Task { inUse ? await disableGateway() : await useGateway(device) }
-            }
-            .buttonStyle(.bordered)
-            .tint(inUse ? .red : nil)
-          }
-        }
-        if let gatewayUseError {
-          Text(gatewayUseError).error()
-        }
-      }
-    }
-  }
-
-  private func gatewaySubtitle(_ device: HubNet.Device, inUse: Bool) -> String {
-    var values = [String]()
-    if inUse { values.append(String(localized: "In use")) }
-    if !device.capability.ipv6 { values.append(String(localized: "IPv4 only")) }
-    if device.capability.metered { values.append(String(localized: "Metered")) }
-    return values.isEmpty ? String(localized: "Available") : values.joined(separator: " · ")
-  }
-
-  @MainActor
-  private func useGateway(_ device: HubNet.Device) async {
-    gatewayUseError = nil
-    do {
-      try await hub.net.vpn(through: device)
-    } catch {
-      gatewayUseError = error.networkMessage
-    }
-  }
-
-  @MainActor
-  private func disableGateway() async {
-    gatewayUseError = nil
-    do {
-      try await hub.net.disableVpn()
-    } catch {
-      gatewayUseError = error.networkMessage
-    }
+  /// The internet the device behind `key` offers: its own agent's gateway, or another agent's on the same device
+  private func gateway(of key: String) -> HubNet.Device? {
+    if let own = gateways.first(where: { $0.key == key }) { return own }
+    guard let device = agents.first(where: { $0.key == key })?.deviceId else { return nil }
+    return gateways.first { gateway in agents.contains { $0.key == gateway.key && $0.deviceId == device } }
   }
 
   // MARK: Services
 
   private var services: some View {
-    VStack(alignment: .leading, spacing: 10) {
-      sectionHeader("Services", "Shared on this network by its devices.")
-      NetworkCard {
-        let sorted = resources.sorted { $0.shareName < $1.shareName }
-        ForEach(Array(sorted.enumerated()), id: \.element.id) { index, resource in
-          if index > 0 { Divider() }
-          NetworkResourceRow(
-            resource: resource,
-            status: connectionStatuses.first { $0.resourceId == resource.resourceId }
-          )
-        }
+    KitSection(
+      "Services",
+      meta: [resources.count == 1 ? String(localized: "1 on this network") : String(localized: "\(resources.count) on this network")],
+      systemImage: "point.3.connected.trianglepath.dotted", hue: .purple
+    ) {
+      ForEach(resources.sorted { $0.shareName < $1.shareName }, id: \.id) { resource in
+        NetworkResourceRow(
+          resource: resource,
+          status: connectionStatuses.first { $0.resourceId == resource.resourceId }
+        )
       }
     }
   }
@@ -588,23 +533,19 @@ struct HubNetworkView: View {
   }
 
   private var problemsSection: some View {
-    VStack(alignment: .leading, spacing: 10) {
-      sectionHeader("Connection problems", nil)
-      NetworkCard {
-        ForEach(Array(problems.enumerated()), id: \.element.id) { index, problem in
-          if index > 0 { Divider() }
-          HStack(alignment: .top, spacing: 12) {
-            Image(systemName: "exclamationmark.triangle.fill")
-              .foregroundStyle(.orange)
-              .frame(width: 28)
-            VStack(alignment: .leading, spacing: 2) {
-              Text(resources.first { $0.resourceId == problem.resourceId }?.shareName ?? problem.resourceId.shortNetworkKey)
-              Text(problem.error?.message ?? String(localized: "Couldn't connect directly")).secondary()
-            }
-            Spacer(minLength: 0)
-            if let date = problem.updatedAt.networkDate {
-              Text(date, format: .relative(presentation: .named)).secondary()
-            }
+    KitSection(
+      "Connection Problems",
+      meta: [problems.count == 1 ? String(localized: "1 service") : String(localized: "\(problems.count) services")],
+      systemImage: "exclamationmark.triangle", hue: .orange
+    ) {
+      ForEach(problems, id: \.id) { problem in
+        SidebarRow(
+          resources.first { $0.resourceId == problem.resourceId }?.shareName ?? problem.resourceId.shortNetworkKey,
+          subtitle: problem.error?.message ?? String(localized: "Couldn't connect directly"),
+          systemImage: "exclamationmark.triangle", hue: .orange
+        ) {
+          if let date = problem.updatedAt.networkDate {
+            Text(date, format: .relative(presentation: .named)).networkNote()
           }
         }
       }
@@ -614,111 +555,146 @@ struct HubNetworkView: View {
   // MARK: Details
 
   private var details: some View {
-    DetailsGroup("Details") {
-      NetworkCard {
-        detailRow("Hub") { Text(hub.settings.name) }
-        if hub.api.contains("hub/net/node") {
-          Divider()
-          detailRow("Node") {
-            HStack {
-              Text(hasNode ? node ?? "" : String(localized: "Not set"))
-              if canSetNode && hasNode {
-                Button(isEditingNode ? "Cancel" : "Change") {
-                  isEditingNode.toggle()
-                  nodeInput = ""
-                  nodeError = nil
-                }
-                .buttonStyle(.borderless)
-              }
+    KitSection("Details", systemImage: "info.circle", hue: .gray) {
+      if hub.api.contains("hub/net/node") {
+        InspectorRow("Coordinator") {
+          HStack(spacing: 8) {
+            Text(coordinatorName).foregroundStyle(hasNode ? .kitLabel : .kitSecondary)
+            if canSetNode {
+              Button(hasNode ? "Edit" : "Set Up") { editsCoordinator = true }
+                .buttonStyle(.kit).controlSize(.small)
             }
-          }
-          if isEditingNode {
-            nodeField
-          }
-        }
-        if let address = hub.net.address {
-          Divider()
-          detailRow("IPv4") { Text(address.ipv4) }
-          Divider()
-          detailRow("IPv6") { Text(address.ipv6) }
-        }
-        if canInvite {
-          Divider()
-          detailRow("Invitations") {
-            Text(canCreateInvitation
-                 ? String(localized: "Ready")
-                 : hub.net.isJoined ? String(localized: "Waiting for this device") : String(localized: "Join the network first"))
           }
         }
       }
-      .padding(.top, 8)
-    }
-    .foregroundStyle(.secondary)
-  }
-
-  private func detailRow<Value: View>(_ title: LocalizedStringKey, @ViewBuilder value: () -> Value) -> some View {
-    HStack {
-      Text(title)
-      Spacer()
-      value()
-        .foregroundStyle(.primary)
-        .textSelection(.enabled)
-        .lineLimit(1)
-        .truncationMode(.middle)
-    }
-  }
-
-  private func sectionHeader(_ title: LocalizedStringKey, _ subtitle: String?) -> some View {
-    VStack(alignment: .leading, spacing: 2) {
-      Text(title).font(.headline)
-      if let subtitle {
-        Text(subtitle).secondary()
+      InspectorRow("Hub", value: hub.settings.name, copyable: false)
+      if let address = hub.net.address {
+        InspectorRow("IPv4", value: address.ipv4)
+        InspectorRow("IPv6", value: address.ipv6)
+      }
+      if canInvite {
+        InspectorRow(
+          "Invitations",
+          value: canCreateInvitation
+            ? String(localized: "Ready")
+            : hub.net.isJoined ? String(localized: "Waiting for this device") : String(localized: "Join the network first"),
+          copyable: false
+        )
       }
     }
   }
 }
 
-/// A titled group that folds away; always open on Apple TV, which has no disclosure group
-private struct DetailsGroup<Content: View>: View {
-  let title: LocalizedStringKey
-  @ViewBuilder var content: Content
-  init(_ title: LocalizedStringKey, @ViewBuilder content: () -> Content) {
-    self.title = title
-    self.content = content()
-  }
+/// A device that offers its internet, and Use or Stop: this device's traffic then goes through it, like a VPN
+struct InternetGatewayRow: View {
+  @Environment(Hub.self) private var hub
+  let gateway: HubNet.Device
+  var title: String
+  @State private var busy = false
+  @State private var error: String?
+
   var body: some View {
-#if os(tvOS)
-    VStack(alignment: .leading, spacing: 10) {
-      Text(title).font(.headline)
-      content
+    let inUse = hub.net.vpn?.id == gateway.id
+    SidebarRow(
+      title, subtitle: error ?? (hub.net.isJoined ? subtitle(inUse: inUse) : String(localized: "Join the network to use it")),
+      systemImage: Device.symbol(platform: gateway.platform), hue: error != nil ? .red : inUse ? .indigo : nil,
+      status: busy ? .working : .idle
+    ) {
+      Button(inUse ? "Stop" : "Use Internet", role: inUse ? .destructive : nil) {
+        Task { await toggle(inUse) }
+      }
+      .buttonStyle(.kit).controlSize(.small)
+      .disabled(busy || !hub.net.isJoined)
     }
-#else
-    DisclosureGroup(title) { content }
-#endif
+  }
+
+  private func subtitle(inUse: Bool) -> String {
+    var values = [String]()
+    if inUse { values.append(String(localized: "In use")) }
+    if !gateway.capability.ipv6 { values.append(String(localized: "IPv4 only")) }
+    if gateway.capability.metered { values.append(String(localized: "Metered")) }
+    return values.isEmpty ? String(localized: "Offers its internet") : values.joined(separator: " · ")
+  }
+
+  @MainActor
+  private func toggle(_ inUse: Bool) async {
+    busy = true
+    error = nil
+    defer { busy = false }
+    do {
+      if inUse { try await hub.net.disableVpn() } else { try await hub.net.vpn(through: gateway) }
+    } catch {
+      self.error = error.networkMessage
+    }
+  }
+}
+
+/// The coordinator the hub's invitations name: a hub-net-node every device can reach, which introduces devices to
+/// each other and never carries their traffic. Hubs use v57.dev's until an owner sets another.
+private struct CoordinatorSheet: View {
+  @Environment(Hub.self) private var hub
+  @Environment(\.kitDismiss) private var dismiss
+  @State private var address: String
+  @State private var isSaving = false
+  @State private var error: String?
+
+  static let v57 = HubNetworkNodeEndpoint.default
+
+  init(current: String?) {
+    _address = State(initialValue: current ?? "")
+  }
+
+  private var trimmed: String { address.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+  var body: some View {
+    KitSheet(
+      title: "Coordinator", systemImage: "point.3.filled.connected.trianglepath.dotted", hue: .teal,
+      status: isSaving ? .working : error == nil ? .idle : .failed(error ?? "")
+    ) {
+      FormCard(footer: "Devices find each other through it. Invitations include it; no traffic passes through it.") {
+        FormRow(
+          "Address", help: "A hub-net-node every device can reach", systemImage: "network", error: error,
+          field: TextField("wss://node.example.com:1964", text: $address)
+            .kitFont(.mono).autocorrectionDisabled()
+            .onChange(of: address) { error = nil }
+        )
+        if trimmed != Self.v57 {
+          GroupRow("Use v57.dev", help: "The default, run by v57 for everyone", action: { address = Self.v57 })
+        }
+      }
+      .kitFormHelpWhileEditing()
+    } footer: {
+      Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction).disabled(isSaving)
+      Button("Save") { Task { await save() } }
+        .buttonStyle(.kitPrimary).keyboardShortcut(.defaultAction)
+        .disabled(trimmed.isEmpty || isSaving)
+    }
+    .kitSheetDismissDisabled(isSaving)
+  }
+
+  @MainActor
+  private func save() async {
+    isSaving = true
+    defer { isSaving = false }
+    do {
+      // The default is no setting at all, so the hub follows it
+      try await hub.net.setNode(trimmed == Self.v57 ? nil : trimmed)
+      dismiss()
+    } catch {
+      self.error = error.networkMessage
+    }
   }
 }
 
 private extension View {
-  /// The rounded text field, where the platform has one
-  @ViewBuilder func roundedBorderField() -> some View {
-#if os(tvOS)
-    self
-#else
-    textFieldStyle(.roundedBorder)
-#endif
+  /// A quiet line of explanation inside a section
+  func networkNote() -> some View {
+    kitFont(.caption).foregroundStyle(.kitSecondary).fixedSize(horizontal: false, vertical: true)
   }
-}
 
-/// Rows in one rounded group, separated by the dividers the caller puts between them
-private struct NetworkCard<Content: View>: View {
-  @ViewBuilder var content: Content
-  var body: some View {
-    VStack(alignment: .leading, spacing: 10) {
-      content
-    }
-    .padding(14)
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .kitSurface(.card)
+  /// What went wrong, in red
+  func networkError() -> some View {
+    kitFont(.caption).foregroundStyle(Hue.red.text).fixedSize(horizontal: false, vertical: true)
   }
 }
 
@@ -752,26 +728,7 @@ private struct NetworkMemberRow: View {
   private var address: String? { (status?.addresses ?? agent?.overlayAddresses ?? []).first }
 
   var body: some View {
-    HStack(spacing: 12) {
-      Image(systemName: Device.symbol(platform: platform))
-        .font(.title3)
-        .frame(width: 28)
-      VStack(alignment: .leading, spacing: 2) {
-        HStack(spacing: 6) {
-          Text(name)
-          if isThisDevice {
-            Text("This device")
-              .note()
-              .foregroundStyle(.secondary)
-              .padding(.horizontal, 6)
-              .padding(.vertical, 2)
-              .background(.quaternary, in: .capsule)
-          }
-        }
-        Text(subtitle).secondary()
-      }
-      .lineLimit(1)
-      Spacer(minLength: 0)
+    SidebarRow(name, subtitle: subtitle, systemImage: Device.symbol(platform: platform), hue: online ? .blue : .gray) {
       if let address {
         Button(copied ? "Copied" : "Copy Address", systemImage: copied ? "checkmark" : "doc.on.doc") {
           address.copyToClipboard()
@@ -781,12 +738,12 @@ private struct NetworkMemberRow: View {
             copied = false
           }
         }
-        .labelStyle(.iconOnly)
-        .buttonStyle(.borderless)
-        .foregroundStyle(.secondary)
+        .buttonStyle(.kitIcon)
       }
     }
-    .foregroundStyle(online ? .primary : .secondary)
+    .titleAccessory {
+      if isThisDevice { Chip("This device", style: .quiet) }
+    }
   }
 
   private var subtitle: String {
@@ -808,17 +765,8 @@ private struct NetworkResourceRow: View {
   @State private var connectionError: String?
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      HStack(spacing: 12) {
-        Image(systemName: "point.3.connected.trianglepath.dotted")
-          .font(.title3)
-          .frame(width: 28)
-        VStack(alignment: .leading, spacing: 2) {
-          Text(resource.shareName)
-          Text(subtitle).secondary()
-        }
-        .lineLimit(1)
-        Spacer(minLength: 0)
+    VStack(alignment: .leading, spacing: 2) {
+      SidebarRow(resource.shareName, subtitle: subtitle, systemImage: "point.3.connected.trianglepath.dotted", hue: .purple) {
         Menu {
           Button("Copy Address", systemImage: "doc.on.doc") {
             resource.authority.copyToClipboard()
@@ -835,22 +783,15 @@ private struct NetworkResourceRow: View {
             }
           }
         } label: {
-          Image(systemName: "ellipsis.circle").font(.title3)
+          Label("More", systemImage: "ellipsis")
         }
         .menuStyle(.button)
-        .buttonStyle(.borderless)
+        .buttonStyle(.kitIcon)
         .menuIndicator(.hidden)
         .fixedSize()
       }
-      Text(resource.authority)
-        .font(.caption.monospaced())
-        .foregroundStyle(.tertiary)
-        .lineLimit(1)
-        .truncationMode(.middle)
-        .textSelection(.enabled)
-        .padding(.leading, 40)
       if let connectionError {
-        Text(connectionError).error().padding(.leading, 40)
+        Text(connectionError).kitFont(.caption).foregroundStyle(Hue.red.text)
       }
     }
     .hubStream(
@@ -883,6 +824,7 @@ private struct NetworkResourceRow: View {
 
   private var subtitle: String {
     var parts = [String]()
+    parts.append(resource.authority)
     if providers.isEmpty {
       parts.append(String(localized: "Unavailable"))
     } else if let status, status.phase != .idle {
@@ -1098,7 +1040,7 @@ private extension HubNetworkConnectionPhase {
   }
 }
 
-private extension HubNetworkAgent {
+extension HubNetworkAgent {
   /// The id of the agent's device, from `device` or a `device:<id>` member
   var deviceId: String? {
     if let device, !device.isEmpty { return device.hasPrefix("device:") ? String(device.dropFirst(7)) : device }

@@ -156,6 +156,8 @@ final class LocalHub {
     configuration.name = AppDevice.name
     configuration.deviceName = AppDevice.name
     configuration.platform = AppDevice.platform
+    // Its devices learn from `hub/info` that this app is the hub's Hub Network agent
+    configuration.host = "app"
     // The app is the owner: its service key and its device
     configuration.owners = [KeyChain.main.publicKey()] + (DeviceIdentity.app.map { [$0.key.publicKey] } ?? [])
     configuration.devicePublicKey = DeviceIdentity.app?.key.publicKey

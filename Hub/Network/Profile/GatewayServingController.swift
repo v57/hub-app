@@ -28,31 +28,17 @@ final class GatewayServingController {
       do {
         try await tunnel.restoreInstalledLocalMembership(hub: hub)
         try await tunnel.setGatewayServing(true)
-        hub.networkAppAgent.enable(tunnel: tunnel)
-        let capability = GatewayCapability(
-          ipv4: true,
-          ipv6: true,
-          dns: true,
-          metered: false,
-          updatedAt: ISO8601DateFormatter.js.string(from: Date())
-        )
-        do {
-          try await hub.client.send(
-            "network/gateway/advertise",
-            GatewayAdvertisementRequest(
-              capability: capability,
-              endpoint: try gatewayEndpoint()
-            )
-          )
-        } catch {
-          throw GatewayServingControllerError.advertisementFailed(
-            String(describing: error)
-          )
+        // Only the hub's machine runs its agent
+        if hub.isOnHubMachine {
+          hub.networkAppAgent.enable(tunnel: tunnel)
         }
+        try await advertise(hub: hub)
         state = .available
       } catch {
         try? await tunnel.setGatewayServing(false)
-        hub.networkAppAgent.enable(tunnel: tunnel)
+        if hub.isOnHubMachine {
+          hub.networkAppAgent.enable(tunnel: tunnel)
+        }
         state = .unavailable
         throw error
       }
@@ -75,7 +61,9 @@ final class GatewayServingController {
           }
         }
         try await tunnel.setGatewayServing(false)
-        hub.networkAppAgent.enable(tunnel: tunnel)
+        if hub.isOnHubMachine {
+          hub.networkAppAgent.enable(tunnel: tunnel)
+        }
         state = .disabled
       } catch {
         state = .unavailable
@@ -84,11 +72,37 @@ final class GatewayServingController {
     }
   }
 
+  /// Tells the hub this device offers its internet. Advertisements are bound to the connection, so a new one sends
+  /// it again; the extension keeps serving meanwhile, so the tunnel stays as it is.
+  func advertise(hub: Hub) async throws {
+    let capability = GatewayCapability(
+      ipv4: true,
+      ipv6: true,
+      dns: true,
+      metered: false,
+      updatedAt: ISO8601DateFormatter.js.string(from: Date())
+    )
+    do {
+      try await hub.client.send(
+        "network/gateway/advertise",
+        GatewayAdvertisementRequest(
+          capability: capability,
+          endpoint: try gatewayEndpoint()
+        )
+      )
+    } catch {
+      throw GatewayServingControllerError.advertisementFailed(
+        String(describing: error)
+      )
+    }
+  }
+
   private func gatewayEndpoint() throws -> String {
     let environment = ProcessInfo.processInfo.environment[
       "HUB_NETWORK_GATEWAY_ENDPOINT"
     ]?.trimmingCharacters(in: .whitespacesAndNewlines)
     let value = environment.flatMap { $0.isEmpty ? nil : $0 }
+      // The extension listens on 51820 while it serves the gateway (PacketTunnelWireGuardAdapter)
       ?? "\(ProcessInfo.processInfo.hostName):51820"
     guard value.lastIndex(of: ":") != nil else {
       throw GatewayServingControllerError.invalidEndpoint

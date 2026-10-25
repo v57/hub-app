@@ -32,8 +32,26 @@ final class PacketTunnelController: PacketTunnelControlling {
 
   func install(configuration: HubNetworkProfileConfiguration) async throws {
     try configuration.validate()
+    // A failed install puts this back: removing it would leave the tunnel with no profile at all
+    let previous = try? store.load()
     try store.save(configuration)
 
+    do {
+      do {
+        try await saveManager(for: configuration)
+      } catch let error as NSError where error.domain == NEVPNErrorDomain
+        && error.code == NEVPNError.configurationStale.rawValue {
+        // Saved elsewhere since this one loaded it (another install, Settings): load it again and retry once
+        manager = nil
+        try await saveManager(for: configuration)
+      }
+    } catch {
+      if let previous { try? store.save(previous) } else { try? store.remove() }
+      throw error
+    }
+  }
+
+  private func saveManager(for configuration: HubNetworkProfileConfiguration) async throws {
     do {
       let manager = try await loadManager() ?? NETunnelProviderManager()
       let tunnelProtocol = NETunnelProviderProtocol()
@@ -50,9 +68,6 @@ final class PacketTunnelController: PacketTunnelControlling {
       try await save(manager)
       try await load(manager)
       self.manager = manager
-    } catch {
-      try? store.remove()
-      throw error
     }
   }
 

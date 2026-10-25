@@ -316,10 +316,19 @@ private struct DeviceTable: View {
 struct DeviceInspector: View {
   let device: Device
   @Environment(Hub.self) private var hub
+  @HubState(\.networkAgents) private var networkAgents
+  @HubState(\.networkGateways) private var gatewayStatuses
   @State private var data: DeviceData?
   @State private var isRevoking = false
   @State private var isRenaming = false
   @State private var name = ""
+
+  /// This device's internet, when it offers it on the Hub Network (and isn't this device)
+  private var gateway: HubNet.Device? {
+    guard !gatewayStatuses.isEmpty, device.key != hub.client.device?.key.publicKey else { return nil }
+    let keys = Set(networkAgents.filter { $0.deviceId == device.id }.map(\.key))
+    return hub.net.devices.first { keys.contains($0.key) }
+  }
 
   var body: some View {
     let isThisDevice = device.key == hub.client.device?.key.publicKey
@@ -336,6 +345,9 @@ struct DeviceInspector: View {
         }
         InspectorRow("Safety code", value: DeviceKey.safetyCode(publicKey: device.key), copyable: false)
         InspectorRow("Key", value: "…" + device.key.suffix(8))
+        if let gateway {
+          InternetGatewayRow(gateway: gateway, title: String(localized: "Internet"))
+        }
       } accessory: {
         if hub.require(permissions: "hub/device/rename") {
           Button("Rename", systemImage: "pencil") {

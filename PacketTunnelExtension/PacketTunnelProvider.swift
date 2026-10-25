@@ -5,6 +5,7 @@
 //  Created by Dmitry on 27.07.26.
 //
 
+import Network
 import NetworkExtension
 import HubService
 import Channel
@@ -850,7 +851,9 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     // NetworkExtension rejects loopback values here even though
     // `tunnelRemoteAddress` is only descriptive for a peerless membership.
     // Use TEST-NET-1 when no real WireGuard peer endpoint exists.
-    let remoteAddress = profile.peerEndpoint.flatMap(Self.endpointHost) ?? "192.0.2.1"
+    // It must be an IP address: a named endpoint (`mac.local:51820`) gets the placeholder, WireGuard resolves the name.
+    let remoteAddress = profile.peerEndpoint.flatMap(Self.endpointHost)
+      .flatMap { IPv4Address($0) != nil || IPv6Address($0) != nil ? $0 : nil } ?? "192.0.2.1"
     let settings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: remoteAddress)
     let ipv4Settings = NEIPv4Settings(
       addresses: [ipv4.string],

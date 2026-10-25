@@ -33,7 +33,17 @@ struct HubNetworkWireGuardKeyStore: Sendable {
   }
 
   private func load() throws -> Data? {
-    var query = baseQuery
+    if let data = try load(baseQuery) { return data }
+    // Moves a key an older build kept in the Mac's login keychain, where only the binary that made it reads it
+    // without a password prompt, into the shared group the extension reads too
+    guard let legacy = try load(legacyQuery) else { return nil }
+    try save(legacy)
+    SecItemDelete(legacyQuery as CFDictionary)
+    return legacy
+  }
+
+  private func load(_ base: [String: Any]) throws -> Data? {
+    var query = base
     query[kSecReturnData as String] = true
     query[kSecMatchLimit as String] = kSecMatchLimitOne
     var result: CFTypeRef?
@@ -55,11 +65,23 @@ struct HubNetworkWireGuardKeyStore: Sendable {
     }
   }
 
+  /// Where older builds kept the key: the legacy keychain on the Mac, without the group
+  private var legacyQuery: [String: Any] {
+    [
+      kSecClass as String: kSecClassGenericPassword,
+      kSecAttrService as String: Self.service,
+      kSecAttrAccount as String: Self.account,
+    ]
+  }
+
+  /// The data-protection keychain in the group the app shares with its extension, as the app's other keys: on the
+  /// Mac the legacy keychain asks for the login password whenever another build of the app or extension reads it
   private var baseQuery: [String: Any] {
     var query: [String: Any] = [
       kSecClass as String: kSecClassGenericPassword,
       kSecAttrService as String: Self.service,
       kSecAttrAccount as String: Self.account,
+      kSecUseDataProtectionKeychain as String: true,
     ]
     // Explicit shared group so app and extension resolve the same item on
     // both platforms (same pattern as NativeJoinKeychainStorage).

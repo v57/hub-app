@@ -129,6 +129,10 @@ final class GatewaySelectionController {
     )
 
     let endpointHostValue = Self.endpointHost(gateway.peerEndpoint)
+    // A gateway names itself (`mac.local:51820`); the tunnel takes it by address, resolved here where local names
+    // resolve
+    let peerEndpoint = Self.numericEndpoint(gateway.peerEndpoint, preferring: hub.settings.address.host)
+      ?? gateway.peerEndpoint
     let namedControlHosts = [hub.settings.address.host, endpointHostValue]
       .compactMap { $0 }
     var resolvedControlHosts = [String]()
@@ -161,7 +165,7 @@ final class GatewaySelectionController {
         trustedHubKey: current.trustedHubKey,
         wireGuardPublicKey: wireGuardKey,
         gatewayGrant: grant,
-        peerEndpoint: gateway.peerEndpoint,
+        peerEndpoint: peerEndpoint,
         controlPlaneIPv4Hosts: ipv4Hosts,
         controlPlaneIPv6Hosts: ipv6Hosts,
         gatewayServingEnabled: current.servesGateway
@@ -213,6 +217,22 @@ final class GatewaySelectionController {
       return nil
     }
     return String(endpoint[..<separator])
+  }
+
+  /// `host:port` with the host resolved to an address, IPv4 first (`192.168.1.21:51820`, `[fd00::1]:51820`); nil when
+  /// it doesn't resolve. A Mac answers with one address per interface: `preferring` (the address this device reaches
+  /// the hub at, when the gateway is the hub's machine) wins.
+  static func numericEndpoint(_ endpoint: String, preferring preferred: String? = nil) -> String? {
+    guard let host = endpointHost(endpoint), let colon = endpoint.lastIndex(of: ":") else { return nil }
+    let port = endpoint[endpoint.index(after: colon)...]
+    let addresses = resolve(host)
+    if let preferred, addresses.contains(preferred) {
+      return IPv6Address(preferred) != nil ? "[\(preferred)]:\(port)" : "\(preferred):\(port)"
+    }
+    if let ipv4 = addresses.filter({ IPv4Address($0) != nil }).sorted().first(where: { !$0.hasPrefix("169.254.") }) {
+      return "\(ipv4):\(port)"
+    }
+    return addresses.first { IPv6Address($0) != nil }.map { "[\($0)]:\(port)" }
   }
 
   private static func resolve(_ host: String) -> [String] {

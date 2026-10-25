@@ -36,6 +36,8 @@ final class ShareNetworkAppAgentCoordinator {
     var bind: (AppleAppAgentBindRequest) async throws -> HubNetworkLocalAgentStatus
     var renew: (AppleAppAgentRenewRequest) async throws -> HubNetworkLocalAgentStatus
     var unbind: (AppleAppAgentUnbindRequest) async throws -> Void
+    /// Registers this device's membership on the hub again, which it forgets when a connection drops
+    var reregister: () async throws -> Void = {}
     var now: () -> Date = Date.init
     var sleep: (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
   }
@@ -48,7 +50,9 @@ final class ShareNetworkAppAgentCoordinator {
   private var currentAssertion: AppleAppAgentReadinessAssertion?
   private var runGeneration: UInt64 = 0
 
-  private(set) var state = ShareNetworkAppAgentState.disabled
+  private(set) var state = ShareNetworkAppAgentState.disabled {
+    didSet { if state != oldValue { print("[agent] \(state)") } }
+  }
 
   var errorMessage: String? {
     guard case .unavailable(let message) = state else { return nil }
@@ -94,6 +98,10 @@ final class ShareNetworkAppAgentCoordinator {
           "hub/net/apple-agent/unbind", request
         )
       },
+      reregister: { [weak hub] in
+        guard let hub else { return }
+        try await hub.net.registerAgain(tunnel: PacketTunnelController())
+      }
     )
   }
 
@@ -248,6 +256,8 @@ final class ShareNetworkAppAgentCoordinator {
     generation: UInt64
   ) async {
     var isRenewal = false
+    // Failures in a row: each waits longer before trying again, up to 30 seconds
+    var failures = 0
 
     while generation == runGeneration,
           desiredEnabled, !Task.isCancelled {
@@ -297,6 +307,7 @@ final class ShareNetworkAppAgentCoordinator {
 
         currentAssertion = assertion
         isRenewal = true
+        failures = 0
         state = .available(
           PacketTunnelBootstrapIdentity(
             tunnelInstanceId: assertion.tunnelInstanceId,
@@ -313,14 +324,27 @@ final class ShareNetworkAppAgentCoordinator {
         await unbindCurrent()
         currentAssertion = nil
         state = .unavailable(Self.boundedMessage(error))
-        if error as? ShareNetworkAppAgentCoordinatorError == .tunnelDisconnected,
-           desiredEnabled,
-           runtime.isConnected() {
-          isRenewal = false
+        guard desiredEnabled, runtime.isConnected() else { break }
+        isRenewal = false
+        if error as? ShareNetworkAppAgentCoordinatorError == .tunnelDisconnected {
           try? await runtime.sleep(Self.healthPollInterval)
           continue
         }
-        break
+        // The hub forgot this device (a new connection, a restarted hub): register it again before the next try
+        if String(describing: error).contains("agent profile not registered") {
+          do {
+            try await runtime.reregister()
+          } catch {
+            print("ShareNetworkAppAgentCoordinator: couldn't register again:", error)
+          }
+        }
+        // Anything else (a profile mid-write) may pass: try again, never give up while the hub and the tunnel are there
+        failures += 1
+        do {
+          try await runtime.sleep(.seconds(min(30, 1 << min(failures - 1, 5))))
+        } catch {
+          break
+        }
       }
     }
   }

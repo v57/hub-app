@@ -32,7 +32,7 @@ struct HubStateStorage {
     HubNetworkLocalAgentStatus.unavailable
   )
   let hubNetAgents = Sync("hub/net/list", [HubNetInfo]())
-  /// `null` until an owner sets one; there is no default node
+  /// The coordinator: v57.dev's until an owner sets another (`null` from hubs older than that default)
   let hubNetNode = Sync("hub/net/node", String?.none)
   let networkGateways = Sync("network/gateway/list", [GatewayStatus]())
   let devices = Sync("hub/devices", [Device]())

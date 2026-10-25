@@ -2,6 +2,7 @@ import Foundation
 import Channel
 import HubService
 import Network
+import NetworkExtension
 import Observation
 
 @Observable
@@ -106,6 +107,12 @@ final class HubNet {
   private var nets: HubNets { .main }
   private var vpnRenewalTask: Task<Void, Never>?
   private var inviterAgentWatcherTask: Task<Void, Never>?
+  private var reconnectTask: Task<Void, Never>?
+  @ObservationIgnored private var tunnelObserver: NSObjectProtocol?
+  @ObservationIgnored private var tunnelWasConnected = false
+  @ObservationIgnored private var registration: Task<Void, Error>?
+  /// A restore runs to its end: what it does (saving the profile, restarting the tunnel) would start it again
+  @ObservationIgnored private var isRestoring = false
 
   private(set) var isJoined = false
   private(set) var isSharing = false
@@ -141,6 +148,21 @@ final class HubNet {
 
   init(hub: Hub) {
     self.hub = hub
+    // A tunnel that comes up after the hub's connection (started from Settings, back after a rebuild or a wake)
+    // finds the hub without its registration: restore it then too
+    tunnelObserver = NotificationCenter.default.addObserver(
+      forName: .NEVPNStatusDidChange, object: nil, queue: .main
+    ) { [weak self] notification in
+      let status = (notification.object as? NEVPNConnection)?.status
+      MainActor.assumeIsolated {
+        guard let self else { return }
+        // Only the change to connected: saving a profile posts the same status again and again
+        let wasConnected = self.tunnelWasConnected
+        self.tunnelWasConnected = status == .connected
+        guard status == .connected, !wasConnected, self.hub.isConnected, !self.isRestoring else { return }
+        self.reconnectTask = Task { [weak self] in await self?.restoreAfterConnecting() }
+      }
+    }
   }
 
   /// `node`: the hub's node when the caller just set it, since `hub/net/node` may not have streamed it back yet
@@ -157,10 +179,13 @@ final class HubNet {
       if await tunnel.status == .notInstalled {
         try await tunnel.authorizeAndInstallLocalHub(hub: hub)
       } else {
-        try await tunnel.restoreInstalledLocalMembership(hub: hub)
+        // The same one-at-a-time registration a reconnect and the agent use
+        try await registerAgain(tunnel: tunnel)
       }
       try await tunnel.start()
-      hub.networkAppAgent.enable(tunnel: tunnel)
+      if hub.isOnHubMachine {
+        hub.networkAppAgent.enable(tunnel: tunnel)
+      }
       try refreshAddress(from: tunnel)
       isJoined = true
       await refreshGlobalVPN()
@@ -301,8 +326,9 @@ final class HubNet {
           await tunnel.status == .connected else { return }
     // A joined non-owner device must not bind as the Apple local agent; the
     // bind API is only present for owners, so gate on it to avoid a
-    // misleading `unavailable` state.
-    if hub.api.contains("hub/net/apple-agent/bind") {
+    // misleading `unavailable` state. Nor may a device away from the hub's
+    // machine: the hub's agent runs where the hub runs.
+    if hub.api.contains("hub/net/apple-agent/bind"), hub.isOnHubMachine {
       hub.networkAppAgent.enable(tunnel: tunnel)
     }
     address = Self.address(from: profile)
@@ -317,10 +343,77 @@ final class HubNet {
   }
 
   func connectionChanged(_ connected: Bool) {
-    hub.networkAppAgent.channelConnectionChanged(connected)
+    guard connected else {
+      reconnectTask?.cancel()
+      hub.networkAppAgent.channelConnectionChanged(false)
+      return
+    }
+    reconnectTask = Task { [weak self] in await self?.restoreAfterConnecting() }
+  }
+
+  /// The hub forgets a member when its connection drops, hub-server and HubServer alike: its registration, its agent
+  /// binding and the internet it offers. Each new connection binds them again, the registration before the agent.
+  private func restoreAfterConnecting() async {
+    guard !isRestoring else { return }
+    isRestoring = true
+    defer {
+      isRestoring = false
+      hub.networkAppAgent.channelConnectionChanged(true)
+    }
+    guard let tunnel = try? PacketTunnelController(),
+          let profile = try? tunnel.installedConfiguration(),
+          profile.hubURL == hub.settings.address,
+          await tunnel.status == .connected else {
+      print("[HubNet] connected: no tunnel up for \(hub.settings.name)")
+      return
+    }
+    print("[HubNet] connected: registering on \(hub.settings.name) again")
+    do {
+      try await registerAgain(tunnel: tunnel)
+    } catch {
+      print("HubNet: couldn't register on the hub again:", error)
+      return
+    }
+    guard !Task.isCancelled else { return }
+    await restoreIfActive()
+    print("[HubNet] restored: joined=\(isJoined) sharing=\(isSharing)")
+    if isSharing {
+      do {
+        try await GatewayServingController().advertise(hub: hub)
+      } catch {
+        print("HubNet: couldn't offer this device's internet again:", error)
+      }
+    }
+  }
+
+  /// Registers this device's membership on the hub again (it forgets it with each connection), keeping the profile's
+  /// inviter: that follows the coordinator, which only joining used to learn, so learn it first.
+  /// One at a time: a reconnect, the agent and a page may all ask at once, and parallel installs of the VPN
+  /// configuration fail as stale and stop each other's tunnel. A caller that comes during one waits for it.
+  func registerAgain(tunnel: PacketTunnelController) async throws {
+    if let registration {
+      try await registration.value
+      return
+    }
+    let task = Task { @MainActor [hub] in
+      if let node = await Self.currentNodeEndpoint(hub: hub, timeout: .seconds(3)) {
+        HubService.Group.HubNetworkNodeEndpointStore.shared.set(node)
+      }
+      try await tunnel.restoreInstalledLocalMembership(hub: hub)
+      // It stops the tunnel when the profile had to change: start it with the new one
+      if await tunnel.status != .connected { try await tunnel.start() }
+    }
+    registration = task
+    defer { registration = nil }
+    try await task.value
   }
 
   func apiCapabilitiesChanged() {
+    // The bind API can arrive after the connection: the hub's machine starts its agent then
+    if isJoined, hub.isOnHubMachine, hub.api.contains("hub/net/apple-agent/bind"),
+       hub.networkAppAgent.state == .disabled, let tunnel = try? PacketTunnelController() {
+      hub.networkAppAgent.enable(tunnel: tunnel)
+    }
     hub.networkAppAgent.apiCapabilitiesChanged()
   }
 
@@ -398,7 +491,7 @@ final class HubNet {
     throw HubNetError.localAgentUnavailable
   }
 
-  /// The node `hub/net/node` names, `nil` when no owner has set one (there is no default node)
+  /// The node `hub/net/node` names (v57.dev's by default), `nil` from a hub older than that default with none set
   private static func currentNodeEndpoint(hub: Hub, timeout: Duration = .seconds(5)) async -> String? {
     hub.state.hubNetNode.subscribe(hub: hub)
     let deadline = ContinuousClock.now.advanced(by: timeout)
@@ -415,10 +508,11 @@ final class HubNet {
   func setNode(_ endpoint: String?) async throws {
     let endpoint = endpoint?.trimmingCharacters(in: .whitespacesAndNewlines)
     try await hub.client.send("hub/net/node/set", endpoint?.isEmpty == false ? endpoint : nil)
-    // A joined device's inviter registers with the node its profile names: apply the new one to the running tunnel
-    guard isJoined, let endpoint, !endpoint.isEmpty,
-          endpoint != HubService.Group.HubNetworkNodeEndpointStore.shared.current() else { return }
-    try await joinNetwork(enabled: true, node: endpoint)
+    // A joined device's inviter registers with the node its profile names: apply the new one to the running tunnel.
+    // Clearing it goes back to the default.
+    let applied = endpoint?.isEmpty == false ? endpoint ?? HubNetworkNodeEndpoint.default : HubNetworkNodeEndpoint.default
+    guard isJoined, applied != HubService.Group.HubNetworkNodeEndpointStore.shared.current() else { return }
+    try await joinNetwork(enabled: true, node: applied)
   }
 
   private func refreshGlobalVPN() async {
@@ -431,8 +525,10 @@ final class HubNet {
   /// reach hub-server and shared ports only through this host, after their
   /// temporary bootstrap peer expires.
   private func startInviterAgentWatcher() {
+    // The inviter takes joiners through, a gateway answers its clients: both need every member as a peer
     guard (try? PacketTunnelController()) != nil,
-          (try? PacketTunnelController().installedConfiguration())?.inviterEnabled == true else {
+          let profile = try? PacketTunnelController().installedConfiguration(),
+          profile.inviterEnabled || profile.servesGateway else {
       return
     }
     inviterAgentWatcherTask?.cancel()
@@ -484,5 +580,14 @@ enum HubNetError: LocalizedError, Equatable {
     case .nodeNotSet:
       "This Hub has no Hub Network node. An owner has to set one before invitations work."
     }
+  }
+}
+
+extension Hub {
+  /// True when this app runs on the hub's machine (the hub this app runs, or a hub-server beside it), the only place
+  /// the hub's Hub Network agent can be: the Hub app there stands in for hub-net. Elsewhere a device only joins.
+  var isOnHubMachine: Bool {
+    guard let host = settings.address.host()?.lowercased() else { return false }
+    return host == "127.0.0.1" || host == "localhost" || host == "::1"
   }
 }

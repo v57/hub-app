@@ -230,13 +230,18 @@ final class PacketTunnelWireGuardAdapter {
   
   private static func configuration(for profile: Profile) throws -> TunnelConfiguration {
     try profile.validate()
-    let query: [String: Any] = [
+    // The app keeps it in the data-protection keychain of the group they share (HubNetworkWireGuardKeyStore)
+    var query: [String: Any] = [
       kSecClass as String: kSecClassGenericPassword,
       kSecAttrService as String: "dev.v57.Hub.network.wireguard.v1",
       kSecAttrAccount as String: "private-key",
+      kSecUseDataProtectionKeychain as String: true,
       kSecReturnData as String: true,
       kSecMatchLimit as String: kSecMatchLimitOne,
     ]
+    if let group = Bundle.main.object(forInfoDictionaryKey: "HubKeychainAccessGroup") as? String, !group.isEmpty {
+      query[kSecAttrAccessGroup as String] = group
+    }
     var result: CFTypeRef?
     let status = SecItemCopyMatching(query as CFDictionary, &result)
     guard status == errSecSuccess, let data = result as? Data, data.count == 32 else {
@@ -252,6 +257,11 @@ final class PacketTunnelWireGuardAdapter {
     var interface = InterfaceConfiguration(privateKey: privateKey)
     interface.addresses = [ipv4, ipv6]
     interface.mtu = 1280
+    // A device sharing its internet listens where it advertises it (GatewayServingController: `<host>:51820`);
+    // otherwise WireGuard picks a random port and the other devices' handshakes go nowhere
+    if profile.servesGateway {
+      interface.listenPort = 51820
+    }
     if profile.usesGateway,
        let dnsAddress = profile.dnsServerAddress,
        let dnsServer = DNSServer(from: dnsAddress) {

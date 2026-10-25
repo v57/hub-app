@@ -8,6 +8,9 @@ import Foundation
 /// (`"ws"`) and fed a non-IP into `controlPlaneIPv4Hosts` validation. Accepts
 /// bare IPs, `host:port`, full URLs, and bracketed IPv6.
 enum HubNetworkNodeEndpoint {
+  /// v57.dev's coordinator, what a hub uses until an owner sets another (as HubServer and hub-server do)
+  static let `default` = "wss://v57.dev:1964"
+
   static func host(from endpoint: String) -> String? {
     var value = endpoint.trimmingCharacters(in: .whitespaces)
     for scheme in ["wss://", "ws://", "https://", "http://"] where value.hasPrefix(scheme) {
