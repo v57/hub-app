@@ -59,6 +59,10 @@ final class HomeApps {
   func setTile(_ tile: Tile, _ app: AppHeader, in hub: Hub.ID) {
     update(hub) { $0.tiles[app.path] = tile }
   }
+  /// Reset Data: every hub's Home as it comes
+  func reset() {
+    layouts = [:]
+  }
   private func update(_ hub: Hub.ID, _ change: (inout Layout) -> Void) {
     var layout = layout(hub)
     change(&layout)

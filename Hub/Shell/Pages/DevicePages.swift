@@ -2,7 +2,7 @@
 //  DevicePages.swift
 //  Hub
 //
-//  What this device does on its own: run a hub, share its services with hubs, Farm.
+//  What this device does on its own: run a hub, share its services with hubs, Farm, and its settings.
 //
 
 #if canImport(ComponentKit)
@@ -31,7 +31,59 @@ struct DevicePageView: View {
 #else
       EmptyState(systemImage: "tree", title: "Not on This Device")
 #endif
+    case .settings:
+      DeviceSettingsPage()
     }
+  }
+}
+
+/// This device's keys, and Reset Data
+struct DeviceSettingsPage: View {
+  @State private var isConfirming = false
+  @State private var isResetting = false
+
+  var body: some View {
+    ScrollView {
+      VStack(spacing: KitMetrics.gutter) {
+        KitSection("Identity", meta: ["kept by Reset Data"], systemImage: "key", hue: .gray) {
+          VStack(spacing: 8) {
+            KeyValueLine(key: "Your Key", value: KeyChain.main.publicKey(), mono: true)
+            KeyValueLine(key: "Device Key", value: DeviceIdentity.app?.key.publicKey ?? "–", mono: true)
+          }.padding(8)
+        }
+        KitSection("Reset Data", meta: ["everything but the keys"], systemImage: "trash", hue: .red) {
+          Text("Removes your hubs, settings and caches, Hub Network membership and its VPN profile, and the hub this \(KitDevice.name) runs with its data. Your keys stay, so hubs that know this \(KitDevice.name) still recognize it.")
+            .kitFont(.caption).fixedSize(horizontal: false, vertical: true).padding(8)
+        } accessory: {
+          Button(isResetting ? "Resetting…" : "Reset Data", role: .destructive) { isConfirming = true }
+            .buttonStyle(.kit).controlSize(.small).disabled(isResetting)
+        }
+      }
+      .frame(maxWidth: 720)
+      .frame(maxWidth: .infinity)
+      .padding(KitMetrics.gutter)
+      .padding(.bottom, 24)
+    }
+    .kitPane(.content)
+    .pageToolbar("Settings", meta: ["this \(KitDevice.name)"], systemImage: "gearshape", hue: .gray) { }
+#if DEBUG
+    // For checks that Reset Data kept them: compare with its `[HubReset] KEPT` lines after a relaunch
+    .onAppear { print("[HubSettings] keys \(KeyChain.main.publicKey()) \(DeviceIdentity.app?.key.publicKey ?? "-")") }
+#endif
+    .kitDialog(
+      "Reset Data?", isPresented: $isConfirming,
+      message: "Hub forgets every hub, its settings, Hub Network and the hub this \(KitDevice.name) runs, and starts over. Your keys stay. This can't be undone.",
+      systemImage: "trash", hue: .red, confirm: "Reset Data", role: .destructive
+    ) {
+      Task { await reset() }
+    }
+  }
+
+  /// Ends at the welcome
+  private func reset() async {
+    isResetting = true
+    _ = await HubReset.resetData()
+    isResetting = false
   }
 }
 

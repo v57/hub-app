@@ -133,6 +133,15 @@ final class LocalHub {
     }
   }
 
+  /// Reset Data: stops the hub and forgets that it runs; its data goes with the rest of the app's
+  func reset() async {
+    await setEnabled(false)
+    port = 1997
+    error = nil
+    didPair = false
+    isPairingHidden = false
+  }
+
   /// A new code for another device to pair with, replacing the old one
   func newPairingCode() async {
     guard let server else { return }

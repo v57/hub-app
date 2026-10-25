@@ -11,10 +11,12 @@ import SwiftUI
 import Security
 
 extension KeyChain {
+  /// The app's service key: what hubs know this app by. Reset Data keeps it.
+  static let identityService = "dev.v57.Hub.identity.v1"
   static let main: KeyChain = {
     let accessGroup = Bundle.main.object(forInfoDictionaryKey: "HubKeychainAccessGroup") as? String
     return try! KeyChain(keychain: .init(
-      service: "dev.v57.Hub.identity.v1",
+      service: identityService,
       account: "ed25519-private-key",
       accessGroup: accessGroup?.isEmpty == false ? accessGroup : nil,
       useDataProtectionKeychain: true

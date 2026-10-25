@@ -2,37 +2,89 @@
 //  Reset.swift
 //  Hub
 //
-//  `--reset` (Debug): wipes everything this app keeps on the device, so the next launch is a first launch, then
-//  quits. Only the app itself may do this: its sandbox container, app group and Keychain group are closed to the
-//  shell. Gone: the saved hubs and settings, the hub this device runs (Hub Server) and native joins, the app
-//  group's files, every Keychain item in the app's access group, the per-hub identities and pins, and the Hub
-//  Network VPN profile. What it removed is printed, so run the binary itself to read it:
-//  `Hub.app/Contents/MacOS/Hub --reset`.
+//  Wipes everything this app keeps on the device: the saved hubs and settings, the hub this device runs (Hub Server)
+//  and native joins, the app group's files, the Keychain items in the app's access group, the per-hub identities
+//  and pins, and the Hub Network VPN profile. Only the app itself may do this: its sandbox container, app group and
+//  Keychain group are closed to the shell.
+//
+//  Settings' Reset Data keeps the app's identity and device keys, so hubs still know this device, and leaves the app
+//  at its welcome. `--reset` (Debug) also removes the keys and quits, so the next launch is a first launch; what it
+//  removed is printed, so run the binary itself to read it: `Hub.app/Contents/MacOS/Hub --reset`.
 //
 
-#if DEBUG
 import Foundation
 import Security
+import HubService
 #if canImport(NetworkExtension) && !os(tvOS)
 import NetworkExtension
 #endif
 
 @MainActor
 enum HubReset {
-  static let isRequested = ProcessInfo.processInfo.arguments.contains("--reset")
-
   static let appGroup = "group.dev.v57.hub"
+
+  /// The Keychain items Reset Data keeps: the app's service key and its device key
+  static let identityServices: Set<String> = [KeyChain.identityService, DeviceKey.keychainService]
+
+#if DEBUG
+  static let isRequested = ProcessInfo.processInfo.arguments.contains("--reset")
 
   /// Wipes and quits. Runs before anything reads the Keychain or the saved hubs, so nothing writes them back.
   static func run() async {
-    var report: [String] = []
-    report += removeKeychainItems()
-    report += removeDefaults()
-    report += removeFiles()
-    report += await removeVPNProfiles()
+    let report = await removeAll(keepingIdentity: false)
     for line in report { print("[HubReset] \(line)") }
     print("[HubReset] done")
     exit(0)
+  }
+#endif
+
+  /// Settings' Reset Data: stops what runs (the hub on this device, Farm, the Hub Network tunnel, every hub's
+  /// connection), wipes the rest and leaves the app at its welcome, with the same identity and device keys. What
+  /// writes settings goes before the wipe, so nothing is written back.
+  static func resetData() async -> [String] {
+#if os(macOS) || os(iOS)
+    Farm.main.isRunning = false
+#endif
+#if canImport(HubServer)
+    await LocalHub.main.reset()
+#endif
+#if canImport(NetworkExtension) && !os(tvOS)
+    await (try? PacketTunnelController())?.stop()
+#endif
+    for hub in Hubs.main.list { hub.client.stop() }
+    Hubs.main.list = []
+    Hubs.main.selected = nil
+#if canImport(ComponentKit)
+    Navigator.main.reset()
+#endif
+    var report = await removeAll(keepingIdentity: true)
+    report.append("KEPT Keychain \(KeyChain.identityService): \(KeyChain.main.publicKey())")
+    if let device = DeviceIdentity.app {
+      report.append("KEPT Keychain \(DeviceKey.keychainService): \(device.key.publicKey)")
+    }
+    HomeApps.main.reset()
+#if canImport(NetworkExtension) && !os(tvOS)
+    HubNets.main.reset()
+#endif
+    HubService.Group.HubNetworkNodeEndpointStore.shared.set("")
+    URLCache.shared.removeAllCachedResponses()
+#if canImport(ComponentKit)
+    // The welcome, now that no hub is left
+    Navigator.main.route = .allHubs
+#endif
+#if DEBUG
+    for line in report { print("[HubReset] \(line)") }
+#endif
+    return report
+  }
+
+  private static func removeAll(keepingIdentity: Bool) async -> [String] {
+    var report: [String] = []
+    report += removeKeychainItems(keepingIdentity: keepingIdentity)
+    report += removeDefaults()
+    report += removeFiles()
+    report += await removeVPNProfiles()
+    return report
   }
 
   // MARK: Keychain
@@ -41,9 +93,10 @@ enum HubReset {
     (Bundle.main.object(forInfoDictionaryKey: "HubKeychainAccessGroup") as? String).flatMap { $0.isEmpty ? nil : $0 }
   }
 
-  /// Every item in the app's access group, then the items the Mac keeps in the login keychain by service: the
-  /// WireGuard key and the identities hubs joined with their own tag (`KeyChain.keychain(tag)`), with their pins.
-  private static func removeKeychainItems() -> [String] {
+  /// Every item in the app's access group (but the identity and device keys when it keeps them), then the items
+  /// the Mac keeps in the login keychain by service: the WireGuard key and the identities hubs joined with their own
+  /// tag (`KeyChain.keychain(tag)`), with their pins.
+  private static func removeKeychainItems(keepingIdentity: Bool) -> [String] {
     var removed: [String] = []
     if let accessGroup {
       for itemClass in [kSecClassGenericPassword, kSecClassKey, kSecClassInternetPassword, kSecClassCertificate] {
@@ -52,6 +105,18 @@ enum HubReset {
           kSecAttrAccessGroup as String: accessGroup,
           kSecUseDataProtectionKeychain as String: true,
         ]
+        if keepingIdentity && itemClass == kSecClassGenericPassword {
+          // The keys are generic passwords: the other services go one by one, with every account under them
+          for service in Set(items(matching: query).compactMap(\.service)).subtracting(identityServices).sorted() {
+            var match = query
+            match[kSecAttrService as String] = service
+            let lines = services(matching: match)
+            if SecItemDelete(match as CFDictionary) == errSecSuccess {
+              removed += lines.map { "Keychain \($0)" }
+            }
+          }
+          continue
+        }
         let services = services(matching: query)
         if SecItemDelete(query as CFDictionary) == errSecSuccess {
           removed += services.map { "Keychain \($0)" }
@@ -70,18 +135,24 @@ enum HubReset {
     return removed
   }
 
-  /// The services of the items a query matches, one line each, for the report
-  private static func services(matching query: [String: Any]) -> [String] {
+  /// The service and account of each item a query matches
+  private static func items(matching query: [String: Any]) -> [(service: String?, account: String?, label: String?)] {
     var search = query
     search[kSecMatchLimit as String] = kSecMatchLimitAll
     search[kSecReturnAttributes as String] = true
     var result: CFTypeRef?
     guard SecItemCopyMatching(search as CFDictionary, &result) == errSecSuccess,
           let items = result as? [[String: Any]] else { return [] }
-    return items.map { item in
-      let service = item[kSecAttrService as String] as? String ?? item[kSecAttrLabel as String] as? String ?? "item"
-      let account = item[kSecAttrAccount as String] as? String
-      return account.map { "\(service) / \($0)" } ?? service
+    return items.map {
+      ($0[kSecAttrService as String] as? String, $0[kSecAttrAccount as String] as? String, $0[kSecAttrLabel as String] as? String)
+    }
+  }
+
+  /// The services of the items a query matches, one line each, for the report
+  private static func services(matching query: [String: Any]) -> [String] {
+    items(matching: query).map { item in
+      let service = item.service ?? item.label ?? "item"
+      return item.account.map { "\(service) / \($0)" } ?? service
     }
   }
 
@@ -208,4 +279,3 @@ enum HubReset {
 #endif
   }
 }
-#endif

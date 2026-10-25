@@ -418,6 +418,7 @@ private struct ThisDeviceSection: View {
         Text(farm.isRunning ? "On" : "Off").kitFont(.caption)
       }
 #endif
+      SidebarRow(value: Route.device(.settings), "Settings", systemImage: "gearshape")
     }
   }
 }

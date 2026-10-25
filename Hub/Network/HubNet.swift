@@ -71,6 +71,12 @@ final class HubNets {
   fileprivate func refresh() async {
     vpn = (try? await Self.vpnActive()) ?? false
   }
+
+  /// Reset Data: the tunnel and its profile are gone
+  func reset() {
+    vpn = false
+    joinProgress = nil
+  }
 }
 
 @Observable

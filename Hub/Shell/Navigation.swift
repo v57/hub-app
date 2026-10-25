@@ -61,7 +61,7 @@ enum HubPage: String, Hashable, CaseIterable, Sendable {
 
 /// What this device offers without a hub (the sidebar's This Mac card)
 enum DevicePage: String, Hashable, Sendable {
-  case localHub, sharedServices, farm
+  case localHub, sharedServices, farm, settings
 }
 
 /// The window's selection: the sidebar selects it, and pages open each other through it.
@@ -143,6 +143,11 @@ final class Navigator {
       }
     }
 #endif
+  }
+  /// Reset Data: no hub opened before, sorted as it comes
+  func reset() {
+    opened = [:]
+    sort = .recent
   }
   func open(_ hub: Hub, _ page: HubPage = .overview) {
     route = .hub(hub.id, page)
