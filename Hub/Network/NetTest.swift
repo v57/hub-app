@@ -2,7 +2,7 @@
 //  NetTest.swift
 //  Hub
 //
-//  `--net-test [use-internet|stop|join|share-internet|leave|status|links|node|hub]` (Debug): drives this device's Hub Network on its first hub (or
+//  `--net-test [use-internet|stop|join|share-internet|leave|status|links|node|hub|ip]` (Debug): drives this device's Hub Network on its first hub (or
 //  `--net-hub <ws address>`) without taps and prints each step as a `[NETTEST]` line: the hub's agent, joining, the
 //  devices that offer their internet, Use Internet, a download through it, the network path and the extension's
 //  diagnostics. On an iPhone, read the lines with
@@ -33,19 +33,38 @@ enum NetTest {
     log("start \(action)")
     guard let hub = await wait("hub", seconds: 20, { firstHub() }) else { return fail("no hub") }
     log("hub \(hub.settings.name) \(hub.settings.address.absoluteString) onHubMachine=\(hub.isOnHubMachine)")
-    if action == "hub" {
-      // Whether the hub answers, and through which address: its own or its Hub Network address. A stopped tunnel
-      // of this hub starts first, as the hub may answer only through it.
-      if let tunnel = try? PacketTunnelController(),
-         let profile = try? tunnel.installedConfiguration(), profile.hubURL == hub.settings.address,
-         await tunnel.status != .connected {
-        do {
-          try await tunnel.start()
-          log("tunnel started")
-        } catch {
-          log("tunnel start: \(error)")
+    // A stopped tunnel of this hub starts first, as the hub may answer only through it (a relaunch from devicectl
+    // ends the extension too)
+    startStopLines()
+    if let tunnel = try? PacketTunnelController() {
+      let profile: HubNetworkProfileConfiguration?
+      do {
+        profile = try tunnel.installedConfiguration()
+      } catch {
+        profile = nil
+        log("tunnel profile: \(error)")
+      }
+      let status = await tunnel.status
+      log("tunnel status=\(status) profile hub=\(profile?.hubURL.absoluteString ?? "none") gateway=\(profile?.usesGateway == true)")
+      // Relaunching the app (`devicectl --terminate-existing`) also ends the extension a moment later, so a tunnel
+      // that looks connected at launch may be on its way down
+      if profile?.hubURL == hub.settings.address {
+        for _ in 0..<5 {
+          if await tunnel.status != .connected {
+            do {
+              try await tunnel.start()
+              log("tunnel started")
+            } catch {
+              log("tunnel start: \(error)")
+            }
+            break
+          }
+          try? await Task.sleep(for: .seconds(2))
         }
       }
+    }
+    if action == "hub" {
+      // Whether the hub answers, and through which address: its own or its Hub Network address
       await hub.net.restoreIfActive()
       let connected = await wait("connected", seconds: 40, { hub.isConnected ? true : nil }) != nil
       log("hub connected=\(hub.isConnected) via \(hub.client.currentURL.absoluteString)")
@@ -58,7 +77,7 @@ enum NetTest {
       await hub.net.restoreIfActive()
       return await links(hub)
     }
-    guard await wait("connected", seconds: 30, { hub.isConnected ? true : nil }) != nil else { return fail("not connected") }
+    guard await wait("connected", seconds: 45, { hub.isConnected ? true : nil }) != nil else { return fail("not connected") }
     guard await wait("api", seconds: 20, { hub.api.isEmpty ? nil : true }) != nil else { return fail("no api") }
     // Subscriptions live while they're held
     let subscriptions = [
@@ -138,6 +157,21 @@ enum NetTest {
       await statusLines(hub)
       return reached == "connected" ? pass() : fail("couldn't reach \(target)")
     }
+    if action == "ip" {
+      // Through a chosen gateway, once the tunnel uses it and the link to it is up
+      if UserDefaults.standard.string(forKey: "HubNet.gateway.\(hub.settings.address.absoluteString)") != nil {
+        let deadline = Date().addingTimeInterval(60)
+        while Date() < deadline {
+          if (try? PacketTunnelController().installedConfiguration())?.usesGateway == true,
+             await linkLines()?.up.isEmpty == false { break }
+          try? await Task.sleep(for: .seconds(3))
+        }
+      }
+      await publicAddress()
+      await statusLines(hub)
+      await diagnostics()
+      return pass()
+    }
     if action == "stop" {
       do {
         try await hub.net.disableVpn()
@@ -156,8 +190,23 @@ enum NetTest {
     }
     log("gateway \(gateway.name ?? "-") key=\(gateway.key.prefix(12)) endpoint=\(gateway.endpoint) overlay=\(gateway.overlayAddress)")
     do {
-      try await hub.net.vpn(through: gateway)
+      // Right after connecting, the hub may not have this device's registration back yet ("agent profile not
+      // registered")
+      for attempt in 1... {
+        do {
+          try await hub.net.vpn(through: gateway)
+          break
+        } catch where attempt < 6 {
+          log("use internet: \(error), again in 3 s")
+          try? await Task.sleep(for: .seconds(3))
+        }
+      }
       log("using internet through \(gateway.name ?? gateway.key.prefix(12).description)")
+      // The new tunnel reaches the gateway once the link to it is up again
+      for _ in 0..<14 {
+        if let status = await linkLines(), !status.up.isEmpty { break }
+        try? await Task.sleep(for: .seconds(3))
+      }
     } catch {
       await diagnostics()
       return fail("use internet: \(error)")
@@ -235,6 +284,14 @@ enum NetTest {
     let coordinator: String
     let linkUps: Int
     let peers: [Peer]
+    let wireGuard: [WireGuardPeer]?
+    struct WireGuardPeer: Decodable {
+      let wireGuardKey: String
+      let endpoint: String?
+      let allowedIPs: [String]
+      let rxBytes: Int
+      let txBytes: Int
+    }
     /// Peers with a handshake in the last 150 seconds
     var up: [Peer] { peers.filter { $0.lastHandshake.map { Date().timeIntervalSince($0) < 150 } ?? false } }
   }
@@ -257,12 +314,18 @@ enum NetTest {
       let age = peer.lastHandshake.map { "\(Int(Date().timeIntervalSince($0)))s ago" } ?? "never"
       log("link peer=\(peer.key.suffix(10)) \(peer.opens ? "opens" : "accepts") attempting=\(peer.attempting) endpoint=\(peer.endpoint ?? "-") routes=\(peer.routes) ports=\(peer.ports) handshake=\(age)")
     }
+    for peer in status.wireGuard ?? [] {
+      log("wireguard peer=\(peer.wireGuardKey.prefix(10)) endpoint=\(peer.endpoint ?? "-") allowed=\(peer.allowedIPs) rx=\(peer.rxBytes) tx=\(peer.txBytes)")
+    }
     return status
   }
 
   private static func statusLines(_ hub: Hub) async {
     log("joined=\(hub.net.isJoined) address=\(hub.net.address?.ipv4 ?? "-") vpn=\(hub.net.vpn?.name ?? "none")")
     await linkLines()
+    if let stats = try? await PacketTunnelController().gatewayStats() {
+      log("gateway stats \(String(decoding: stats, as: UTF8.self))")
+    }
     let path = await currentPath()
     log("path status=\(path.status) interfaces=\(path.availableInterfaces.map { "\($0.name)(\($0.type))" }) primary=\(path.availableInterfaces.first.map { "\($0.name)" } ?? "-")")
   }
@@ -317,6 +380,7 @@ enum NetTest {
   /// Where the traffic leaves (Cloudflare's trace: the public IP and data centre), then 5 MB to time
   private static func download() async {
     let session = URLSession(configuration: .ephemeral)
+    await publicAddress(session)
     if let (data, _) = try? await session.data(from: URL(string: "https://www.cloudflare.com/cdn-cgi/trace")!) {
       let trace = String(decoding: data, as: UTF8.self).split(separator: "\n")
         .filter { $0.hasPrefix("ip=") || $0.hasPrefix("colo=") || $0.hasPrefix("warp=") }
@@ -334,6 +398,16 @@ enum NetTest {
     }
   }
 
+  /// The address the internet sees this device at
+  private static func publicAddress(_ session: URLSession = URLSession(configuration: .ephemeral)) async {
+    do {
+      let (data, _) = try await session.data(from: URL(string: "https://vijo.gg/ip")!)
+      log("public address \(String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines))")
+    } catch {
+      log("public address failed: \(error.localizedDescription)")
+    }
+  }
+
   /// The extension's own lines: over its IPC while it runs, else from the file it also writes in the app group
   private static func diagnostics() async {
     if let controller = try? PacketTunnelController(),
@@ -347,6 +421,16 @@ enum NetTest {
       return
     }
     for line in text.split(separator: "\n").suffix(25) { log("extension file \(line)") }
+  }
+
+  /// When the extension last started and stopped, and why, from the file it keeps across its runs
+  private static func startStopLines() {
+    guard let group = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.dev.v57.hub"),
+          let text = try? String(contentsOf: group.appendingPathComponent("hn9xx-diag.log"), encoding: .utf8) else { return }
+    let lines = text.split(separator: "\n").filter {
+      $0.contains("startTunnel: profile decoded") || $0.contains("stopTunnel") || $0.contains("failed")
+    }
+    for line in lines.suffix(8) { log("extension before \(line)") }
   }
 
   // MARK: Helpers
