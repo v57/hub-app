@@ -1,25 +1,29 @@
 import Foundation
 
-/// Online-inviter registration client for hub-net-node.
+/// The device's client for the coordinator (hub-net-node, PROTOCOL.md).
 ///
-/// Mirrors the Go `hub-net/agent/nodeclient`: it holds one persistent WebSocket to the node's `/rendezvous` and runs
-/// the signed challenge handshake:
+/// It holds one persistent WebSocket to the node's `/rendezvous` and keeps the device present with the signed
+/// challenge handshake:
 ///
-///     inviter.register (service key only) -> inviter.challenge
-///     -> inviter.register (nonce + signature) -> inviter.registered
+///     presence.register (service key only) -> presence.challenge
+///     -> presence.register (nonce + signature) -> presence.registered
 ///
-/// The node keeps a registration for its lease (2 minutes) and drops it when the connection closes, and an
-/// invitation only works while its inviter is registered. So the client renews at half the remaining lease on its
-/// own task, re-registers at once on a new connection when the socket closes, and reads the socket on a dedicated
-/// reader, so no wait for a reply can block a renewal. While registered, `inviter.bootstrap` pushes arrive when a
-/// joiner opens a session with one of this inviter's invitations; the client then probes, opens its own side of the
-/// paired session (on this connection: the node requires it), offers the inviter's candidate, and reports the
-/// joiner's candidates + observed endpoint to a handler. Bootstrap sessions run one at a time and close as soon as
-/// the joiner's candidates arrive.
+/// The node keeps a registration for its lease (2 minutes) and drops it, with every link of the device, when the
+/// connection closes. So the client renews at half the remaining lease on its own task, registers again at once on a
+/// new connection when the socket closes, and reads the socket on a dedicated reader, so no wait for a reply can
+/// block a renewal.
+///
+/// While present it carries two kinds of traffic:
+/// - Peer links (`link.*`): `openLink` asks the node to introduce this device to the other side of a hub-signed grant;
+///   `link.incoming`, `link.ready` and `link.closed` pushes go to `onLink` (`LinkManager` decides on them).
+/// - Invitations: `inviter.bootstrap` pushes arrive when a joiner opens a session with one of this device's
+///   invitations; the client then probes, opens its own side of the paired session (on this connection: the node
+///   requires it), offers the inviter's candidate, and reports the joiner's candidates + observed endpoint to a
+///   handler. Bootstrap sessions run one at a time and close as soon as the joiner's candidates arrive.
 ///
 /// Depends only on Foundation (signing is a closure), so it is tested against the real node outside the extension
 /// (`Scripts/InviterNodeTests`).
-final class InviterNodeClient: NSObject, URLSessionWebSocketDelegate, @unchecked Sendable {
+final class CoordinatorClient: NSObject, URLSessionWebSocketDelegate, @unchecked Sendable {
   struct BootstrapEvent {
     let invitationCode: String
     let tokenDigest: String
@@ -73,6 +77,19 @@ final class InviterNodeClient: NSObject, URLSessionWebSocketDelegate, @unchecked
     var challengeNonce: String? = nil
     var challengeSignature: String? = nil
     var registrationExpiresAt: String? = nil
+    var grant: PeerLinkGrant? = nil
+    var linkId: String? = nil
+    var probeToken: String? = nil
+    var peerKey: String? = nil
+    var endpoints: [LinkEndpoint]? = nil
+    var punchAt: String? = nil
+  }
+
+  /// A `link.opened` reply: the link's id, this side's probe token and the other side
+  struct OpenedLink: Equatable, Sendable {
+    let linkId: String
+    let probeToken: String
+    let peerKey: String
   }
 
   struct NodeError: Codable {
@@ -90,9 +107,8 @@ final class InviterNodeClient: NSObject, URLSessionWebSocketDelegate, @unchecked
     let generation: UInt64
   }
 
-  /// Signing domain for the online-inviter registration challenge, matching
-  /// `hub-service-go/protocol` `PurposeInviterRegistration`.
-  static let registrationDomain = "hub-network/inviter-registration/v1"
+  /// Signing domain for the presence challenge, matching hub-net-node's `PurposePresence`
+  static let registrationDomain = "hub-network/presence/v1"
   /// How long a request waits for its reply
   var replyTimeout: TimeInterval = 15
   /// How long a bootstrap session waits for the joiner's candidates
@@ -105,11 +121,12 @@ final class InviterNodeClient: NSObject, URLSessionWebSocketDelegate, @unchecked
   private let probe: (String, Data) async throws -> Void
   private let candidates: () -> Candidate?
   private let onBootstrap: (BootstrapEvent) async -> Void
+  private let onLink: (Envelope) async -> Void
   private let onStatusChange: (Bool) -> Void
   private let log: (String) -> Void
 
   private let lock = NSLock()
-  private var link: InviterNodeLink?
+  private var link: CoordinatorLink?
   private var isRegistered = false
   private var runTask: Task<Void, Never>?
   /// Registrations completed, renewals included (for tests)
@@ -121,7 +138,8 @@ final class InviterNodeClient: NSObject, URLSessionWebSocketDelegate, @unchecked
     sign: @escaping (Data) throws -> String,
     probe: @escaping (String, Data) async throws -> Void,
     candidates: @escaping () -> Candidate?,
-    onBootstrap: @escaping (BootstrapEvent) async -> Void,
+    onBootstrap: @escaping (BootstrapEvent) async -> Void = { _ in },
+    onLink: @escaping (Envelope) async -> Void = { _ in },
     onStatusChange: @escaping (Bool) -> Void,
     log: @escaping (String) -> Void = { _ in }
   ) {
@@ -131,11 +149,38 @@ final class InviterNodeClient: NSObject, URLSessionWebSocketDelegate, @unchecked
     self.probe = probe
     self.candidates = candidates
     self.onBootstrap = onBootstrap
+    self.onLink = onLink
     self.onStatusChange = onStatusChange
     self.log = log
   }
 
   var registered: Bool { lock.withLock { isRegistered } }
+
+  /// The coordinator this client registers at, as configured
+  var nodeEndpointValue: String { nodeEndpoint }
+
+  /// The node's UDP endpoint, where link probes go
+  var udpEndpoint: String { Self.nodeUDPEndpoint(nodeEndpoint) }
+
+  /// Asks the node to introduce this device to the other side of `grant` (`link.open`)
+  func openLink(_ grant: PeerLinkGrant) async throws -> OpenedLink {
+    guard let link = lock.withLock({ isRegistered ? self.link : nil }) else { throw CoordinatorError.closed }
+    let opened = try await link.exclusive {
+      try await link.request(Envelope(
+        majorVersion: 1, minorVersion: 0, type: "link.open", requestId: UUID().uuidString, grant: grant
+      ), timeout: self.replyTimeout)
+    }
+    guard opened.type == "link.opened", let linkId = opened.linkId, let probeToken = opened.probeToken,
+      let peerKey = opened.peerKey
+    else { throw CoordinatorError.invalidResponse }
+    return OpenedLink(linkId: linkId, probeToken: probeToken, peerKey: peerKey)
+  }
+
+  /// Sends a link message that has no reply: `link.accept`, `link.reject`, `link.offer` or `link.close`
+  func sendLink(_ type: String, linkId: String, endpoints: [LinkEndpoint]? = nil) async throws {
+    guard let link = lock.withLock({ self.link }) else { throw CoordinatorError.closed }
+    try await link.send(Envelope(majorVersion: 1, minorVersion: 0, type: type, linkId: linkId, endpoints: endpoints))
+  }
 
   func start() {
     lock.withLock {
@@ -145,7 +190,7 @@ final class InviterNodeClient: NSObject, URLSessionWebSocketDelegate, @unchecked
   }
 
   func stop() {
-    let (task, link) = lock.withLock { () -> (Task<Void, Never>?, InviterNodeLink?) in
+    let (task, link) = lock.withLock { () -> (Task<Void, Never>?, CoordinatorLink?) in
       defer {
         runTask = nil
         self.link = nil
@@ -173,7 +218,7 @@ final class InviterNodeClient: NSObject, URLSessionWebSocketDelegate, @unchecked
       } catch is CancellationError {
         return
       } catch {
-        log("inviter node: registration failed: \(error)")
+        log("coordinator: registration failed: \(error)")
       }
       setRegistered(false)
       guard !Task.isCancelled else { return }
@@ -186,7 +231,7 @@ final class InviterNodeClient: NSObject, URLSessionWebSocketDelegate, @unchecked
         failures += 1
         delay = min(pow(2, Double(failures - 1)), 30)
       }
-      log("inviter node: connecting again in \(delay)s")
+      log("coordinator: connecting again in \(delay)s")
       try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
     }
   }
@@ -194,12 +239,12 @@ final class InviterNodeClient: NSObject, URLSessionWebSocketDelegate, @unchecked
   /// One connection: registers, renews ahead of expiry and serves bootstrap pushes until the socket closes. Returns
   /// whether it was registered.
   private func connectAndServe() async throws -> Bool {
-    guard let url = Self.rendezvousURL(nodeEndpoint) else { throw InviterNodeError.invalidNode }
+    guard let url = Self.rendezvousURL(nodeEndpoint) else { throw CoordinatorError.invalidNode }
     let configuration = URLSessionConfiguration.ephemeral
     configuration.timeoutIntervalForRequest = 300
     configuration.timeoutIntervalForResource = 7 * 24 * 3600
     let session = URLSession(configuration: configuration, delegate: self, delegateQueue: nil)
-    let link = InviterNodeLink(socket: session.webSocketTask(with: url), log: log)
+    let link = CoordinatorLink(socket: session.webSocketTask(with: url), log: log)
     lock.withLock { self.link = link }
     defer {
       session.invalidateAndCancel()
@@ -209,7 +254,7 @@ final class InviterNodeClient: NSObject, URLSessionWebSocketDelegate, @unchecked
 
     var expiresAt = try await link.exclusive { try await self.register(link) }
     setRegistered(true)
-    log("inviter node: registered, lease until \(expiresAt)")
+    log("coordinator: present, lease until \(expiresAt)")
 
     let renewal = Task { [weak self] in
       while !Task.isCancelled {
@@ -219,9 +264,9 @@ final class InviterNodeClient: NSObject, URLSessionWebSocketDelegate, @unchecked
         guard !Task.isCancelled, let self else { return }
         do {
           expiresAt = try await link.exclusive { try await self.register(link) }
-          self.log("inviter node: renewed, lease until \(expiresAt)")
+          self.log("coordinator: renewed, lease until \(expiresAt)")
         } catch {
-          self.log("inviter node: renewal failed: \(error); reconnecting")
+          self.log("coordinator: renewal failed: \(error); reconnecting")
           await link.close()
           return
         }
@@ -229,40 +274,48 @@ final class InviterNodeClient: NSObject, URLSessionWebSocketDelegate, @unchecked
     }
     defer { renewal.cancel() }
 
+    // Links are handled apart from invitations, so a bootstrap session holding the connection never delays them
+    let links = Task { [weak self] in
+      for await push in link.links {
+        await self?.onLink(push)
+      }
+    }
+    defer { links.cancel() }
+
     for await push in await link.bootstraps {
       await handleBootstrap(link, push)
     }
-    log("inviter node: connection closed\(await link.closeReason.map { ": \($0)" } ?? "")")
+    log("coordinator: connection closed\(await link.closeReason.map { ": \($0)" } ?? "")")
     return true
   }
 
   // MARK: Registration handshake
 
   /// Runs the challenge handshake. Call inside `link.exclusive`.
-  private func register(_ link: InviterNodeLink) async throws -> Date {
+  private func register(_ link: CoordinatorLink) async throws -> Date {
     let challenge = try await link.request(Envelope(
-      majorVersion: 1, minorVersion: 0, type: "inviter.register", requestId: UUID().uuidString, serviceKey: serviceKey
+      majorVersion: 1, minorVersion: 0, type: "presence.register", requestId: UUID().uuidString, serviceKey: serviceKey
     ), timeout: replyTimeout)
-    guard challenge.type == "inviter.challenge", let nonce = challenge.challengeNonce, !nonce.isEmpty else {
-      throw InviterNodeError.invalidResponse
+    guard challenge.type == "presence.challenge", let nonce = challenge.challengeNonce, !nonce.isEmpty else {
+      throw CoordinatorError.invalidResponse
     }
     guard let nonceData = Self.base64URLDecode(nonce) ?? Data(base64Encoded: nonce), !nonceData.isEmpty else {
-      throw InviterNodeError.invalidNonce
+      throw CoordinatorError.invalidNonce
     }
     let registered = try await link.request(Envelope(
-      majorVersion: 1, minorVersion: 0, type: "inviter.register", requestId: UUID().uuidString,
+      majorVersion: 1, minorVersion: 0, type: "presence.register", requestId: UUID().uuidString,
       serviceKey: serviceKey, challengeNonce: nonce, challengeSignature: try sign(nonceData)
     ), timeout: replyTimeout)
-    guard registered.type == "inviter.registered", let raw = registered.registrationExpiresAt,
+    guard registered.type == "presence.registered", let raw = registered.registrationExpiresAt,
       let expiresAt = Self.parseRFC3339(raw)
-    else { throw InviterNodeError.invalidResponse }
+    else { throw CoordinatorError.invalidResponse }
     lock.withLock { registrations += 1 }
     return expiresAt
   }
 
   // MARK: Bootstrap exchange
 
-  private func handleBootstrap(_ link: InviterNodeLink, _ pending: Envelope) async {
+  private func handleBootstrap(_ link: CoordinatorLink, _ pending: Envelope) async {
     log("inviter.bootstrap rx replay=\(pending.tokenDigest?.prefix(8) ?? "?")")
     guard let invitationCode = pending.invitationCode, let tokenDigest = pending.tokenDigest,
       let transactionId = pending.transactionId, let joinerKey = pending.key,
@@ -292,7 +345,7 @@ final class InviterNodeClient: NSObject, URLSessionWebSocketDelegate, @unchecked
   }
 
   private func exchangeCandidates(
-    _ link: InviterNodeLink, pending: Envelope, sessionId: String,
+    _ link: CoordinatorLink, pending: Envelope, sessionId: String,
     invitationCode: String, tokenDigest: String, transactionId: String, joinerKey: String
   ) async throws -> BootstrapEvent? {
     if let candidate = candidates() {
@@ -309,7 +362,7 @@ final class InviterNodeClient: NSObject, URLSessionWebSocketDelegate, @unchecked
       let list: Envelope
       do {
         list = try await link.candidates(sessionId: sessionId, timeout: deadline.timeIntervalSinceNow)
-      } catch InviterNodeError.timeout where event != nil {
+      } catch CoordinatorError.timeout where event != nil {
         break
       }
       event = BootstrapEvent(
@@ -329,14 +382,14 @@ final class InviterNodeClient: NSObject, URLSessionWebSocketDelegate, @unchecked
       transactionId: pending.transactionId ?? "", tunnelInstanceId: "", generation: 0
     ))
     let endpoint = Self.nodeUDPEndpoint(nodeEndpoint)
-    guard !endpoint.isEmpty else { throw InviterNodeError.invalidNode }
+    guard !endpoint.isEmpty else { throw CoordinatorError.invalidNode }
     try await probe(endpoint, data)
   }
 
   /// The node records the UDP probe asynchronously and refuses `session.open` with the retryable
   /// `udp_observation_required` until it has: probe like the joiner does (three datagrams 50 ms apart), then
   /// re-probe and retry the open a few times instead of failing the bootstrap on the first refusal.
-  private func openSessionAfterProbe(_ link: InviterNodeLink, pending: Envelope) async throws -> String {
+  private func openSessionAfterProbe(_ link: CoordinatorLink, pending: Envelope) async throws -> String {
     var attempt = 0
     while true {
       for _ in 0..<3 {
@@ -350,10 +403,10 @@ final class InviterNodeClient: NSObject, URLSessionWebSocketDelegate, @unchecked
           transactionId: pending.transactionId, tunnelInstanceId: pending.tunnelInstanceId, generation: pending.generation
         ), timeout: replyTimeout)
         guard opened.type == "session.opened", let sessionId = opened.sessionId, !sessionId.isEmpty else {
-          throw InviterNodeError.invalidResponse
+          throw CoordinatorError.invalidResponse
         }
         return sessionId
-      } catch InviterNodeError.node("udp_observation_required") where attempt < 5 {
+      } catch CoordinatorError.node("udp_observation_required") where attempt < 5 {
         attempt += 1
         log("inviter.bootstrap udp observation pending, retry \(attempt)")
         try await Task.sleep(nanoseconds: UInt64(200_000_000 * attempt))
@@ -422,9 +475,10 @@ final class InviterNodeClient: NSObject, URLSessionWebSocketDelegate, @unchecked
 
 /// One WebSocket to the node. A reader task delivers every message: replies to the one request in flight, error
 /// replies (the node sends them without a request id) to that request, `inviter.bootstrap` pushes to `bootstraps`,
-/// and `candidate.list` to the session waiting for it. Timeouts never cancel the socket read, so nothing blocks.
-actor InviterNodeLink {
-  typealias Envelope = InviterNodeClient.Envelope
+/// link pushes (and errors about a link nobody waits on) to `links`, and `candidate.list` to the session waiting for
+/// it. Timeouts never cancel the socket read, so nothing blocks.
+actor CoordinatorLink {
+  typealias Envelope = CoordinatorClient.Envelope
 
   private let socket: URLSessionWebSocketTask
   private let log: (String) -> Void
@@ -434,9 +488,11 @@ actor InviterNodeLink {
   private var nextWaiter = 0
   private var pushes: AsyncStream<Envelope>.Continuation!
   let bootstraps: AsyncStream<Envelope>
+  private var linkPushes: AsyncStream<Envelope>.Continuation!
+  let links: AsyncStream<Envelope>
   private(set) var closeReason: String?
   private var isClosed = false
-  /// One holder at a time: registrations and whole bootstrap sessions
+  /// One holder at a time: registrations, link openings and whole bootstrap sessions
   private var busy = false
   private var queue: [CheckedContinuation<Void, Never>] = []
 
@@ -446,6 +502,9 @@ actor InviterNodeLink {
     var continuation: AsyncStream<Envelope>.Continuation!
     bootstraps = AsyncStream(bufferingPolicy: .unbounded) { continuation = $0 }
     pushes = continuation
+    var linkContinuation: AsyncStream<Envelope>.Continuation!
+    links = AsyncStream(bufferingPolicy: .unbounded) { linkContinuation = $0 }
+    linkPushes = linkContinuation
   }
 
   func start() {
@@ -469,7 +528,7 @@ actor InviterNodeLink {
       @unknown default: continue
       }
       guard let envelope = try? JSONDecoder().decode(Envelope.self, from: data), envelope.majorVersion == 1 else {
-        log("inviter node: unreadable message")
+        log("coordinator: unreadable message")
         continue
       }
       deliver(envelope)
@@ -479,13 +538,18 @@ actor InviterNodeLink {
   private func deliver(_ envelope: Envelope) {
     if envelope.type == "inviter.bootstrap" {
       pushes.yield(envelope)
+    } else if ["link.incoming", "link.ready", "link.closed"].contains(envelope.type) {
+      linkPushes.yield(envelope)
     } else if envelope.type == "error" {
-      let error = InviterNodeError.node(envelope.error?.code ?? "unknown")
-      if let reply {
+      let error = CoordinatorError.node(envelope.error?.code ?? "unknown")
+      // An error about a link carries its id and no request id unless it answers one
+      if let reply, envelope.requestId == reply.requestId || (envelope.requestId == nil && envelope.linkId == nil) {
         self.reply = nil
         reply.continuation.resume(throwing: error)
+      } else if envelope.linkId != nil {
+        linkPushes.yield(envelope)
       } else {
-        log("inviter node: error \(envelope.error?.code ?? "?") \(envelope.error?.message ?? "")")
+        log("coordinator: error \(envelope.error?.code ?? "?") \(envelope.error?.message ?? "")")
       }
     } else if envelope.type == "candidate.list", let sessionId = envelope.sessionId {
       if let waiter = candidateWaiter, waiter.sessionId == sessionId {
@@ -505,13 +569,14 @@ actor InviterNodeLink {
     isClosed = true
     closeReason = reason
     pushes.finish()
+    linkPushes.finish()
     if let reply {
       self.reply = nil
-      reply.continuation.resume(throwing: InviterNodeError.closed)
+      reply.continuation.resume(throwing: CoordinatorError.closed)
     }
     if let waiter = candidateWaiter {
       candidateWaiter = nil
-      waiter.continuation.resume(throwing: InviterNodeError.closed)
+      waiter.continuation.resume(throwing: CoordinatorError.closed)
     }
   }
 
@@ -521,14 +586,14 @@ actor InviterNodeLink {
   }
 
   func send(_ envelope: Envelope) async throws {
-    guard !isClosed else { throw InviterNodeError.closed }
+    guard !isClosed else { throw CoordinatorError.closed }
     let data = try JSONEncoder().encode(envelope)
     try await socket.send(.string(String(decoding: data, as: UTF8.self)))
   }
 
   /// Sends a request and waits for its reply (or an error reply) up to `timeout`. Call inside `exclusive`.
   func request(_ envelope: Envelope, timeout: TimeInterval) async throws -> Envelope {
-    guard !isClosed else { throw InviterNodeError.closed }
+    guard !isClosed else { throw CoordinatorError.closed }
     nextWaiter += 1
     let id = nextWaiter
     return try await withCheckedThrowingContinuation { continuation in
@@ -542,7 +607,7 @@ actor InviterNodeLink {
       }
       Task {
         try? await Task.sleep(nanoseconds: UInt64(max(0.1, timeout) * 1_000_000_000))
-        self.failReply(id, InviterNodeError.timeout)
+        self.failReply(id, CoordinatorError.timeout)
       }
     }
   }
@@ -560,7 +625,7 @@ actor InviterNodeLink {
       candidateLists[sessionId] = lists.isEmpty ? nil : lists
       return first
     }
-    guard !isClosed else { throw InviterNodeError.closed }
+    guard !isClosed else { throw CoordinatorError.closed }
     nextWaiter += 1
     let id = nextWaiter
     return try await withCheckedThrowingContinuation { continuation in
@@ -575,10 +640,10 @@ actor InviterNodeLink {
   private func failCandidates(_ id: Int) {
     guard let waiter = candidateWaiter, waiter.id == id else { return }
     candidateWaiter = nil
-    waiter.continuation.resume(throwing: InviterNodeError.timeout)
+    waiter.continuation.resume(throwing: CoordinatorError.timeout)
   }
 
-  /// Runs `body` while no other registration or bootstrap session uses the connection
+  /// Runs `body` while no other registration, link opening or bootstrap session uses the connection
   func exclusive<T>(_ body: @Sendable () async throws -> T) async throws -> T {
     if busy {
       await withCheckedContinuation { queue.append($0) }
@@ -595,7 +660,7 @@ actor InviterNodeLink {
   }
 }
 
-enum InviterNodeError: Error, Equatable {
+enum CoordinatorError: Error, Equatable {
   case invalidNode
   case invalidResponse
   case invalidNonce

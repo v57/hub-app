@@ -2,7 +2,7 @@
 //  NetTest.swift
 //  Hub
 //
-//  `--net-test [use-internet|stop|join|share-internet|leave|status]` (Debug): drives this device's Hub Network on its first hub (or
+//  `--net-test [use-internet|stop|join|share-internet|leave|status|links|node]` (Debug): drives this device's Hub Network on its first hub (or
 //  `--net-hub <ws address>`) without taps and prints each step as a `[NETTEST]` line: the hub's agent, joining, the
 //  devices that offer their internet, Use Internet, a download through it, the network path and the extension's
 //  diagnostics. On an iPhone, read the lines with
@@ -33,6 +33,10 @@ enum NetTest {
     log("start \(action)")
     guard let hub = await wait("hub", seconds: 20, { firstHub() }) else { return fail("no hub") }
     log("hub \(hub.settings.name) \(hub.settings.address.absoluteString) onHubMachine=\(hub.isOnHubMachine)")
+    if action == "links" {
+      // Also away from the hub: the link to its machine is what this checks
+      return await links(hub)
+    }
     guard await wait("connected", seconds: 30, { hub.isConnected ? true : nil }) != nil else { return fail("not connected") }
     guard await wait("api", seconds: 20, { hub.api.isEmpty ? nil : true }) != nil else { return fail("no api") }
     // Subscriptions live while they're held
@@ -57,6 +61,18 @@ enum NetTest {
       keyLines(hub)
       await diagnostics()
       return pass()
+    }
+    if action == "node" {
+      // `--net-node <ws address>`, or none for the default: the coordinator the hub names (owners only)
+      let arguments = CommandLine.arguments
+      let node = arguments.firstIndex(of: "--net-node").flatMap { $0 + 1 < arguments.count ? arguments[$0 + 1] : nil }
+      do {
+        try await hub.net.setNode(node)
+        log("coordinator set to \(node ?? "the default")")
+        return pass()
+      } catch {
+        return fail("set coordinator: \(error)")
+      }
     }
     if action == "leave" {
       do {
@@ -155,8 +171,77 @@ enum NetTest {
     }
   }
 
+  /// Waits up to `--net-wait` seconds (40) for a link with a fresh handshake, printing the extension's links as they
+  /// go, then opens the hub's port on each linked device's overlay address
+  private static func links(_ hub: Hub) async {
+    let arguments = CommandLine.arguments
+    let seconds = arguments.firstIndex(of: "--net-wait").flatMap { $0 + 1 < arguments.count ? Double(arguments[$0 + 1]) : nil } ?? 40
+    let deadline = Date().addingTimeInterval(seconds)
+    var status: LinkStatusLines?
+    while Date() < deadline {
+      status = await linkLines()
+      if status?.up.isEmpty == false { break }
+      try? await Task.sleep(for: .seconds(3))
+    }
+    log("hub connected=\(hub.isConnected)")
+    guard let status, !status.up.isEmpty else {
+      await diagnostics()
+      return fail("no link came up")
+    }
+    var reachedAll = true
+    // A member reaches the hub on the machine it links to
+    for peer in status.up where peer.opens {
+      guard let address = peer.routes.first(where: { !$0.contains(":") })?.split(separator: "/").first else { continue }
+      let reached = await reach("\(address):1997")
+      log("reach \(address):1997 through the link: \(reached)")
+      if reached != "connected" { reachedAll = false }
+    }
+    await statusLines(hub)
+    reachedAll ? pass() : fail("a linked device's hub port didn't answer")
+  }
+
+  private struct LinkStatusLines: Decodable {
+    struct Peer: Decodable {
+      let key: String
+      let opens: Bool
+      let attempting: Bool
+      let endpoint: String?
+      let routes: [String]
+      let ports: [String]
+      let lastHandshake: Date?
+    }
+    let present: Bool
+    let coordinator: String
+    let linkUps: Int
+    let peers: [Peer]
+    /// Peers with a handshake in the last 150 seconds
+    var up: [Peer] { peers.filter { $0.lastHandshake.map { Date().timeIntervalSince($0) < 150 } ?? false } }
+  }
+
+  /// Prints the extension's links and returns them
+  @discardableResult
+  private static func linkLines() async -> LinkStatusLines? {
+    guard let data = try? await PacketTunnelController().linkStatus() else {
+      log("links: no tunnel")
+      return nil
+    }
+    let decoder = JSONDecoder()
+    decoder.dateDecodingStrategy = .iso8601
+    guard let status = try? decoder.decode(LinkStatusLines.self, from: data) else {
+      log("links: unreadable \(String(decoding: data, as: UTF8.self).prefix(200))")
+      return nil
+    }
+    log("links present=\(status.present) coordinator=\(status.coordinator) ups=\(status.linkUps) peers=\(status.peers.count)")
+    for peer in status.peers {
+      let age = peer.lastHandshake.map { "\(Int(Date().timeIntervalSince($0)))s ago" } ?? "never"
+      log("link peer=\(peer.key.suffix(10)) \(peer.opens ? "opens" : "accepts") attempting=\(peer.attempting) endpoint=\(peer.endpoint ?? "-") routes=\(peer.routes) ports=\(peer.ports) handshake=\(age)")
+    }
+    return status
+  }
+
   private static func statusLines(_ hub: Hub) async {
     log("joined=\(hub.net.isJoined) address=\(hub.net.address?.ipv4 ?? "-") vpn=\(hub.net.vpn?.name ?? "none")")
+    await linkLines()
     let path = await currentPath()
     log("path status=\(path.status) interfaces=\(path.availableInterfaces.map { "\($0.name)(\($0.type))" }) primary=\(path.availableInterfaces.first.map { "\($0.name)" } ?? "-")")
   }

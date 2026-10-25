@@ -21,6 +21,9 @@ final class PacketTunnelWireGuardAdapter {
   /// Permanent peers for network members (hub host only), keyed by base64
   /// WireGuard key. Merged with a member's bootstrap peer by key.
   private var memberPeers: [String: [IPAddressRange]] = [:]
+  /// Peers of verified links (`LinkManager`), keyed by base64 WireGuard key. A link to a key the base configuration
+  /// or another set already has extends that peer and sets its endpoint.
+  private var linkPeers: [String: (endpoint: Endpoint?, routes: [IPAddressRange])] = [:]
 
   init(provider: NEPacketTunnelProvider) {
     let logger = Logger(
@@ -64,6 +67,8 @@ final class PacketTunnelWireGuardAdapter {
         logger.error("start failed: backend handle \(handle, privacy: .public)")
       case .sendBackendDatagram(let code):
         logger.error("probe failed: backend code \(code, privacy: .public)")
+      case .setInboundFilter(let code):
+        logger.error("start failed: inbound filter code \(code, privacy: .public)")
       case nil:
         logger.error("start failed: \(String(reflecting: error), privacy: .public)")
       }
@@ -549,6 +554,51 @@ final class PacketTunnelWireGuardAdapter {
     }
   }
 
+  /// Replaces the link peers, then lets each linked device's addresses reach only the ports its grant names
+  /// (`hubtun.go`); devices that aren't linked pass as before.
+  func setLinkPeers(_ peers: [LinkManager.Peer]) async throws {
+    try await withCheckedThrowingContinuation {
+      (continuation: CheckedContinuation<Void, Error>) in
+      bootstrapQueue.async { [weak self] in
+        guard let self else {
+          continuation.resume(throwing: PacketTunnelWireGuardConfigurationError.invalidBootstrapPeer)
+          return
+        }
+        var next: [String: (endpoint: Endpoint?, routes: [IPAddressRange])] = [:]
+        for peer in peers {
+          let routes = peer.routes.compactMap(Self.bootstrapHostRoute)
+          guard let keyData = Data(base64Encoded: peer.wireGuardKey), PublicKey(rawValue: keyData) != nil,
+                routes.count == peer.routes.count, next[peer.wireGuardKey] == nil else {
+            continuation.resume(throwing: PacketTunnelWireGuardConfigurationError.invalidBootstrapPeer)
+            return
+          }
+          next[peer.wireGuardKey] = (peer.endpoint.flatMap(Endpoint.init(from:)), routes)
+        }
+        let previous = self.linkPeers
+        self.linkPeers = next
+        if let error = self.applyBootstrapPeers() {
+          self.linkPeers = previous
+          continuation.resume(throwing: error)
+          return
+        }
+        continuation.resume()
+      }
+    }
+    try await adapter.setInboundFilter(Self.inboundFilter(peers))
+  }
+
+  /// `{"sources":[{"prefix","ports":[{"protocol","port"}]}]}`, or nil (everything passes) without links
+  static func inboundFilter(_ peers: [LinkManager.Peer]) -> String? {
+    struct Port: Encodable { let `protocol`: String; let port: UInt16 }
+    struct Source: Encodable { let prefix: String; let ports: [Port] }
+    struct Filter: Encodable { let sources: [Source] }
+    let sources = peers.flatMap { peer in
+      peer.sources.map { Source(prefix: $0, ports: peer.ports.map { Port(protocol: $0.protocol, port: $0.port) }) }
+    }
+    guard !sources.isEmpty, let data = try? JSONEncoder().encode(Filter(sources: sources)) else { return nil }
+    return String(decoding: data, as: UTF8.self)
+  }
+
   /// Sets (or removes, with `nil`) one bootstrap peer and applies them all. Restores the previous state when
   /// WireGuard refuses the configuration.
   private func updateBootstrapPeer(_ peer: PeerConfiguration?, for assignmentId: String) -> Error? {
@@ -574,6 +624,16 @@ final class PacketTunnelWireGuardAdapter {
     let baseRoutes = Set(
       baseConfiguration.peers.flatMap(\.allowedIPs).map(Self.routeIdentity)
     )
+    // A link to a peer the base configuration has (the hub host of a member that joined through it) sets its endpoint
+    // and adds the link's routes
+    var basePeers = baseConfiguration.peers
+    for index in basePeers.indices {
+      guard let link = linkPeers[basePeers[index].publicKey.base64Key] else { continue }
+      if let endpoint = link.endpoint { basePeers[index].endpoint = endpoint }
+      basePeers[index].allowedIPs += link.routes.filter { route in
+        !basePeers[index].allowedIPs.contains { Self.routeIdentity($0) == Self.routeIdentity(route) }
+      }
+    }
     // One entry per key: a member that is still inside its bootstrap window
     // keeps the bootstrap peer's endpoint and addresses plus its own.
     var merged: [String: PeerConfiguration] = [:]
@@ -589,6 +649,17 @@ final class PacketTunnelWireGuardAdapter {
       let id = peer.publicKey.base64Key
       guard merged[id] == nil else { return PacketTunnelWireGuardConfigurationError.peerConflict }
       merged[id] = peer
+    }
+    for (key, link) in linkPeers {
+      guard let keyData = Data(base64Encoded: key), let publicKey = PublicKey(rawValue: keyData),
+            !baseKeys.contains(publicKey) else { continue }
+      var peer = merged[key] ?? PeerConfiguration(publicKey: publicKey)
+      if let endpoint = link.endpoint { peer.endpoint = endpoint }
+      peer.allowedIPs += link.routes.filter { route in
+        !peer.allowedIPs.contains { Self.routeIdentity($0) == Self.routeIdentity(route) }
+      }
+      peer.persistentKeepAlive = 25
+      merged[key] = peer
     }
     for (key, routes) in memberPeers {
       guard let keyData = Data(base64Encoded: key), let publicKey = PublicKey(rawValue: keyData),
@@ -610,7 +681,7 @@ final class PacketTunnelWireGuardAdapter {
     let configuration = TunnelConfiguration(
       name: baseConfiguration.name,
       interface: baseConfiguration.interface,
-      peers: baseConfiguration.peers + merged.keys.sorted().compactMap { merged[$0] }
+      peers: basePeers + merged.keys.sorted().compactMap { merged[$0] }
     )
     let semaphore = DispatchSemaphore(value: 0)
     var result: Error?
@@ -662,6 +733,22 @@ final class PacketTunnelWireGuardAdapter {
       .flatMap { Int64($0.dropFirst("last_handshake_time_sec=".count)) }
     guard let seconds, seconds > 0 else { return false }
     return Date().timeIntervalSince1970 - TimeInterval(seconds) <= maximumAge
+  }
+
+  /// The last handshake with the peer of a base64 WireGuard key
+  func lastHandshake(wireGuardKey: String) async -> Date? {
+    guard let keyData = Data(base64Encoded: wireGuardKey), let key = PublicKey(rawValue: keyData),
+          let configuration = await adapter.getRuntimeConfiguration() else { return nil }
+    var inPeer = false
+    for line in configuration.split(separator: "\n") {
+      if line.hasPrefix("public_key=") {
+        inPeer = line.dropFirst("public_key=".count) == key.hexKey
+      } else if inPeer, line.hasPrefix("last_handshake_time_sec="),
+                let seconds = TimeInterval(line.dropFirst("last_handshake_time_sec=".count)), seconds > 0 {
+        return Date(timeIntervalSince1970: seconds)
+      }
+    }
+    return nil
   }
 
   func sendObservationProbe(
@@ -811,6 +898,14 @@ extension WireGuardAdapter {
         } else {
           continuation.resume()
         }
+      }
+    }
+  }
+
+  func setInboundFilter(_ settings: String?) async throws {
+    try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+      setInboundFilter(settings) { error in
+        if let error { continuation.resume(throwing: error) } else { continuation.resume() }
       }
     }
   }

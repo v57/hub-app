@@ -294,6 +294,56 @@ final class PacketTunnelController: PacketTunnelControlling {
     _ = try JSONDecoder().decode(Response.self, from: response)
   }
 
+  /// Hands `network/links` to the extension, which checks every grant against the hub key it pinned before it links
+  func setLinks(_ links: HubNetworkPeerLinks) async throws {
+    guard let manager = try await loadManager(),
+          manager.connection.status == .connected,
+          let session = manager.connection as? NETunnelProviderSession else {
+      throw PacketTunnelControllerError.notConnected
+    }
+    struct Request: Encodable {
+      let command: String
+      let links: HubNetworkPeerLinks
+    }
+    let request = try JSONEncoder().encode(Request(command: "links", links: links))
+    _ = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Data, Error>) in
+      do {
+        try session.sendProviderMessage(request) { data in
+          guard let data else {
+            continuation.resume(throwing: PacketTunnelControllerError.bootstrapRuntimeUnavailable)
+            return
+          }
+          continuation.resume(returning: data)
+        }
+      } catch {
+        continuation.resume(throwing: error)
+      }
+    }
+  }
+
+  /// The extension's links: presence at the coordinator and each linked device (NETTEST)
+  func linkStatus() async throws -> Data {
+    guard let manager = try await loadManager(),
+          manager.connection.status == .connected,
+          let session = manager.connection as? NETunnelProviderSession else {
+      throw PacketTunnelControllerError.notConnected
+    }
+    let request = try JSONEncoder().encode(GatewayProviderMessage(command: "linkStatus"))
+    return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Data, Error>) in
+      do {
+        try session.sendProviderMessage(request) { data in
+          guard let data else {
+            continuation.resume(throwing: PacketTunnelControllerError.bootstrapRuntimeUnavailable)
+            return
+          }
+          continuation.resume(returning: data)
+        }
+      } catch {
+        continuation.resume(throwing: error)
+      }
+    }
+  }
+
   func startNativeJoin(_ start: PacketTunnelNativeJoinStart) async throws
     -> PacketTunnelNativeJoinStatus {
     try await sendNativeJoinMessage(.init(
@@ -680,4 +730,40 @@ struct KeychainProof: Codable, Sendable {
 
 private struct UnsafeSendable<Value>: @unchecked Sendable {
   let value: Value
+}
+
+/// `network/links` as the hub sends it (Core/HubServer `PeerLinks.swift`), passed to the extension unchanged
+struct HubNetworkPeerLinks: Codable, Equatable, Sendable {
+  struct Grant: Codable, Equatable, Sendable {
+    struct Side: Codable, Equatable, Sendable {
+      let key: String
+      let wireGuardKey: String
+      let member: String
+      let addresses: [String]
+    }
+    struct Port: Codable, Equatable, Sendable {
+      let `protocol`: String
+      let port: UInt16
+    }
+    let version: Int
+    let grantId: String
+    let hubKey: String
+    let hubNetworkId: String
+    let purpose: String
+    let a: Side
+    let b: Side
+    let aViaB: [String]
+    let bViaA: [String]
+    let aToB: [Port]
+    let bToA: [Port]
+    let issuedAt: String
+    let expiresAt: String
+    let signature: String
+  }
+  let version: Int
+  let hubKey: String
+  let hubNetworkId: String
+  let coordinator: String
+  let hubHost: Bool
+  let grants: [Grant]
 }

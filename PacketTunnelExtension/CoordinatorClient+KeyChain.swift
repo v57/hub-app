@@ -1,14 +1,15 @@
 import Foundation
 import HubService
 
-extension InviterNodeClient {
-  /// Registers `identity` as the inviter, signing challenges with it and logging to the extension diagnostics
+extension CoordinatorClient {
+  /// Keeps `identity` present, signing challenges with it and logging to the extension diagnostics
   convenience init(
     nodeEndpoint: String,
     identity: KeyChain,
     probe: @escaping (String, Data) async throws -> Void,
     candidates: @escaping () -> Candidate?,
     onBootstrap: @escaping (BootstrapEvent) async -> Void,
+    onLink: @escaping (Envelope) async -> Void,
     onStatusChange: @escaping (Bool) -> Void
   ) {
     self.init(
@@ -18,6 +19,7 @@ extension InviterNodeClient {
       probe: probe,
       candidates: candidates,
       onBootstrap: onBootstrap,
+      onLink: onLink,
       onStatusChange: onStatusChange,
       log: { extensionDiagnostics($0) }
     )

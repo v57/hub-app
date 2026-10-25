@@ -117,18 +117,18 @@ final class InviterNodeTests: XCTestCase {
     }
     let session = URLSession(configuration: .ephemeral)
     defer { session.invalidateAndCancel() }
-    let joiner = InviterNodeLink(
+    let joiner = CoordinatorLink(
       socket: session.webSocketTask(with: URL(string: "ws://127.0.0.1:\(port)/rendezvous")!), log: { _ in })
     await joiner.start()
     defer { Task { await joiner.close() } }
-    let opened = try await joiner.request(InviterNodeClient.Envelope(
+    let opened = try await joiner.request(CoordinatorClient.Envelope(
       majorVersion: 1, minorVersion: 0, type: "session.open", requestId: "open-\(round)", invitationCode: code,
       key: joinerKey, tokenDigest: digest, transactionId: transaction, tunnelInstanceId: "tunnel", generation: 1
     ), timeout: 5)
     let sessionId = try XCTUnwrap(opened.sessionId, "round \(round): \(opened.type) \(opened.error?.message ?? "")")
-    try await joiner.send(InviterNodeClient.Envelope(
+    try await joiner.send(CoordinatorClient.Envelope(
       majorVersion: 1, minorVersion: 0, type: "candidate.offer", sessionId: sessionId,
-      candidate: InviterNodeClient.Candidate(
+      candidate: CoordinatorClient.Candidate(
         version: 1, candidateId: UUID().uuidString, sessionId: sessionId, key: joinerKey, kind: "host", transport: "udp",
         address: "192.0.2.\(round)", port: 40000, priority: 100,
         expiresAt: ISO8601DateFormatter().string(from: Date().addingTimeInterval(30)))
@@ -137,28 +137,28 @@ final class InviterNodeTests: XCTestCase {
     XCTAssertEqual(event.joinerKey, joinerKey)
     XCTAssertEqual(event.transactionId, transaction)
     XCTAssertTrue(event.candidates.contains { $0.address == "192.0.2.\(round)" }, "round \(round): \(event.candidates)")
-    try? await joiner.send(InviterNodeClient.Envelope(majorVersion: 1, minorVersion: 0, type: "session.close", sessionId: sessionId))
+    try? await joiner.send(CoordinatorClient.Envelope(majorVersion: 1, minorVersion: 0, type: "session.close", sessionId: sessionId))
   }
 }
 
 /// An inviter with its own key, driving the node client under test
 final class NodeInviter: @unchecked Sendable {
   let key = Curve25519.Signing.PrivateKey()
-  private(set) var client: InviterNodeClient!
+  private(set) var client: CoordinatorClient!
   private let lock = NSLock()
-  private var events: [InviterNodeClient.BootstrapEvent] = []
+  private var events: [CoordinatorClient.BootstrapEvent] = []
   private var changes: [Bool] = []
 
   init(port: UInt16) {
     let key = self.key
     let serviceKey = (Data([0x30, 0x2a, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x03, 0x21, 0x00])
       + key.publicKey.rawRepresentation).base64EncodedString()
-    client = InviterNodeClient(
+    client = CoordinatorClient(
       nodeEndpoint: "ws://127.0.0.1:\(port)",
       serviceKey: serviceKey,
       sign: { nonce in
         // Domain, zero byte, 4-byte big-endian payload length, payload (Go network.SignBytes)
-        var input = Data(InviterNodeClient.registrationDomain.utf8)
+        var input = Data(CoordinatorClient.registrationDomain.utf8)
         input.append(0)
         withUnsafeBytes(of: UInt32(nonce.count).bigEndian) { input.append(contentsOf: $0) }
         input.append(nonce)
@@ -169,7 +169,7 @@ final class NodeInviter: @unchecked Sendable {
         try sendUDP(payload, port: port)
       },
       candidates: {
-        InviterNodeClient.Candidate(
+        CoordinatorClient.Candidate(
           version: 1, candidateId: UUID().uuidString, sessionId: "", key: serviceKey, kind: "host", transport: "udp",
           address: "198.51.100.1", port: 41000, priority: 100,
           expiresAt: ISO8601DateFormatter().string(from: Date().addingTimeInterval(30)))
@@ -203,7 +203,7 @@ final class NodeInviter: @unchecked Sendable {
     }
   }
 
-  func bootstrap(digest: String, timeout: TimeInterval) async throws -> InviterNodeClient.BootstrapEvent {
+  func bootstrap(digest: String, timeout: TimeInterval) async throws -> CoordinatorClient.BootstrapEvent {
     let deadline = Date().addingTimeInterval(timeout)
     while Date() < deadline {
       if let event = lock.withLock({ events.first { $0.tokenDigest == digest } }) { return event }

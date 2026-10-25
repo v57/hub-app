@@ -107,6 +107,7 @@ final class HubNet {
   private var nets: HubNets { .main }
   private var vpnRenewalTask: Task<Void, Never>?
   private var inviterAgentWatcherTask: Task<Void, Never>?
+  private var linksWatcherTask: Task<Void, Never>?
   private var reconnectTask: Task<Void, Never>?
   @ObservationIgnored private var tunnelObserver: NSObjectProtocol?
   @ObservationIgnored private var tunnelWasConnected = false
@@ -190,10 +191,13 @@ final class HubNet {
       isJoined = true
       await refreshGlobalVPN()
       startInviterAgentWatcher()
+      startLinksWatcher()
       print("done")
     } else {
       inviterAgentWatcherTask?.cancel()
       inviterAgentWatcherTask = nil
+      linksWatcherTask?.cancel()
+      linksWatcherTask = nil
       if vpn != nil {
         try await disableVpn()
       }
@@ -340,6 +344,7 @@ final class HubNet {
     await refreshGlobalVPN()
     // After a relaunch the inviter still has to mirror members into the extension
     startInviterAgentWatcher()
+    startLinksWatcher()
   }
 
   func connectionChanged(_ connected: Bool) {
@@ -518,6 +523,34 @@ final class HubNet {
   private func refreshGlobalVPN() async {
     print("refreshGlobalVPN")
     await nets.refresh()
+  }
+
+  /// Forwards `network/links` to the extension while joined: the grants that let this device link to the hub's machine
+  /// directly, and where to meet it. The extension keeps them, so it can link from a network where the hub itself is
+  /// out of reach.
+  private func startLinksWatcher() {
+    linksWatcherTask?.cancel()
+    linksWatcherTask = Task { [weak self] in
+      guard let hub = self?.hub else { return }
+      var sent: HubNetworkPeerLinks?
+      while !Task.isCancelled {
+        do {
+          for try await links: HubNetworkPeerLinks in hub.client.values("network/links") {
+            // The tunnel may still be starting: retry until it takes them
+            for _ in 0..<10 where links != sent {
+              if (try? await PacketTunnelController().setLinks(links)) != nil {
+                sent = links
+                break
+              }
+              try? await Task.sleep(for: .seconds(2))
+            }
+          }
+        } catch {
+          print("network/links: \(error)")
+        }
+        try? await Task.sleep(for: .seconds(5))
+      }
+    }
   }
 
   /// While serving as the hub's inviter, mirror every member from

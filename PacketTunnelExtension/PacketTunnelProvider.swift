@@ -59,7 +59,10 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
   /// Reachable IPv4 advertised for the inviter's HUBB listener and WireGuard
   /// endpoints (see `ReachableAddress`); nil falls back to 0.0.0.0.
   private var inviterAdvertiseAddress: String?
-  private var inviterNodeClient: InviterNodeClient?
+  /// Keeps this device present at the coordinator, for links and invitations
+  private var coordinatorClient: CoordinatorClient?
+  private var linkManager: LinkManager?
+  private var linkTicker: Task<Void, Never>?
   private var inviter: Inviter?
   private var inviterSweepTask: Task<Void, Never>?
   private var inviterRegistered = false
@@ -116,6 +119,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
       } else {
         extensionDiagnostics("inviter off in this profile")
       }
+      startCoordinator(profile: profile)
     } catch {
       gatewayServingState = profile.servesGateway ? .unavailable : .disabled
       await wireGuardAdapter.stop()
@@ -159,6 +163,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     nativeJoinClients.removeAll()
     activeBootstrapProfile = nil
     stopInviter()
+    stopCoordinator()
   }
 
   // MARK: Inviter
@@ -231,29 +236,62 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     inviterListener = listener
     let listenerEndpoint = listener.start()
 
-    // Register with the node hub-server names (hub/net/node), which invitations
-    // carry in ?e=. A node address inside the overlay range (Tailscale) is
-    // excluded from the tunnel through controlPlaneIPv4Hosts.
-    // There is no default node: without one the inviter can't register
-    guard let nodeEndpoint = profile.nodeEndpoint, !nodeEndpoint.isEmpty else {
-      extensionDiagnostics("inviter not started: the profile names no node")
-      listener.stop()
-      inviterListener = nil
+    inviterSweepTask?.cancel()
+    inviterSweepTask = Task { [weak self] in
+      while !Task.isCancelled {
+        try? await Task.sleep(for: .seconds(60))
+        await self?.inviter?.sweep()
+      }
+    }
+    extensionDiagnostics("inviter started on \(listenerEndpoint), advertising \(advertiseAddress ?? "none")")
+  }
+
+  private func stopInviter() {
+    inviterSweepTask?.cancel()
+    inviterSweepTask = nil
+    inviterListener?.stop()
+    inviterListener = nil
+    Task { await inviter?.closeAll() }
+    inviter = nil
+    inviterRegistered = false
+  }
+
+  // MARK: Coordinator and links
+
+  /// Registers presence at the coordinator the hub named (`network/links`, else the profile's node) and runs this
+  /// device's links. Invitation bootstraps arrive on the same connection.
+  private func startCoordinator(profile: Profile) {
+    guard coordinatorClient == nil else { return }
+    let identity: KeyChain
+    do {
+      identity = try KeyChain.hubIdentity()
+    } catch {
+      extensionDiagnostics("coordinator not started: no hub identity in the keychain: \(error)")
       return
     }
-    let nodeClient = InviterNodeClient(
+    guard let trustedHubKey = profile.trustedHubKey, !trustedHubKey.isEmpty else {
+      extensionDiagnostics("coordinator not started: the profile pins no hub key")
+      return
+    }
+    let stored = Self.storedLinks().flatMap { $0.hubKey == trustedHubKey ? $0 : nil }
+    guard let nodeEndpoint = stored?.coordinator ?? profile.nodeEndpoint, !nodeEndpoint.isEmpty else {
+      extensionDiagnostics("coordinator not started: no coordinator known")
+      return
+    }
+    let advertiseAddress = ReachableAddress.primaryIPv4()
+    let client = CoordinatorClient(
       nodeEndpoint: nodeEndpoint,
       identity: identity,
       probe: { [weak self] endpoint, payload in
         guard let self, let listener = self.inviterListener else {
-          throw InviterNodeError.closed
+          throw CoordinatorError.closed
         }
         try await listener.sendProbe(endpoint: endpoint, payload: payload)
       },
       candidates: { [weak self] in
         guard let self, let listener = self.inviterListener,
               let port = listener.port else { return nil }
-        return InviterNodeClient.Candidate(
+        return CoordinatorClient.Candidate(
           version: 1, candidateId: UUID().uuidString, sessionId: "",
           key: identity.publicKey(), kind: "host", transport: "udp",
           address: advertiseAddress ?? "0.0.0.0", port: port, priority: 100,
@@ -266,36 +304,120 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         guard let self else { return }
         await self.handleInviterBootstrap(event)
       },
-      onStatusChange: { [weak self] registered in
-        self?.inviterRegistered = registered
+      onLink: { [weak self] envelope in
+        await self?.linkManager?.handle(envelope)
+      },
+      onStatusChange: { [weak self] present in
+        guard let self else { return }
+        self.inviterRegistered = present
+        extensionDiagnostics("coordinator presence \(present ? "registered" : "lost")")
+        let manager = self.linkManager
+        Task { await manager?.presenceChanged(present) }
       }
     )
-    inviterNodeClient = nodeClient
-    nodeClient.start()
-
-    inviterSweepTask?.cancel()
-    inviterSweepTask = Task { [weak self] in
+    let adapter = wireGuardAdapter
+    let udpEndpoint = client.udpEndpoint
+    let manager = LinkManager(ownKey: identity.publicKey(), trustedHubKey: trustedHubKey, dependencies: .init(
+      open: { try await client.openLink($0) },
+      send: { try await client.sendLink($0, linkId: $1, endpoints: $2) },
+      probe: { try await adapter.sendObservationProbe(endpoint: udpEndpoint, payload: $0) },
+      apply: { try await adapter.setLinkPeers($0) },
+      lastHandshake: { await adapter.lastHandshake(wireGuardKey: $0) },
+      candidates: {
+        guard let address = ReachableAddress.primaryIPv4(), let port = await adapter.listenPort() else { return [] }
+        return [LinkEndpoint(address: address, port: port)]
+      },
+      log: { extensionDiagnostics($0) }
+    ))
+    coordinatorClient = client
+    linkManager = manager
+    linkTicker = Task {
+      if let stored { await manager.update(grants: stored.grants) }
       while !Task.isCancelled {
-        try? await Task.sleep(for: .seconds(60))
-        await self?.inviter?.sweep()
+        try? await Task.sleep(for: .seconds(30))
+        await manager.tick()
       }
     }
-    extensionDiagnostics("inviter started on \(listenerEndpoint), node \(nodeEndpoint), advertising \(advertiseAddress ?? "none")")
+    client.start()
+    extensionDiagnostics("coordinator \(nodeEndpoint), \(stored?.grants.count ?? 0) stored link grants")
   }
 
-  private func stopInviter() {
-    inviterSweepTask?.cancel()
-    inviterSweepTask = nil
-    inviterNodeClient?.stop()
-    inviterNodeClient = nil
-    inviterListener?.stop()
-    inviterListener = nil
-    Task { await inviter?.closeAll() }
-    inviter = nil
+  private func stopCoordinator() {
+    linkTicker?.cancel()
+    linkTicker = nil
+    coordinatorClient?.stop()
+    coordinatorClient = nil
+    linkManager = nil
     inviterRegistered = false
   }
 
-  private func handleInviterBootstrap(_ event: InviterNodeClient.BootstrapEvent) async {
+  /// The app forwarded `network/links`: keep it for restarts away from the hub, follow its coordinator and hand the
+  /// grants to the link manager (which checks each one itself)
+  private func receiveLinks(_ links: PeerLinksState) async {
+    Self.storeLinks(links)
+    guard let profile = activeBootstrapProfile else { return }
+    if coordinatorClient == nil || coordinatorClient?.nodeEndpointValue != links.coordinator {
+      stopCoordinator()
+      startCoordinator(profile: profile)
+      return
+    }
+    await linkManager?.update(grants: links.grants)
+  }
+
+  private static var linksURL: URL? {
+    FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
+      .appendingPathComponent("peer-links.json")
+  }
+
+  private static func storedLinks() -> PeerLinksState? {
+    guard let url = linksURL, let data = try? Data(contentsOf: url) else { return nil }
+    return try? JSONDecoder().decode(PeerLinksState.self, from: data)
+  }
+
+  private static func storeLinks(_ links: PeerLinksState) {
+    guard let url = linksURL, let data = try? JSONEncoder().encode(links) else { return }
+    try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try? data.write(to: url, options: .atomic)
+  }
+
+  private struct LinksMessage: Decodable {
+    let command: String
+    let links: PeerLinksState
+  }
+
+  private struct LinkStatus: Encodable {
+    struct Peer: Encodable {
+      let key: String
+      let wireGuardKey: String
+      let opens: Bool
+      let attempting: Bool
+      let endpoint: String?
+      let routes: [String]
+      let ports: [String]
+      let lastHandshake: Date?
+    }
+    let present: Bool
+    let coordinator: String
+    let linkUps: Int
+    let peers: [Peer]
+  }
+
+  private func linkStatus() async -> LinkStatus {
+    var peers: [LinkStatus.Peer] = []
+    for entry in await linkManager?.status ?? [] {
+      peers.append(LinkStatus.Peer(
+        key: entry.peer.key, wireGuardKey: entry.peer.wireGuardKey, opens: entry.opens, attempting: entry.attempting,
+        endpoint: entry.peer.endpoint, routes: entry.peer.routes, ports: entry.peer.ports.map { "\($0.protocol)/\($0.port)" },
+        lastHandshake: await wireGuardAdapter.lastHandshake(wireGuardKey: entry.peer.wireGuardKey)
+      ))
+    }
+    return LinkStatus(
+      present: coordinatorClient?.registered ?? false, coordinator: coordinatorClient?.nodeEndpointValue ?? "",
+      linkUps: await linkManager?.linkUps ?? 0, peers: peers
+    )
+  }
+
+  private func handleInviterBootstrap(_ event: CoordinatorClient.BootstrapEvent) async {
     guard let inviter else { return }
     extensionDiagnostics("inviter push replayId=\(event.tokenDigest.prefix(8)) joiner=\(event.joinerKey.prefix(8))")
     inviter.expectBootstrap(
@@ -315,6 +437,10 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     if messageData == Data("hn9xx-diag".utf8) {
       return Data(extensionDiagnosticsBuffer.joined(separator: "\n").utf8)
     }
+    if let message = try? JSONDecoder().decode(LinksMessage.self, from: messageData), message.command == "links" {
+      await receiveLinks(message.links)
+      return try? JSONEncoder().encode(MemberPeersResponse(ok: true))
+    }
     if let message = try? JSONDecoder().decode(ExtensionNativeJoinMessage.self, from: messageData) {
       return await handleNativeJoinMessage(message)
     } else if let message = try? JSONDecoder().decode(ExtensionBootstrapMessage.self, from: messageData) {
@@ -322,7 +448,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     } else {
       do {
         let message = try JSONDecoder().decode(GatewayProviderMessage.self, from: messageData)
-        guard ["gatewayStatus", "exitStatus", "keychainProof", "inviterStatus", "memberPeers"].contains(message.command) else { return nil }
+        guard ["gatewayStatus", "exitStatus", "keychainProof", "inviterStatus", "memberPeers", "linkStatus"].contains(message.command) else { return nil }
         switch message.command {
         case "gatewayStatus":
           return try JSONEncoder().encode(StateResponse(state: gatewayServingState))
@@ -343,6 +469,10 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
             listenerEndpoint: inviterListener.map { "\(inviterAdvertiseAddress ?? "0.0.0.0"):\($0.port ?? 0)" } ?? ""
           )
           return try JSONEncoder().encode(status)
+        case "linkStatus":
+          let encoder = JSONEncoder()
+          encoder.dateEncodingStrategy = .iso8601
+          return try encoder.encode(await linkStatus())
         case "memberPeers":
           let message = try JSONDecoder().decode(MemberPeersMessage.self, from: messageData)
           try await wireGuardAdapter.setMemberPeers(message.peers.map { ($0.publicKey, $0.allowedIPs) })

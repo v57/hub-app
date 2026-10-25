@@ -1,5 +1,5 @@
 // swift-tools-version:6.0
-// Drives PacketTunnelExtension sources (symlinked) outside the extension: InviterNodeClient against a real
+// Drives PacketTunnelExtension sources (symlinked) outside the extension: CoordinatorClient and LinkManager against a real
 // hub-net-node, the inviter's bootstrap admission and the bootstrap peers' route claims. Run with ./run.sh.
 import PackageDescription
 
