@@ -55,7 +55,12 @@ extension KeyChain {
     self.settings = settings
     let identity = settings.identityTag.map(KeyChain.keychain) ?? .main
     key = identity.publicKey()
-    self.client = HubClient(settings.address, keyChain: identity, options: .init(device: .app, instance: "Hub"))
+    let address = settings.address
+    self.client = HubClient(settings.address, keyChain: identity, options: .init(
+      device: .app, instance: "Hub",
+      // Away from the hub's own address, its machine still answers on Hub Network through the link to it
+      alternateURLs: { await HubNet.alternateURLs(for: address) }
+    ))
     client.debugNetwork = true
     if client.device != nil {
       client.report(description: AppDevice.description, data: AppDevice.data)

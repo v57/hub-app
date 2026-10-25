@@ -2,7 +2,7 @@
 //  NetTest.swift
 //  Hub
 //
-//  `--net-test [use-internet|stop|join|share-internet|leave|status|links|node]` (Debug): drives this device's Hub Network on its first hub (or
+//  `--net-test [use-internet|stop|join|share-internet|leave|status|links|node|hub]` (Debug): drives this device's Hub Network on its first hub (or
 //  `--net-hub <ws address>`) without taps and prints each step as a `[NETTEST]` line: the hub's agent, joining, the
 //  devices that offer their internet, Use Internet, a download through it, the network path and the extension's
 //  diagnostics. On an iPhone, read the lines with
@@ -33,6 +33,26 @@ enum NetTest {
     log("start \(action)")
     guard let hub = await wait("hub", seconds: 20, { firstHub() }) else { return fail("no hub") }
     log("hub \(hub.settings.name) \(hub.settings.address.absoluteString) onHubMachine=\(hub.isOnHubMachine)")
+    if action == "hub" {
+      // Whether the hub answers, and through which address: its own or its Hub Network address. A stopped tunnel
+      // of this hub starts first, as the hub may answer only through it.
+      if let tunnel = try? PacketTunnelController(),
+         let profile = try? tunnel.installedConfiguration(), profile.hubURL == hub.settings.address,
+         await tunnel.status != .connected {
+        do {
+          try await tunnel.start()
+          log("tunnel started")
+        } catch {
+          log("tunnel start: \(error)")
+        }
+      }
+      await hub.net.restoreIfActive()
+      let connected = await wait("connected", seconds: 40, { hub.isConnected ? true : nil }) != nil
+      log("hub connected=\(hub.isConnected) via \(hub.client.currentURL.absoluteString)")
+      _ = await linkLines()
+      await diagnostics()
+      return connected ? pass() : fail("not connected")
+    }
     if action == "links" {
       // Also away from the hub: the link to its machine is what this checks
       await hub.net.restoreIfActive()
@@ -184,7 +204,7 @@ enum NetTest {
       if status?.up.isEmpty == false { break }
       try? await Task.sleep(for: .seconds(3))
     }
-    log("hub connected=\(hub.isConnected)")
+    log("hub connected=\(hub.isConnected) via \(hub.client.currentURL.absoluteString)")
     guard let status, !status.up.isEmpty else {
       await diagnostics()
       return fail("no link came up")

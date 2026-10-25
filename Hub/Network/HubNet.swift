@@ -329,6 +329,32 @@ final class HubNet {
     hub.service.group(enabled: isJoined)
   }
 
+  /// The hub's Hub Network address, `ws://<overlay>:<port>`, while this device's tunnel belongs to the hub at
+  /// `address` and links to the hub's machine. The hub's client tries it when `address` doesn't answer, e.g. on
+  /// cellular when `address` is a LAN address.
+  static func alternateURLs(for address: URL) async -> [URL] {
+    guard let tunnel = try? PacketTunnelController(),
+          let profile = try? tunnel.installedConfiguration(), profile.hubURL == address,
+          let data = try? await tunnel.linkStatus(),
+          let status = try? JSONDecoder().decode(LinkedMachines.self, from: data) else { return [] }
+    // A member opens its link to the hub's machine; the routes are that machine's overlay addresses
+    return status.peers.filter(\.opens).compactMap { peer in
+      guard let ipv4 = peer.routes.first(where: { !$0.contains(":") })?.split(separator: "/").first,
+            var components = URLComponents(url: address, resolvingAgainstBaseURL: false) else { return nil }
+      components.host = String(ipv4)
+      if components.port == nil { components.port = 1997 }
+      return components.url
+    }
+  }
+
+  private struct LinkedMachines: Decodable {
+    struct Peer: Decodable {
+      let opens: Bool
+      let routes: [String]
+    }
+    let peers: [Peer]
+  }
+
   func restoreIfActive() async {
     guard let tunnel = try? PacketTunnelController(),
           let profile = try? tunnel.installedConfiguration(),
