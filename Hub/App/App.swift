@@ -21,6 +21,12 @@ struct HubApp: App {
   @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 #endif
   @Environment(\.scenePhase) private var scenePhase
+#if DEBUG
+  init() {
+    // Line by line, also into a file or `devicectl --console`, so a run's log reads as it goes
+    setvbuf(stdout, nil, _IOLBF, 0)
+  }
+#endif
   var body: some Scene {
     WindowGroup {
       if ProcessInfo.isScreenshot {

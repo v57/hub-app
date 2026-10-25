@@ -82,6 +82,12 @@ struct RootView: View {
 #endif
     }
 #if DEBUG
+    // `--net-test`: drives this device's Hub Network and prints each step (NetTest)
+    .task {
+#if !os(tvOS)
+      if NetTest.isRequested { await NetTest.run() }
+#endif
+    }
     // `--connect ws://127.0.0.1:2097 --code ABC-123`: pairs with a hub at launch, for checks against a real hub
     .task {
       let arguments = CommandLine.arguments
