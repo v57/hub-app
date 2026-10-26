@@ -2,7 +2,7 @@
 //  NetTest.swift
 //  Hub
 //
-//  `--net-test [use-internet|stop|join|share-internet|leave|status|links|node|hub|ip]` (Debug): drives this device's Hub Network on its first hub (or
+//  `--net-test [use-internet|stop|join|share-internet|leave|status|links|node|hub|ip|reach|get|grant]` (Debug): drives this device's Hub Network on its first hub (or
 //  `--net-hub <ws address>`) without taps and prints each step as a `[NETTEST]` line: the hub's agent, joining, the
 //  devices that offer their internet, Use Internet, a download through it, the network path and the extension's
 //  diagnostics. On an iPhone, read the lines with
@@ -156,6 +156,45 @@ enum NetTest {
       log("reach \(target): \(reached)")
       await statusLines(hub)
       return reached == "connected" ? pass() : fail("couldn't reach \(target)")
+    }
+    if action == "get" {
+      // `--net-url <url>`: an HTTP GET over whatever route the system picks, e.g. a share on the hub's machine
+      let arguments = CommandLine.arguments
+      let url = arguments.firstIndex(of: "--net-url").flatMap { $0 + 1 < arguments.count ? URL(string: arguments[$0 + 1]) : nil }
+        ?? URL(string: "http://100.96.0.2:1997/")!
+      var request = URLRequest(url: url, timeoutInterval: 15)
+      request.cachePolicy = .reloadIgnoringLocalCacheData
+      do {
+        let (data, response) = try await URLSession(configuration: .ephemeral).data(for: request)
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        log("get \(url.absoluteString): \(status) \(String(decoding: data.prefix(200), as: UTF8.self))")
+        await linkLines()
+        return status == 200 ? pass() : fail("status \(status)")
+      } catch {
+        log("get \(url.absoluteString) failed: \(error.localizedDescription)")
+        await linkLines()
+        return fail("get failed")
+      }
+    }
+    if action == "grant" {
+      // `--net-key <key> --net-prefix <prefix>` (owners): lets a service's key call paths under the prefix, e.g. a test
+      // service that publishes network shares
+      let arguments = CommandLine.arguments
+      func value(_ name: String) -> String? {
+        arguments.firstIndex(of: name).flatMap { $0 + 1 < arguments.count ? arguments[$0 + 1] : nil }
+      }
+      guard let key = value("--net-key") else { return fail("grant needs --net-key") }
+      let prefix = value("--net-prefix") ?? "network/"
+      struct Subject: Encodable { let key: String }
+      struct Object: Encodable { let prefix: String }
+      struct Body: Encodable { let subject: Subject; let object: Object }
+      do {
+        try await hub.client.send("hub/grant/add", Body(subject: Subject(key: key), object: Object(prefix: prefix)))
+        log("granted \(prefix) to \(key.suffix(12))")
+        return pass()
+      } catch {
+        return fail("grant: \(error)")
+      }
     }
     if action == "ip" {
       // Through a chosen gateway, once the tunnel uses it and the link to it is up
