@@ -42,6 +42,14 @@ enum NetTest {
       for line in text.split(separator: "\n") where line.dropFirst().prefix(since.count) >= since { log("diag \(line)") }
       return pass()
     }
+#if canImport(VaultHub)
+    if action == "vault" {
+      // The v57 vault: its hubs and their connections, the hosts mirrored from them and the projects they reach
+      try? await Task.sleep(for: .seconds(15))
+      for line in AppVault.lines() { log("vault \(line)") }
+      return pass()
+    }
+#endif
     guard let hub = await wait("hub", seconds: 20, { firstHub() }) else { return fail("no hub") }
     log("hub \(hub.settings.name) \(hub.settings.address.absoluteString) onHubMachine=\(hub.isOnHubMachine)")
     // A stopped tunnel of this hub starts first, as the hub may answer only through it (a relaunch from devicectl

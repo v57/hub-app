@@ -42,6 +42,26 @@ enum AppVault {
     directory.setConnects(hub, false)
   }
 
+#if DEBUG
+  /// What the vault holds about hubs, devices and projects, for `--net-test vault`
+  static func lines() -> [String] {
+    let vault = Vault.shared
+    var lines = ["device \(vault.deviceID) store=\(vault.store != nil) sync=\(vault.sync?.isRunning == true) pending=\((try? vault.store?.pendingCount()) ?? -1) error=\(vault.sync?.lastError ?? "-")"]
+    for hub in vault.hubs {
+      let status = directory?.connection(for: hub.id).map { "\($0.status)" } ?? "-"
+      lines.append("hub \(hub.url) key=\(hub.hubKey?.suffix(8) ?? "-") connects=\(hub.connects.sorted()) members=\(hub.members) status=\(status)")
+    }
+    for host in vault.hosts where host.isViaHub {
+      lines.append("host \(host.name) \(host.user)@\(host.hostname):\(host.port) hub=\(host.hub?.hubID ?? "-") device=\(host.hub?.deviceID ?? "-") vaultDevice=\(vault.vaultDevice(of: host) ?? "-")")
+    }
+    for project in vault.projects {
+      lines.append("project \(project.name) on=\(project.paths.keys.sorted()) places=\(vault.otherPlaces(of: project).map { "\($0.deviceName):\($0.host?.hostname ?? "no host")" })")
+    }
+    for key in vault.deviceKeys { lines.append("deviceKey \(key.id) \(key.deviceName) \(key.publicKey.suffix(20))") }
+    return lines
+  }
+#endif
+
   private static func record(of settings: Hub.Settings) -> VaultHubServer? {
     let url = HubDirectory.normalized(settings.address.absoluteString)
     return Vault.shared.hubs.first { HubDirectory.normalized($0.url) == url }

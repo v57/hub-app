@@ -1,5 +1,5 @@
 {
-  "originHash" : "5713141f07594bae089e11659de225ecb1b366f59bfb6bc0885cb1fb7fef9b77",
+  "originHash" : "5e21d9320c60006b98a14c99268026ed49063cd1821ef02be3b7551b9ec2fcc1",
   "pins" : [
     {
       "identity" : "channelswift",
@@ -8,6 +8,15 @@
       "state" : {
         "branch" : "main",
         "revision" : "184bc846275ffee4318ec5c5e3ba03b7504b548d"
+      }
+    },
+    {
+      "identity" : "component",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/v57/Component.git",
+      "state" : {
+        "branch" : "main",
+        "revision" : "a1066eebe9f7e0f43c2801871e5a2f650c53f7b4"
       }
     }
   ],
