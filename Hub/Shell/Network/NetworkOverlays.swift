@@ -396,15 +396,30 @@ struct ShareAppSheet: View {
   @State private var showsAccess = false
   @State private var busy = false
   @State private var error: String?
+  @State private var running: [ListeningApps.Found]?
   @HubState(\.groups) private var groups
 
   enum Choice: Hashable {
+    case app(Int)
     case another
   }
 
   var body: some View {
     KitSheet(title: "Share an App", meta: "With your devices in \(hub.settings.name)", systemImage: "plus", hue: .accent, status: busy ? .working : .idle) {
-      FormCard { anotherRow }
+      if running == nil {
+        HStack(spacing: 6) {
+          ProgressView().controlSize(.small)
+          Text("Looking for apps on this \(KitDevice.name)…").kitFont(.caption)
+        }
+      } else if let running, !running.isEmpty {
+        Text("Running on this \(KitDevice.name)").kitFont(.sectionHeader)
+      }
+      FormCard {
+        ForEach(running ?? []) { app in
+          appRow(app)
+        }
+        anotherRow
+      }
       if choice == .another || idiom.isTouch && choice == nil {
         FormCard {
           FormRow("Name", systemImage: "textformat", field: TextField("Jellyfin", text: $name).autocorrectionDisabled())
@@ -439,6 +454,21 @@ struct ShareAppSheet: View {
         .disabled(selected == nil || busy)
     }
     .kitSheetDismissDisabled(busy)
+    .task { running = await ListeningApps.scan() }
+  }
+
+  private func appRow(_ app: ListeningApps.Found) -> some View {
+    let isShared = facts.sharedApps.contains { $0.id == "tcp-\(app.port)" }
+    return FormRow(NetworkAppNames.main.name(port: app.port), help: "\(app.app.kind) · port \(app.port)", systemImage: KnownPorts.symbol(app.port), hue: .blue) {
+      if isShared {
+        Chip("Shared", hue: .green)
+      } else if choice == .app(app.port) {
+        Image(systemName: "checkmark").foregroundStyle(Hue.accent.text)
+      }
+    }
+    .opacity(isShared ? 0.6 : 1)
+    .contentShape(Rectangle())
+    .onTapGesture { if !isShared { choice = .app(app.port) } }
   }
 
   private var anotherRow: some View {
@@ -461,6 +491,8 @@ struct ShareAppSheet: View {
   /// The app to share: the one picked from the list, or the typed port
   private var selected: (name: String, port: Int)? {
     switch choice {
+    case .app(let port):
+      return (NetworkAppNames.main.name(port: port), port)
     case .another, nil:
       guard choice == .another || idiom.isTouch, let number = Int(port.trimmingCharacters(in: .whitespaces)), (1...65535).contains(number) else { return nil }
       let typed = name.trimmingCharacters(in: .whitespaces)
