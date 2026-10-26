@@ -17,12 +17,11 @@ import HubUI
 /// its code), which puts this device on the hub's private network
 struct ConnectSheet: View {
   @Environment(\.kitDismiss) private var dismiss
-  @State private var input = NetworkInvitationRouter.main.pendingInput.isEmpty ? "" : NetworkInvitationRouter.main.consume()
+  @State private var input = ""
   @State private var code = ""
   @State private var pairing = HubPairing()
-  @State private var nets = HubNets.main
-  @State private var joining = false
-  @State private var joinError: String?
+  /// The invitation being joined: the sheet becomes the join flow
+  @State private var joinLink: String? = NetworkInvitationRouter.main.pendingInput.isEmpty ? nil : NetworkInvitationRouter.main.consume()
   @State private var scanning = false
   @State private var scanError: String?
 
@@ -53,16 +52,24 @@ struct ConnectSheet: View {
     }
   }
 
-  private var isWorking: Bool { joining || pairing.state.isWorking }
+  private var isWorking: Bool { pairing.state.isWorking }
 
   var body: some View {
+    if let joinLink {
+      JoinNetworkSheet(link: joinLink).id(joinLink)
+    } else {
+      form
+    }
+  }
+
+  private var form: some View {
     KitSheet(
       title: "Connect to a Hub", systemImage: "hexagon", hue: .accent, status: isWorking ? .working : .idle
     ) {
       QRScanCard(
         title: "Scan Code", scanning: $scanning, error: scanError
       ) { text in
-        if accept(text) {
+        if scanned(text) {
           scanning = false
           scanError = nil
         } else {
@@ -76,10 +83,7 @@ struct ConnectSheet: View {
           systemImage: isInvitation ? "person.badge.plus" : "network", hue: isInvitation ? .teal : .accent, error: inputError,
           field: TextField("Address or invitation", text: $input)
             .kitFont(.mono).autocorrectionDisabled()
-            .onChange(of: input) {
-              joinError = nil
-              accept(input)
-            }
+            .onChange(of: input) { accept(input) }
         )
         if !isInvitation {
           FormRow(
@@ -92,9 +96,7 @@ struct ConnectSheet: View {
       }
       // The fields explain themselves while they're edited
       .kitFormHelpWhileEditing()
-      if joining {
-        Text(NativeJoinPresentation.progress(nets.joinProgress?.state)).kitFont(.caption)
-      } else if pairing.state != .idle {
+      if pairing.state != .idle {
         PairingStatusView(pairing).kitFont(.caption)
       }
     } footer: {
@@ -106,12 +108,11 @@ struct ConnectSheet: View {
     .kitSheetDismissDisabled(isWorking)
     // An invitation link opened while the sheet is up
     .onChange(of: NetworkInvitationRouter.main.pendingInput) { _, pending in
-      if !pending.isEmpty, !isWorking { input = NetworkInvitationRouter.main.consume() }
+      if !pending.isEmpty, !isWorking, joinLink == nil { joinLink = NetworkInvitationRouter.main.consume() }
     }
   }
 
   private var inputError: String? {
-    if let joinError { return joinError }
     switch entry {
     case .badInvitation(let message): return message
     case .unknown: return "Not an address or an invitation"
@@ -120,7 +121,7 @@ struct ConnectSheet: View {
   }
 
   private var action: String {
-    if isInvitation { return joining ? "Joining…" : "Join" }
+    if isInvitation { return "Join" }
     return code.isEmpty ? "Connect" : "Pair"
   }
 
@@ -134,7 +135,7 @@ struct ConnectSheet: View {
   private func go() async {
     switch entry {
     case .address(let url): await connect(url)
-    case .invitation: await join()
+    case .invitation: joinLink = input.trimmingCharacters(in: .whitespacesAndNewlines)
     default: break
     }
   }
@@ -150,19 +151,6 @@ struct ConnectSheet: View {
     dismiss()
   }
 
-  private func join() async {
-    joining = true
-    joinError = nil
-    defer { joining = false }
-    do {
-      let hub = try await HubNets.main.join(link: input.trimmingCharacters(in: .whitespacesAndNewlines))
-      Navigator.main.open(hub, .network)
-      dismiss()
-    } catch {
-      joinError = NativeJoinPresentation.error(error)
-    }
-  }
-
   /// Takes a hub://pair link (typed, pasted or scanned) apart into the address and code; keeps an invitation whole.
   /// False when the text is neither.
   @discardableResult
@@ -175,6 +163,15 @@ struct ConnectSheet: View {
     guard (try? NetworkInvitationParser.decode(text)) != nil else { return false }
     if input != text { input = text }
     return true
+  }
+
+  /// A scanned code: an invitation goes straight to what joining means
+  private func scanned(_ text: String) -> Bool {
+    if (try? NetworkInvitationParser.decode(text)) != nil {
+      joinLink = text
+      return true
+    }
+    return accept(text)
   }
 }
 
