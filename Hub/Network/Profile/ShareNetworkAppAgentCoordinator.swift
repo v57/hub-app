@@ -38,6 +38,8 @@ final class ShareNetworkAppAgentCoordinator {
     var unbind: (AppleAppAgentUnbindRequest) async throws -> Void
     /// Registers this device's membership on the hub again, which it forgets when a connection drops
     var reregister: () async throws -> Void = {}
+    /// The key the agent signs with, for the services on this machine (`LocalShareAgent`)
+    var identity: () -> KeyChain? = { nil }
     var now: () -> Date = Date.init
     var sleep: (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
   }
@@ -51,7 +53,35 @@ final class ShareNetworkAppAgentCoordinator {
   private var runGeneration: UInt64 = 0
 
   private(set) var state = ShareNetworkAppAgentState.disabled {
-    didSet { if state != oldValue { print("[agent] \(state)") } }
+    didSet {
+      guard state != oldValue else { return }
+      print("[agent] \(state)")
+      updateShareAgent()
+    }
+  }
+
+  #if os(macOS)
+  private var shareAgent: LocalShareAgent?
+  #endif
+
+  /// While this app is its machine's agent, the services on the machine get their shares attested by it
+  private func updateShareAgent() {
+    #if os(macOS)
+    if case .available = state {
+      guard shareAgent == nil, let identity = runtime.identity() else { return }
+      let agent = LocalShareAgent(identity: identity)
+      do {
+        try agent.start()
+        shareAgent = agent
+        print("[agent] attesting shares on \(LocalShareAgent.socketPath)")
+      } catch {
+        print("[agent] can't listen on \(LocalShareAgent.socketPath): \(error)")
+      }
+    } else {
+      shareAgent?.stop()
+      shareAgent = nil
+    }
+    #endif
   }
 
   var errorMessage: String? {
@@ -101,7 +131,8 @@ final class ShareNetworkAppAgentCoordinator {
       reregister: { [weak hub] in
         guard let hub else { return }
         try await hub.net.registerAgain(tunnel: PacketTunnelController())
-      }
+      },
+      identity: { [weak hub] in hub?.identity }
     )
   }
 

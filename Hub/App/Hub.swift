@@ -51,9 +51,13 @@ extension KeyChain {
   @ObservationIgnored lazy var networkAppAgent =
     ShareNetworkAppAgentCoordinator(hub: self)
   
+  /// The key this app connects to the hub with, and binds as its machine's agent with
+  @ObservationIgnored let identity: KeyChain
+
   init(settings: Settings) {
     self.settings = settings
     let identity = settings.identityTag.map(KeyChain.keychain) ?? .main
+    self.identity = identity
     key = identity.publicKey()
     let address = settings.address
     self.client = HubClient(settings.address, keyChain: identity, options: .init(
