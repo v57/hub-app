@@ -24,6 +24,12 @@ struct HubNetworkCard: View {
         NetworkCardContent().hub(hub).id(hub.id)
       }
     }
+#if os(macOS)
+    // Keep This Mac Awake holds while any hub's network uses this Mac's internet
+    .onChange(of: hubs.list.contains { $0.net.isSharing }, initial: true) { _, sharing in
+      KeepAwake.main.update(sharing: sharing)
+    }
+#endif
     .task {
 #if DEBUG
       guard !HubDemo.isOn else { return }

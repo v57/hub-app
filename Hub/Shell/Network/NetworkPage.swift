@@ -229,6 +229,17 @@ struct HubNetworkPage: View {
           })
           .toggleStyle(.kitSwitch).labelsHidden().controlSize(.small)
         }
+#if os(macOS)
+        if hub.net.isSharing {
+          SidebarRow(
+            "Keep this Mac awake while sharing",
+            subtitle: "So it answers when you’re away. It can sleep with the lid closed only on power.", systemImage: "sun.max", hue: .yellow
+          ) {
+            Toggle("Keep this Mac awake while sharing", isOn: Bindable(KeepAwake.main).isOn)
+              .toggleStyle(.kitSwitch).labelsHidden().controlSize(.small)
+          }
+        }
+#endif
       }
       if hub.api.contains("network/gateway/grant") {
         SidebarRow("Use another device’s internet", subtitle: internetLine, systemImage: "globe", hue: .indigo) {

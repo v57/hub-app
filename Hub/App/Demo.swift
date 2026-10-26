@@ -121,7 +121,8 @@ enum HubDemo {
 
   /// Home's network as the hub-net boards draw it: this Mac, home-nas sharing its internet and two apps, a phone, a PC
   /// this Mac can't reach, an asleep laptop, and two more devices that share their internet. `--demo-net 100`: that
-  /// many devices, for the map's rings and the list. `--demo-net-off`: this Mac's network is off.
+  /// many devices, for the map's rings and the list. `--demo-net-off`: this Mac's network is off. `--demo-net-sharing`: this
+  /// Mac shares its internet.
   static func network(_ hub: Hub) {
     let arguments = ProcessInfo.processInfo.arguments
     let count = arguments.firstIndex(of: "--demo-net").flatMap { $0 + 1 < arguments.count ? Int(arguments[$0 + 1]) : nil } ?? 0
@@ -199,7 +200,7 @@ enum HubDemo {
       "hub/net/node", "hub/net/node/set", "hub/net/list", "hub/net/local-agent",
     ])
     let joined = !arguments.contains("--demo-net-off")
-    hub.net.demo(joined: joined, address: .init(ipv4: "100.96.0.2", ipv6: "fd48:5542:4e45::2"), tcp: joined ? [5432, 8096] : [])
+    hub.net.demo(joined: joined, sharing: joined && arguments.contains("--demo-net-sharing"), address: .init(ipv4: "100.96.0.2", ipv6: "fd48:5542:4e45::2"), tcp: joined ? [5432, 8096] : [])
     if joined, !arguments.contains("--demo-net-own") {
       hub.net.demo(vpn: .some(hub.net.devices.first { $0.key == "agent-home-nas" }))
       NetworkRecents.main.use("agent-home-nas", hub: hub, internet: true)
