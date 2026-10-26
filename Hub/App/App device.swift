@@ -78,7 +78,7 @@ enum AppDevice {
 #endif
   }
 
-  static func description() -> DeviceDescription {
+  static func description() async -> DeviceDescription {
     let storage = storage()
     return DeviceDescription(
       name: name, os: os, arch: arch,
@@ -87,6 +87,7 @@ enum AppDevice {
         memory: Int64(ProcessInfo.processInfo.physicalMemory),
         disks: storage.map { [.init(name: "System", total: $0.total, free: $0.free)] },
         power: battery().level == nil ? .ac : .battery,
+        ssh: await ssh(),
         model: model
       )
     )
@@ -106,6 +107,53 @@ enum AppDevice {
       storageTotal: storage?.total
     )
   }
+
+  // MARK: SSH
+  /// This Mac's SSH server (Remote Login), as hub-launcher reports it: every host key it offers, signed by the device
+  /// key so other devices pin it through the hub, which opens the port in its members' links to this Mac. macOS starts
+  /// sshd from launchd on the `ssh` service, so the port is 22 whatever sshd_config says
+  static func ssh() async -> Capabilities.SSH? {
+#if os(macOS)
+    guard let device = DeviceIdentity.app?.key else { return nil }
+    let keys = await hostKeys(port: 22)
+    guard let preferred = keys.first else { return nil }
+    return Capabilities.SSH(port: 22, user: NSUserName(), hostKey: preferred, otherHostKeys: Array(keys.dropFirst()), device: device)
+#else
+    return nil
+#endif
+  }
+
+#if os(macOS)
+  /// The host keys the SSH server on this machine's port offers, Ed25519 first, then ECDSA and RSA (the v57 apps'
+  /// libssh2 on mbedTLS can't use Ed25519). The sandbox can't read /etc/ssh, so sshd itself tells them through
+  /// `ssh-keyscan`; none when nothing answers
+  static func hostKeys(port: Int) async -> [String] {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/ssh-keyscan")
+    process.arguments = ["-T", "2", "-t", "ed25519,ecdsa,rsa", "-p", String(port), "127.0.0.1"]
+    let output = Pipe()
+    process.standardOutput = output
+    process.standardError = FileHandle.nullDevice
+    let text: String = await withCheckedContinuation { continuation in
+      process.terminationHandler = { _ in
+        continuation.resume(returning: String(decoding: output.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self))
+      }
+      do { try process.run() } catch {
+        process.terminationHandler = nil
+        continuation.resume(returning: "")
+      }
+    }
+    let keys = text.split(separator: "\n").compactMap { line -> String? in
+      // `127.0.0.1 ssh-ed25519 AAAA…`; comment lines start with `#`
+      let fields = line.split(separator: " ")
+      guard !line.hasPrefix("#"), fields.count >= 3 else { return nil }
+      return "\(fields[1]) \(fields[2])"
+    }
+    let preference = ["ssh-ed25519", "ecdsa-sha2-", "ssh-rsa"]
+    func rank(_ key: String) -> Int { preference.firstIndex { key.hasPrefix($0) } ?? preference.count }
+    return keys.sorted { rank($0) < rank($1) }
+  }
+#endif
 
   // MARK: Battery
   static func battery() -> (level: Double?, charging: Bool?) {
