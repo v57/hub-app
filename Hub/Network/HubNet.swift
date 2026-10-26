@@ -296,12 +296,16 @@ final class HubNet {
     chosenGateway = device.key
     vpnRenewalTask?.cancel()
     vpnRenewalTask = Task { [weak self] in
+      // A grant lasts a month and the tunnel goes on without the app: while it runs, it renews the grant once half
+      // has passed. A failed renewal is tried again the next hour
       while !Task.isCancelled {
-        try? await Task.sleep(for: .seconds(240))
+        try? await Task.sleep(for: .seconds(3600))
         guard !Task.isCancelled, let self,
-              let current = self.devices.first(where: { $0.id == device.id }) else {
+              let grant = (try? PacketTunnelController().installedConfiguration())?.gatewayGrant,
+              grant.gatewayKey == device.key else {
           return
         }
+        guard Self.halfSpent(grant), let current = self.devices.first(where: { $0.id == device.id }) else { continue }
         do {
           try await GatewaySelectionController().renew(
             ReachableGateway(
@@ -314,13 +318,22 @@ final class HubNet {
           )
           self.vpn = current
         } catch {
-          self.vpn = nil
-          return
+          print("[HubNet] renewing \(current.name ?? "the gateway")'s grant: \(error)")
         }
       }
     }
     try refreshAddress(from: PacketTunnelController())
     await refreshGlobalVPN()
+  }
+
+  /// Whether half of the grant's lifetime has passed
+  static func halfSpent(_ grant: GatewayGrant, now: Date = Date()) -> Bool {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    guard let issuedAt = formatter.date(from: grant.issuedAt), let expiresAt = formatter.date(from: grant.expiresAt) else {
+      return true
+    }
+    return now >= issuedAt.addingTimeInterval(expiresAt.timeIntervalSince(issuedAt) / 2)
   }
 
   func disableVpn() async throws {

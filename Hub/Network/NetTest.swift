@@ -45,7 +45,7 @@ enum NetTest {
         log("tunnel profile: \(error)")
       }
       let status = await tunnel.status
-      log("tunnel status=\(status) profile hub=\(profile?.hubURL.absoluteString ?? "none") gateway=\(profile?.usesGateway == true)")
+      log("tunnel status=\(status) profile hub=\(profile?.hubURL.absoluteString ?? "none") gateway=\(profile?.usesGateway == true) onDemand=\(await tunnel.isOnDemandEnabled) grant=\(profile?.gatewayGrant.map { "\($0.issuedAt)..\($0.expiresAt)" } ?? "-")")
       // Relaunching the app (`devicectl --terminate-existing`) also ends the extension a moment later, so a tunnel
       // that looks connected at launch may be on its way down
       if profile?.hubURL == hub.settings.address {

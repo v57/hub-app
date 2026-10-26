@@ -17,6 +17,11 @@ final class PacketTunnelController: PacketTunnelControlling {
     try self.init(store: HubNetworkProfileStore())
   }
 
+  /// Whether the system keeps the tunnel up on its own (VPN On Demand)
+  var isOnDemandEnabled: Bool {
+    get async { (try? await loadManager())?.isOnDemandEnabled ?? false }
+  }
+
   var status: PacketTunnelStatus {
     get async {
       do {
@@ -65,6 +70,7 @@ final class PacketTunnelController: PacketTunnelControlling {
       manager.localizedDescription = Self.localizedDescription
       manager.protocolConfiguration = tunnelProtocol
       manager.isEnabled = true
+      Self.keepConnected(manager, configuration.usesGateway)
       try await save(manager)
       try await load(manager)
       self.manager = manager
@@ -88,6 +94,12 @@ final class PacketTunnelController: PacketTunnelControlling {
     guard manager.isEnabled else {
       throw PacketTunnelControllerError.disabled
     }
+    let usesGateway = (try? store.load())?.usesGateway == true
+    if manager.isOnDemandEnabled != usesGateway {
+      Self.keepConnected(manager, usesGateway)
+      try await save(manager)
+      try await load(manager)
+    }
     try manager.connection.startVPNTunnel()
     try await waitForConnection(manager, expected: .connected)
   }
@@ -97,6 +109,12 @@ final class PacketTunnelController: PacketTunnelControlling {
   ) async throws {
     if let manager = try await loadManager(),
        manager.connection.status != .disconnected {
+      // On Demand would start the old one again; installing sets it for the new one
+      if manager.isOnDemandEnabled {
+        Self.keepConnected(manager, false)
+        try await save(manager)
+        try await load(manager)
+      }
       manager.connection.stopVPNTunnel()
       try await waitForConnection(manager, expected: .disconnected)
     }
@@ -108,9 +126,21 @@ final class PacketTunnelController: PacketTunnelControlling {
   /// it still disconnecting
   func stop() async {
     guard let manager = try? await loadManager() else { return }
+    // On Demand would start it again
+    if manager.isOnDemandEnabled {
+      Self.keepConnected(manager, false)
+      try? await save(manager)
+    }
     guard manager.connection.status != .disconnected, manager.connection.status != .invalid else { return }
     manager.connection.stopVPNTunnel()
     try? await waitForConnection(manager, expected: .disconnected)
+  }
+
+  /// Through another device's internet, the system keeps the tunnel up (VPN On Demand): it starts it again after the
+  /// extension ends, a restart or a network change, without the app
+  private static func keepConnected(_ manager: NETunnelProviderManager, _ enabled: Bool) {
+    manager.onDemandRules = enabled ? [NEOnDemandRuleConnect()] : nil
+    manager.isOnDemandEnabled = enabled
   }
 
   /// Waits for a tunnel that is going down to finish, at most 15 seconds
@@ -127,11 +157,12 @@ final class PacketTunnelController: PacketTunnelControlling {
   /// does not. `install(configuration:)` re-enables it.
   func remove() async throws {
     if let manager = try await loadManager() {
-      manager.connection.stopVPNTunnel()
-      if manager.isEnabled {
+      if manager.isEnabled || manager.isOnDemandEnabled {
+        Self.keepConnected(manager, false)
         manager.isEnabled = false
         try await save(manager)
       }
+      manager.connection.stopVPNTunnel()
     }
     try store.remove()
   }
