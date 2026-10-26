@@ -2,7 +2,7 @@
 //  NetTest.swift
 //  Hub
 //
-//  `--net-test [use-internet|stop|join|share-internet|leave|status|links|node|hub|ip|reach|get|grant|diag]` (Debug): drives this device's Hub Network on its first hub (or
+//  `--net-test [use-internet|stop|join|share-internet|leave|status|links|node|hub|ip|reach|get|grant|diag|fallback]` (Debug): drives this device's Hub Network on its first hub (or
 //  `--net-hub <ws address>`) without taps and prints each step as a `[NETTEST]` line: the hub's agent, joining, the
 //  devices that offer their internet, Use Internet, a download through it, the network path and the extension's
 //  diagnostics. On an iPhone, read the lines with
@@ -73,6 +73,29 @@ enum NetTest {
           try? await Task.sleep(for: .seconds(2))
         }
       }
+    }
+    if action == "fallback" {
+      // `--net-on true|false`: use this device's own internet while the gateway doesn't answer, then print where
+      // traffic goes every 5 s for `--net-watch <seconds>` (default 0)
+      let arguments = CommandLine.arguments
+      let value = arguments.firstIndex(of: "--net-on").flatMap { $0 + 1 < arguments.count ? arguments[$0 + 1] : nil }
+      let watch = arguments.firstIndex(of: "--net-watch").flatMap { $0 + 1 < arguments.count ? Int(arguments[$0 + 1]) : nil } ?? 0
+      if let value {
+        do {
+          try await hub.net.setFallsBack(value == "true")
+          log("fallback \(value == "true" ? "on" : "off")")
+        } catch {
+          return fail("fallback: \(error)")
+        }
+      }
+      for step in 0...(watch / 5) {
+        if step > 0 { try? await Task.sleep(for: .seconds(5)) }
+        let exit = (try? await PacketTunnelController().exitStatus()).map { String(decoding: $0, as: UTF8.self) } ?? "-"
+        let gateway = await linkLines()?.wireGuard?.first { $0.allowedIPs.contains("0.0.0.0/0") }
+        log("exit \(exit) rx=\(gateway?.rxBytes ?? -1) path=\(await currentPath().availableInterfaces.first.map { $0.name } ?? "-")")
+      }
+      await diagnostics()
+      return pass()
     }
     if action == "hub" {
       // Whether the hub answers, and through which address: its own or its Hub Network address
