@@ -372,16 +372,18 @@ actor LinkManager {
 
   /// Tries each endpoint until a handshake with the peer completes, from `punchAt` on, for up to `punchWindow`
   private func punch(_ linkId: String, endpoints: [LinkEndpoint], at punchAt: Date) async {
-    guard let attempt = attempts[linkId] else { return }
+    guard let attempt = attempts[linkId], !endpoints.isEmpty else { return }
     let link = attempt.link
-    // A link opened again for a new grant over a path that still works keeps its endpoint
-    if peers[link.other.key]?.endpoint != nil, await isLive(link) {
+    // A link opened again for a new grant over a path that still works keeps its endpoint. The other side must
+    // still be there: after a network change its old mapping can look live for a while, and punching is needed
+    if let current = peers[link.other.key]?.endpoint, endpoints.contains(where: { $0.endpoint == current }),
+      await isLive(link)
+    {
       delivered[link.other.key] = link.grant.grantId
-      dependencies.log("link \(linkId.prefix(8)) renewed with \(link.other.key.suffix(8))")
+      dependencies.log("link \(linkId.prefix(8)) renewed with \(link.other.key.suffix(8)) at \(current)")
       finish(linkId)
       return
     }
-    guard !endpoints.isEmpty else { return }
     let wait = punchAt.timeIntervalSince(dependencies.now())
     if wait > 0 { try? await Task.sleep(nanoseconds: UInt64(min(wait, 5) * 1_000_000_000)) }
     let started = dependencies.now()

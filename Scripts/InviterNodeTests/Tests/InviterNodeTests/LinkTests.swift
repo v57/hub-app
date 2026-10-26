@@ -102,6 +102,32 @@ final class LinkTests: XCTestCase {
     XCTAssertEqual(member.count("opened to"), opened)
   }
 
+  /// The member moved to another network and opens the link again: the machine's handshake with the old mapping still
+  /// looks live, but the member isn't there any more, so the machine punches to where it is now
+  func testAMemberOnANewNetworkIsPunchedToAgain() async throws {
+    let hub = Curve25519.Signing.PrivateKey()
+    let member = LinkDevice(port: port, trusting: hub, name: "member")
+    let machine = LinkDevice(port: port, trusting: hub, name: "machine")
+    machine.start()
+    member.start()
+    defer {
+      member.client.stop()
+      machine.client.stop()
+    }
+    try await member.waitPresent()
+    try await machine.waitPresent()
+    await member.manager.update(grants: [signedGrant(hub: hub, member: member, machine: machine)])
+    let before = try await machine.waitLinked(to: member)
+    XCTAssertEqual(before.endpoint, "198.51.100.2:41000")
+
+    member.candidate = "203.0.113.7"
+    let ports: [PeerLinkGrant.Port] = [.init(protocol: "tcp", port: 1997), .init(protocol: "tcp", port: 8642)]
+    await member.manager.update(grants: [signedGrant(hub: hub, member: member, machine: machine, ports: ports)])
+    try await machine.waitLog("up with \(member.serviceKey.suffix(8)) at 203.0.113.7:41000")
+    XCTAssertFalse(machine.logged("renewed with"))
+    XCTAssertEqual(machine.appliedPeers.first { $0.key == member.serviceKey }?.ports, ports)
+  }
+
   func testTheMachineRejectsAGrantFromAnotherHub() async throws {
     let hub = Curve25519.Signing.PrivateKey()
     let attacker = Curve25519.Signing.PrivateKey()
@@ -192,6 +218,12 @@ final class LinkDevice: @unchecked Sendable {
   private let lock = NSLock()
   private var peers: [LinkManager.Peer] = []
   private var lines: [String] = []
+  private var candidateAddress = ""
+  /// The host candidate this device offers, as if it moved to another network when changed
+  var candidate: String {
+    get { lock.withLock { candidateAddress } }
+    set { lock.withLock { candidateAddress = newValue } }
+  }
 
   init(port: UInt16, trusting hub: Curve25519.Signing.PrivateKey, name: String) {
     self.name = name
@@ -217,7 +249,7 @@ final class LinkDevice: @unchecked Sendable {
       log: { [weak self] in self?.log($0) }
     )
     let client = client!
-    let candidate = name == "member" ? "198.51.100.2" : "198.51.100.1"
+    candidateAddress = name == "member" ? "198.51.100.2" : "198.51.100.1"
     manager = LinkManager(ownKey: serviceKey, trustedHubKey: spki(hub.publicKey), dependencies: .init(
       open: { try await client.openLink($0) },
       send: { try await client.sendLink($0, linkId: $1, endpoints: $2) },
@@ -226,7 +258,7 @@ final class LinkDevice: @unchecked Sendable {
       lastHandshake: { [weak self] wireGuardKey in
         self?.lock.withLock { self?.peers.first { $0.wireGuardKey == wireGuardKey }?.endpoint != nil } == true ? Date() : nil
       },
-      candidates: { [LinkEndpoint(address: candidate, port: 41000)] },
+      candidates: { [weak self] in [LinkEndpoint(address: self?.candidate ?? "", port: 41000)] },
       log: { [weak self] in self?.log($0) }
     ))
   }
