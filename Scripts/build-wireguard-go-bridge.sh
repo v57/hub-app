@@ -2,10 +2,24 @@
 set -eu
 
 action="${1:-build}"
-set -- ${ARCHS}
-target_arch="${1:-unknown}"
+
+# The Makefile adds -m<platform>-version-min from these, but Xcode 27 no longer
+# passes them to external build targets, so the Go objects came out built for
+# the SDK's version (27.0) instead of the deployment target.
+if [ -z "${DEPLOYMENT_TARGET_CLANG_FLAG_NAME:-}" ]; then
+  case "${PLATFORM_NAME}" in
+    macosx) DEPLOYMENT_TARGET_CLANG_FLAG_NAME=mmacosx-version-min ;;
+    iphoneos) DEPLOYMENT_TARGET_CLANG_FLAG_NAME=miphoneos-version-min ;;
+    iphonesimulator) DEPLOYMENT_TARGET_CLANG_FLAG_NAME=mios-simulator-version-min ;;
+  esac
+  DEPLOYMENT_TARGET_CLANG_ENV_NAME="${DEPLOYMENT_TARGET_SETTING_NAME:-}"
+  export DEPLOYMENT_TARGET_CLANG_FLAG_NAME DEPLOYMENT_TARGET_CLANG_ENV_NAME
+fi
+
+archs="$(echo ${ARCHS} | tr ' ' '-')"
+deployment_target="$(eval echo "\${${DEPLOYMENT_TARGET_CLANG_ENV_NAME:-unset}:-any}")"
 source_stamp="$(cksum api-apple.go wireguard.h go.mod Makefile | cksum | awk '{print $1}')"
-cache_root="/tmp/hub-wireguard-go-${UID}/${CONFIGURATION}-${PLATFORM_NAME}-${target_arch}-${source_stamp}"
+cache_root="/tmp/hub-wireguard-go-${UID}/${CONFIGURATION}-${PLATFORM_NAME}-${deployment_target}-${archs}-${source_stamp}"
 products="${cache_root}/products"
 objects="${cache_root}/objects"
 
