@@ -77,6 +77,8 @@ enum NetTest {
       await hub.net.restoreIfActive()
       return await links(hub)
     }
+    // Away from the hub (cellular) it answers only through the tunnel the relaunch took down
+    if action == "reach" || action == "get" { await hub.net.restoreIfActive() }
     guard await wait("connected", seconds: 45, { hub.isConnected ? true : nil }) != nil else { return fail("not connected") }
     guard await wait("api", seconds: 20, { hub.api.isEmpty ? nil : true }) != nil else { return fail("no api") }
     // Subscriptions live while they're held
