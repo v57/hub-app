@@ -1,5 +1,6 @@
 import CryptoKit
 import Foundation
+import Network
 
 /// A host candidate a device declares for a link, or the endpoint the node observed
 struct LinkEndpoint: Codable, Hashable, Sendable {
@@ -371,7 +372,8 @@ actor LinkManager {
   // MARK: Punching
 
   /// Tries each endpoint until a handshake with the peer completes, from `punchAt` on, for up to `punchWindow`
-  private func punch(_ linkId: String, endpoints: [LinkEndpoint], at punchAt: Date) async {
+  private func punch(_ linkId: String, endpoints offered: [LinkEndpoint], at punchAt: Date) async {
+    let endpoints = Self.reachableFirst(offered, own: await dependencies.candidates())
     guard let attempt = attempts[linkId], !endpoints.isEmpty else { return }
     let link = attempt.link
     // A link opened again for a new grant over a path that still works keeps its endpoint. The other side must
@@ -456,6 +458,32 @@ actor LinkManager {
       key: link.other.key, wireGuardKey: link.other.wireGuardKey, routes: link.routes,
       sources: link.other.addresses.map(PeerLinkGrant.hostRoute), ports: link.exposed, endpoint: endpoint
     )
+  }
+
+  /// A private address of another network (the Mac's LAN seen from a phone on cellular) can't answer, and trying it
+  /// first costs a trial while the other side tries the public mapping: it goes last. Both sides order alike, so they
+  /// try the same path at the same time
+  static func reachableFirst(_ endpoints: [LinkEndpoint], own: [LinkEndpoint]) -> [LinkEndpoint] {
+    let foreign = endpoints.map { endpoint in
+      guard let address = IPv4Address(endpoint.address) else { return false }
+      return isPrivate(address) && !own.contains { IPv4Address($0.address).map { sameSubnet($0, address) } ?? false }
+    }
+    return zip(endpoints, foreign).filter { !$0.1 }.map(\.0) + zip(endpoints, foreign).filter { $0.1 }.map(\.0)
+  }
+
+  /// 10/8, 172.16/12, 192.168/16, 100.64/10 (carrier NAT) and 169.254/16
+  private static func isPrivate(_ address: IPv4Address) -> Bool {
+    let bytes = [UInt8](address.rawValue)
+    switch (bytes[0], bytes[1]) {
+    case (10, _), (192, 168), (169, 254): return true
+    case (172, 16...31), (100, 64...127): return true
+    default: return false
+    }
+  }
+
+  /// Same /24, as home networks are
+  private static func sameSubnet(_ a: IPv4Address, _ b: IPv4Address) -> Bool {
+    a.rawValue.prefix(3) == b.rawValue.prefix(3)
   }
 
   private static func unique(_ endpoints: [LinkEndpoint]) -> [LinkEndpoint] {

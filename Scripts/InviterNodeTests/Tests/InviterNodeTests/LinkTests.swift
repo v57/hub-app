@@ -128,6 +128,18 @@ final class LinkTests: XCTestCase {
     XCTAssertEqual(machine.appliedPeers.first { $0.key == member.serviceKey }?.ports, ports)
   }
 
+  /// The Mac on its home network, the phone on cellular: each tries the other's public mapping before a private
+  /// address it can't reach, so both punch the same path at once; on one LAN the host candidate stays first
+  func testPrivateAddressesOfAnotherNetworkGoLast() {
+    func endpoints(_ addresses: String...) -> [LinkEndpoint] { addresses.map { LinkEndpoint(address: $0, port: 51820) } }
+    let mac = endpoints("192.168.1.21"), phoneOnCellular = endpoints("10.142.7.9")
+    let observedMac = endpoints("185.117.120.192"), observedPhone = endpoints("94.54.1.2")
+    XCTAssertEqual(LinkManager.reachableFirst(mac + observedMac, own: phoneOnCellular), observedMac + mac)
+    XCTAssertEqual(LinkManager.reachableFirst(phoneOnCellular + observedPhone, own: mac), observedPhone + phoneOnCellular)
+    XCTAssertEqual(LinkManager.reachableFirst(mac + observedMac, own: endpoints("192.168.1.18")), mac + observedMac)
+    XCTAssertEqual(LinkManager.reachableFirst(endpoints("198.51.100.1", "127.0.0.1"), own: []), endpoints("198.51.100.1", "127.0.0.1"))
+  }
+
   func testTheMachineRejectsAGrantFromAnotherHub() async throws {
     let hub = Curve25519.Signing.PrivateKey()
     let attacker = Curve25519.Signing.PrivateKey()
