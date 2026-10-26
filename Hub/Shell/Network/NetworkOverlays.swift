@@ -21,6 +21,7 @@ struct NetworkDeviceSheet: View {
   @Environment(Hub.self) private var hub
   @Environment(\.kitDismiss) private var dismiss
   @Environment(\.openURL) private var openURL
+  @Environment(\.kitIdiom) private var idiom
   @State private var busy = false
   @State private var error: String?
   @State private var copied = false
@@ -87,7 +88,7 @@ struct NetworkDeviceSheet: View {
     } footer: {
       SheetStatus(device.statusLine, systemImage: device.status == .cantReach ? "exclamationmark.triangle" : "circle.fill", hue: device.hue)
       if let address = device.address {
-        Button(copied ? "Copied" : "Copy Address", systemImage: copied ? "checkmark" : "doc.on.doc") {
+        Button(copied ? "Copied" : idiom == .phone ? "Copy" : "Copy Address", systemImage: copied ? "checkmark" : "doc.on.doc") {
           address.copyToClipboard()
           copied = true
         }
