@@ -2,7 +2,7 @@
 //  NetTest.swift
 //  Hub
 //
-//  `--net-test [use-internet|stop|join|share-internet|leave|status|links|node|hub|ip|reach|get|grant]` (Debug): drives this device's Hub Network on its first hub (or
+//  `--net-test [use-internet|stop|join|share-internet|leave|status|links|node|hub|ip|reach|get|grant|diag]` (Debug): drives this device's Hub Network on its first hub (or
 //  `--net-hub <ws address>`) without taps and prints each step as a `[NETTEST]` line: the hub's agent, joining, the
 //  devices that offer their internet, Use Internet, a download through it, the network path and the extension's
 //  diagnostics. On an iPhone, read the lines with
@@ -31,6 +31,17 @@ enum NetTest {
   static func run() async {
     let action = action
     log("start \(action)")
+    if action == "diag" {
+      // `--net-since <ISO time prefix>`: the extension's log from then on, without touching the tunnel
+      let arguments = CommandLine.arguments
+      let since = arguments.firstIndex(of: "--net-since").flatMap { $0 + 1 < arguments.count ? arguments[$0 + 1] : nil } ?? ""
+      guard let group = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.dev.v57.hub"),
+            let text = try? String(contentsOf: group.appendingPathComponent("hn9xx-diag.log"), encoding: .utf8) else {
+        return fail("no diagnostics")
+      }
+      for line in text.split(separator: "\n") where line.dropFirst().prefix(since.count) >= since { log("diag \(line)") }
+      return pass()
+    }
     guard let hub = await wait("hub", seconds: 20, { firstHub() }) else { return fail("no hub") }
     log("hub \(hub.settings.name) \(hub.settings.address.absoluteString) onHubMachine=\(hub.isOnHubMachine)")
     // A stopped tunnel of this hub starts first, as the hub may answer only through it (a relaunch from devicectl
