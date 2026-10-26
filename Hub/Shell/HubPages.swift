@@ -128,10 +128,8 @@ struct AppsPage: View {
 }
 
 struct NetworkPage: View {
-  @Environment(Hub.self) private var hub
   var body: some View {
-    HubNetworkView().kitPane(.content)
-      .pageToolbar("Hub Network", meta: PageMeta.parts(hub, []), systemImage: "globe", hue: .teal) { }
+    HubNetworkPage()
   }
 }
 

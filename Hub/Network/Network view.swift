@@ -675,7 +675,7 @@ struct GatewayFallbackRow: View {
 
 /// The coordinator the hub's invitations name: a hub-net-node every device can reach, which introduces devices to
 /// each other and never carries their traffic. Hubs use v57.dev's until an owner sets another.
-private struct CoordinatorSheet: View {
+struct CoordinatorSheet: View {
   @Environment(Hub.self) private var hub
   @Environment(\.kitDismiss) private var dismiss
   @State private var address: String

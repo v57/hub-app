@@ -73,6 +73,7 @@ enum HubDemo {
       load(state.hostPending, ["MCowBQYDK2VwAyEAlmstudio\(slug)": ["llm/list", "llm/chat"], "MCowBQYDK2VwAyEAapns\(slug)": ["apns/send", "apns/send/many"]].prefix(security).reduce(into: [String: [String]]()) { $0[$1.key] = $1.value })
     }
     load(state.devices, (0..<devices).map { device($0, slug: slug) })
+    if name == "Home" { network(hub) }
     load(state.pendingDevices, (0..<pending).map { ["id": "pending\($0)", "key": "pendingkey\($0)\(slug)", "name": "Gaming PC", "platform": "windows", "safetyCode": "728 621"] })
     if !launcher.isEmpty {
       load(state.launcherInfo, ["apps": launcher.map { ["name": $0.0, "active": $0.1, "restarts": true, "updateAvailable": $0.2, "instances": 1] }])
@@ -112,6 +113,108 @@ enum HubDemo {
     "hub/group/list", "hub/group/names", "hub/group/update", "hub/group/update/users", "hub/whitelist", "hub/whitelist/status",
     "hub/status", "hub/status/badges", "launcher/info", "launcher/status", "s3/read/directory", "hub/merge/add",
   ]
+
+  // MARK: Hub Network
+
+  /// The agent key of this device on the demo's networks
+  static let thisAgentKey = "agent-studio-mac"
+
+  /// Home's network as the hub-net boards draw it: this Mac, home-nas sharing its internet and two apps, a phone, a PC
+  /// this Mac can't reach, an asleep laptop, and two more devices that share their internet. `--demo-net 100`: that
+  /// many devices, for the map's rings and the list. `--demo-net-off`: this Mac's network is off.
+  static func network(_ hub: Hub) {
+    let arguments = ProcessInfo.processInfo.arguments
+    let count = arguments.firstIndex(of: "--demo-net").flatMap { $0 + 1 < arguments.count ? Int(arguments[$0 + 1]) : nil } ?? 0
+    var devices: [(name: String, platform: String, state: String, gateway: Bool, apps: [(String, Int, String?)])] = [
+      ("studio-mac", "macos", "online", false, []),
+      ("home-nas", "linux", "online", true, [("photos", 2342, nil), ("jellyfin", 8096, "family")]),
+      ("maya-iphone", "ios", "online", false, []),
+      ("gaming-pc", "windows", "unreachable", false, [("steam-link", 27036, nil)]),
+      ("old-macbook", "macos", "asleep", false, []),
+      ("fra-vps", "linux", "online", true, []),
+      ("office-mini", "macos", "online", true, [("files", 8384, nil), ("notes", 3000, nil), ("print", 631, nil)]),
+      ("parents-pi", "linux", "asleep", true, []),
+    ]
+    let extra = ["lab-runner", "kiosk-lobby", "pixel", "ipad", "nas", "printer", "tv", "build", "camera", "sensor"]
+    for index in devices.count..<max(devices.count, count) {
+      let name = "\(extra[index % extra.count])-\(String(format: "%02d", index / extra.count + 1))"
+      let state = index % 33 == 0 ? "unreachable" : index % 9 == 0 ? "asleep" : "online"
+      devices.append((name, ["linux", "macos", "ios", "android"][index % 4], state, false, []))
+    }
+    let now = Date()
+    var agents = [[String: Any]](), statuses = [[String: Any]](), gateways = [[String: Any]](), resources = [[String: Any]]()
+    var providers = [String: [HubNetworkProvider]]()
+    for (index, device) in devices.enumerated() {
+      let key = index == 0 ? thisAgentKey : "agent-\(device.name)"
+      let address = "100.96.\(index / 250).\(index % 250 + 2)"
+      let seen = ISO8601DateFormatter.js.string(from: now.addingTimeInterval(device.state == "asleep" ? -26 * 3600 : -60))
+      agents.append([
+        "version": 1, "key": key, "wireGuardKey": "wg-\(device.name)", "name": device.name, "platform": device.platform,
+        "overlayAddresses": [address, "fd48:5542:4e45::\(index + 2)"], "connectedAt": seen, "online": device.state != "asleep",
+      ])
+      statuses.append([
+        "version": 1, "key": key, "available": device.state != "asleep", "addresses": [address], "peers": 3,
+        "shares": device.apps.count, "updatedAt": seen,
+      ])
+      if device.gateway {
+        gateways.append([
+          "version": 1, "hubNetworkId": "home", "key": key, "wireGuardKey": "wg-\(device.name)", "endpoint": "203.0.113.\(index):51820",
+          "capability": ["version": 1, "capability": "internet-gateway-v1", "ipv4": true, "ipv6": device.name != "home-nas", "dns": true,
+                         "metered": device.name == "office-mini", "updatedAt": seen],
+          "state": device.state == "asleep" ? "unavailable" : "available", "updatedAt": seen,
+        ])
+      }
+      for app in device.apps {
+        let id = "res-\(device.name)-\(app.0)"
+        resources.append([
+          "version": 1, "resourceId": id, "ownerKey": key, "shareName": app.0, "authority": "\(app.0).\(device.name).hub.invalid:\(app.1)",
+          "policy": ["mode": app.2 == nil ? "hub" : "group", "group": app.2 as Any], "generation": 1,
+        ])
+        providers[id] = [HubNetworkProvider(version: 1, providerId: "p-\(id)", resourceId: id, serviceKey: key, key: key, protocol: .tcp,
+                                            overlayAddress: address, port: UInt16(app.1), connectedAt: seen)]
+      }
+      if device.state == "unreachable" { NetworkLinks.main.mark(key, unreachable: true, since: now.addingTimeInterval(-240)) }
+    }
+    // This Mac's own shares
+    for (port, policy) in [(5432, "family"), (8096, nil as String?)] {
+      resources.append([
+        "version": 1, "resourceId": "res-mine-\(port)", "ownerKey": hub.key, "shareName": "tcp-\(port)",
+        "authority": "tcp-\(port).studio-mac.hub.invalid:\(port)", "policy": ["mode": policy == nil ? "hub" : "group", "group": policy as Any],
+        "generation": 1,
+      ])
+    }
+    load(hub.state.networkAgents, agents)
+    load(hub.state.networkAgentStatus, statuses)
+    load(hub.state.networkGateways, gateways)
+    load(hub.state.networkResources, resources)
+    hub.state.hubNetNode.value = "wss://v57.dev:1964"
+    load(hub.state.networkLocalAgent, [
+      "version": 1, "state": "available", "capabilities": [String](), "connected": true, "bootstrapCapable": true,
+      "updatedAt": ISO8601DateFormatter.js.string(from: now),
+    ])
+    NetworkProviders.main.providers.merge(providers) { $1 }
+    hub.api.formUnion([
+      "network/resource/list", "network/agents/list", "network/status/agents", "network/gateway/list", "network/gateway/grant",
+      "network/gateway/advertise", "network/gateway/remove", "network/resource/update", "network/resource/revoke",
+      "hub/net/node", "hub/net/node/set", "hub/net/list", "hub/net/local-agent",
+    ])
+    let joined = !arguments.contains("--demo-net-off")
+    hub.net.demo(joined: joined, address: .init(ipv4: "100.96.0.2", ipv6: "fd48:5542:4e45::2"), tcp: joined ? [5432, 8096] : [])
+    if joined, !arguments.contains("--demo-net-own") {
+      hub.net.demo(vpn: .some(hub.net.devices.first { $0.key == "agent-home-nas" }))
+      NetworkRecents.main.use("agent-home-nas", hub: hub, internet: true)
+    }
+  }
+
+  /// Who may use one of the demo's shared apps
+  static func setPolicy(_ policy: HubNetworkPolicy, share: String, hub: Hub) {
+    hub.state.networkResources.value = hub.state.networkResources.value.map { resource in
+      guard resource.shareName == share || resource.resourceId == share else { return resource }
+      return HubNetworkResource(version: resource.version, resourceId: resource.resourceId, ownerKey: resource.ownerKey,
+                                shareName: resource.shareName, authority: resource.authority, policy: policy,
+                                generation: resource.generation + 1)
+    }
+  }
 
   private static func load<T: Decodable & Sendable>(_ sync: HubStateStorage.Sync<T>, _ value: Any) {
     do {

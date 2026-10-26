@@ -689,6 +689,22 @@ final class HubNet {
       }
     }
   }
+
+#if DEBUG
+  /// `--demo`: this device's side of the hub's network as the boards draw it, without a tunnel. The pages' actions
+  /// change it the same way.
+  func demo(
+    joined: Bool? = nil, sharing: Bool? = nil, vpn: Device?? = nil, address: Address? = nil, tcp: Set<Int>? = nil,
+    fallsBack: Bool? = nil
+  ) {
+    if let joined { isJoined = joined }
+    if let fallsBack { self.fallsBack = fallsBack }
+    if let sharing { isSharing = sharing }
+    if let vpn { self.vpn = vpn }
+    if let address { self.address = address }
+    if let tcp { sharedTcp = tcp }
+  }
+#endif
 }
 
 enum HubNetError: LocalizedError, Equatable {
