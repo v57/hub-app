@@ -9,6 +9,13 @@ cache_root="/tmp/hub-wireguard-go-${UID}/${CONFIGURATION}-${PLATFORM_NAME}-${tar
 products="${cache_root}/products"
 objects="${cache_root}/objects"
 
+# Go keeps its module cache in GOPATH (default ~/go). When ~/go is a symlink to
+# an unmounted volume, go build fails with "mkdir ~/go: file exists" and Xcode
+# reports only "never received target ended message". Use a cache of our own.
+if [ -z "${GOPATH:-}" ] && [ -L "${HOME}/go" ] && [ ! -d "${HOME}/go" ]; then
+  export GOPATH="/tmp/hub-wireguard-go-${UID}/gopath"
+fi
+
 # Upstream Makefile uses Xcode output paths as make target names. A project path
 # containing spaces is therefore parsed as multiple targets. Build in a stable,
 # space-free cache and copy only resulting archive/header into Xcode products.
