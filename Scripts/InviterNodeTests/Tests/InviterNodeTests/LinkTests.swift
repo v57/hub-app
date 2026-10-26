@@ -72,6 +72,36 @@ final class LinkTests: XCTestCase {
     XCTAssertNotNil(onMember.endpoint)
   }
 
+  /// A share the hub's machine fronts after the link came up: the member's new grant opens the link again, and the
+  /// machine lets the member reach the share's port too, over the same path
+  func testANewGrantReachesTheMachineOverALiveLink() async throws {
+    let hub = Curve25519.Signing.PrivateKey()
+    let member = LinkDevice(port: port, trusting: hub, name: "member")
+    let machine = LinkDevice(port: port, trusting: hub, name: "machine")
+    machine.start()
+    member.start()
+    defer {
+      member.client.stop()
+      machine.client.stop()
+    }
+    try await member.waitPresent()
+    try await machine.waitPresent()
+    await member.manager.update(grants: [signedGrant(hub: hub, member: member, machine: machine)])
+    let before = try await machine.waitLinked(to: member)
+    XCTAssertEqual(before.ports, [PeerLinkGrant.Port(protocol: "tcp", port: 1997)])
+
+    let ports: [PeerLinkGrant.Port] = [.init(protocol: "tcp", port: 1997), .init(protocol: "tcp", port: 8642)]
+    await member.manager.update(grants: [signedGrant(hub: hub, member: member, machine: machine, ports: ports)])
+    try await member.waitLog("renewed with")
+    let after = try XCTUnwrap(machine.appliedPeers.first { $0.key == member.serviceKey })
+    XCTAssertEqual(after.ports, ports)
+    XCTAssertEqual(after.endpoint, before.endpoint, "the live path stays")
+    // The same grant again doesn't open another link
+    let opened = member.count("opened to")
+    await member.manager.tick()
+    XCTAssertEqual(member.count("opened to"), opened)
+  }
+
   func testTheMachineRejectsAGrantFromAnotherHub() async throws {
     let hub = Curve25519.Signing.PrivateKey()
     let attacker = Curve25519.Signing.PrivateKey()
@@ -118,7 +148,10 @@ final class LinkTests: XCTestCase {
       now: now.addingTimeInterval(40 * 24 * 3600))) { XCTAssertEqual($0 as? PeerLinkGrantError, .expired) }
   }
 
-  private func signedGrant(hub: Curve25519.Signing.PrivateKey, member: LinkDevice, machine: LinkDevice) -> PeerLinkGrant {
+  private func signedGrant(
+    hub: Curve25519.Signing.PrivateKey, member: LinkDevice, machine: LinkDevice,
+    ports: [PeerLinkGrant.Port] = [.init(protocol: "tcp", port: 1997)]
+  ) -> PeerLinkGrant {
     let formatter = ISO8601DateFormatter()
     formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
     let unsigned = PeerLinkGrant(
@@ -126,7 +159,7 @@ final class LinkTests: XCTestCase {
       a: .init(key: member.serviceKey, wireGuardKey: member.wireGuardKey, member: "device:a", addresses: ["100.96.0.2", "fd48:5542:4e45::2"]),
       b: .init(key: machine.serviceKey, wireGuardKey: machine.wireGuardKey, member: "device:b", addresses: ["100.96.0.1", "fd48:5542:4e45::1"]),
       aViaB: ["100.96.0.1/32", "fd48:5542:4e45::1/128"], bViaA: ["100.96.0.2/32", "fd48:5542:4e45::2/128"],
-      aToB: [.init(protocol: "tcp", port: 1997)], bToA: [],
+      aToB: ports, bToA: [],
       issuedAt: formatter.string(from: Date().addingTimeInterval(-1)),
       expiresAt: formatter.string(from: Date().addingTimeInterval(3600)), signature: ""
     )
@@ -208,6 +241,8 @@ final class LinkDevice: @unchecked Sendable {
   }
 
   func logged(_ text: String) -> Bool { lock.withLock { lines.contains { $0.contains(text) } } }
+
+  func count(_ text: String) -> Int { lock.withLock { lines.filter { $0.contains(text) }.count } }
 
   func waitPresent(timeout: TimeInterval = 5) async throws {
     let deadline = Date().addingTimeInterval(timeout)

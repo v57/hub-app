@@ -201,6 +201,9 @@ actor LinkManager {
   private var peers: [String: Peer] = [:]
   private var attempts: [String: Attempt] = [:]
   private var opening: Set<String> = []
+  /// The grant each linked device last took, by its key: a new grant (other ports) opens the link again even while
+  /// the path is live, since the other side learns ports only from the grant a link brings
+  private var delivered: [String: String] = [:]
   private var present = false
   private(set) var linkUps = 0
 
@@ -221,8 +224,11 @@ actor LinkManager {
       }
     }
     own = verified
-    for link in verified where peers[link.other.key]?.wireGuardKey != link.other.wireGuardKey {
-      peers[link.other.key] = Self.peer(for: link, endpoint: nil)
+    for link in verified {
+      let current = peers[link.other.key]
+      let endpoint = current?.wireGuardKey == link.other.wireGuardKey ? current?.endpoint : nil
+      let peer = Self.peer(for: link, endpoint: endpoint)
+      if current != peer { peers[link.other.key] = peer }
     }
     await removeStale()
     await openWhereNeeded()
@@ -299,8 +305,10 @@ actor LinkManager {
       return
     }
     admitted[peerKey] = link
-    if peers[peerKey]?.wireGuardKey != link.other.wireGuardKey || peers[peerKey]?.routes != link.routes {
-      peers[peerKey] = Self.peer(for: link, endpoint: peers[peerKey]?.endpoint)
+    let current = peers[peerKey]
+    let peer = Self.peer(for: link, endpoint: current?.wireGuardKey == link.other.wireGuardKey ? current?.endpoint : nil)
+    if current != peer {
+      peers[peerKey] = peer
       await apply()
     }
     dependencies.log("link.incoming \(linkId.prefix(8)) from \(peerKey.suffix(8)) accepted")
@@ -319,9 +327,7 @@ actor LinkManager {
     guard present else { return }
     for link in own where link.opens && !opening.contains(link.grant.grantId) {
       guard !attempts.values.contains(where: { $0.link.grant.grantId == link.grant.grantId }) else { continue }
-      if let last = await dependencies.lastHandshake(link.other.wireGuardKey),
-        dependencies.now().timeIntervalSince(last) < Self.liveHandshakeAge
-      {
+      if delivered[link.other.key] == link.grant.grantId, await isLive(link) {
         continue
       }
       opening.insert(link.grant.grantId)
@@ -366,8 +372,16 @@ actor LinkManager {
 
   /// Tries each endpoint until a handshake with the peer completes, from `punchAt` on, for up to `punchWindow`
   private func punch(_ linkId: String, endpoints: [LinkEndpoint], at punchAt: Date) async {
-    guard let attempt = attempts[linkId], !endpoints.isEmpty else { return }
+    guard let attempt = attempts[linkId] else { return }
     let link = attempt.link
+    // A link opened again for a new grant over a path that still works keeps its endpoint
+    if peers[link.other.key]?.endpoint != nil, await isLive(link) {
+      delivered[link.other.key] = link.grant.grantId
+      dependencies.log("link \(linkId.prefix(8)) renewed with \(link.other.key.suffix(8))")
+      finish(linkId)
+      return
+    }
+    guard !endpoints.isEmpty else { return }
     let wait = punchAt.timeIntervalSince(dependencies.now())
     if wait > 0 { try? await Task.sleep(nanoseconds: UInt64(min(wait, 5) * 1_000_000_000)) }
     let started = dependencies.now()
@@ -386,6 +400,7 @@ actor LinkManager {
       while dependencies.now() < trialEnd, !Task.isCancelled {
         if let last = await dependencies.lastHandshake(link.other.wireGuardKey), last >= started.addingTimeInterval(-1) {
           linkUps += 1
+          delivered[link.other.key] = link.grant.grantId
           dependencies.log("link \(linkId.prefix(8)) up with \(link.other.key.suffix(8)) at \(endpoint.endpoint)")
           finish(linkId)
           return
@@ -395,6 +410,12 @@ actor LinkManager {
     }
     dependencies.log("link \(linkId.prefix(8)) to \(link.other.key.suffix(8)) found no path through \(endpoints.map(\.endpoint))")
     finish(linkId)
+  }
+
+  /// Whether handshakes with the link's peer still come
+  private func isLive(_ link: VerifiedLink) async -> Bool {
+    guard let last = await dependencies.lastHandshake(link.other.wireGuardKey) else { return false }
+    return dependencies.now().timeIntervalSince(last) < Self.liveHandshakeAge
   }
 
   private func finish(_ linkId: String) {
@@ -409,6 +430,7 @@ actor LinkManager {
     own.removeAll { $0.expiresAt <= now }
     admitted = admitted.filter { $0.value.expiresAt > now }
     let keep = Set(own.map(\.other.key)).union(admitted.keys)
+    delivered = delivered.filter { keep.contains($0.key) }
     let before = peers.count
     peers = peers.filter { keep.contains($0.key) }
     await apply(force: peers.count != before)
