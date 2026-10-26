@@ -23,6 +23,8 @@ enum AppVault {
     let vault = Vault.shared
     guard vault.store != nil else { return }
     vault.startSync()
+    // This device's SSH key (the Secure Enclave key the v57 apps share), for the user's machines to authorize
+    try? vault.store?.publishDeviceKey()
     let directory = HubDirectory(vault: vault)
     self.directory = directory
     directory.start()

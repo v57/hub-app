@@ -19,23 +19,30 @@ import IOKit.ps
 #endif
 
 extension DeviceIdentity {
-  /// The device key, shared with every v57 app through the v57 keychain group (VaultHub's `HubKeyStore`), so the Hub
-  /// app and the v57 apps are one device on a hub. The first time, the key the app kept on its own (Keychain
-  /// `dev.v57.Hub.device.v1`) becomes the shared one, so the device keeps its id, approvals and Hub Network address.
-  /// Without the shared group the app keeps its own key. `nil` when the Keychain refuses (then the app connects
-  /// without a device).
+  /// The device key: the app's own (Keychain `dev.v57.Hub.device.v1`), which it also puts in the v57 keychain group
+  /// for every v57 app (VaultHub's `HubKeyStore`), so the Hub app and the v57 apps are one device on a hub, with the
+  /// app's approvals and Hub Network address. Without a key of its own the app takes the group's and keeps it. Without
+  /// the group it keeps its own. `nil` when the Keychain refuses (then the app connects without a device).
   @MainActor static let app: DeviceIdentity? = {
     let accessGroup = (Bundle.main.object(forInfoDictionaryKey: "HubKeychainAccessGroup") as? String).flatMap { $0.isEmpty ? nil : $0 }
     var key: DeviceKey?
 #if canImport(VaultHub)
-    if let shared = try? HubKeyStore.adoptDeviceKey(ownDeviceKeySeed(accessGroup: accessGroup)),
-       let keyChain = try? KeyChain(rawRepresentation: shared.seed) {
-      key = DeviceKey(keyChain)
+    let own = ownDeviceKeySeed(accessGroup: accessGroup)
+    if let shared = try? HubKeyStore.shareDeviceKey(own) {
+      // Taken from the group: it becomes the app's own, which the extension and later launches read
+      let keyChain = own == nil
+        ? try? KeyChain(.configuredKeychain(ownDeviceKey(accessGroup: accessGroup)), rawRepresentation: shared.seed)
+        : try? KeyChain(rawRepresentation: shared.seed)
+      key = keyChain.map(DeviceKey.init)
     }
 #endif
     guard let key = key ?? (try? DeviceKey.keychain(accessGroup: accessGroup)) else { return nil }
     return DeviceIdentity(key: key, name: AppDevice.name, platform: AppDevice.platform)
   }()
+
+  private static func ownDeviceKey(accessGroup: String?) -> KeyChain.KeychainConfiguration {
+    .init(service: DeviceKey.keychainService, account: "ed25519-private-key", accessGroup: accessGroup, useDataProtectionKeychain: true)
+  }
 
   /// The seed of the device key the app kept on its own, before it shared one
   private static func ownDeviceKeySeed(accessGroup: String?) -> Data? {
