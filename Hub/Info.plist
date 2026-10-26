@@ -2,8 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>HubKeychainAccessGroup</key>
-	<string>$(AppIdentifierPrefix)dev.v57.Hub</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -17,10 +15,8 @@
 			</array>
 		</dict>
 	</array>
-	<key>NSCameraUsageDescription</key>
-	<string>Hub reads the QR code another device shows to pair with a hub or join its network.</string>
-	<key>NSLocalNetworkUsageDescription</key>
-	<string>Hub connects to hubs on your network and, when this device runs a hub, lets your other devices connect to it.</string>
+	<key>HubKeychainAccessGroup</key>
+	<string>$(AppIdentifierPrefix)dev.v57.Hub</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>

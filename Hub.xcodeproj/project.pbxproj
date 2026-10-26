@@ -7,10 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		C0C0A0042F9A000100C0A004 /* ComponentKit in Frameworks */ = {isa = PBXBuildFile; productRef = C0C0A0022F9A000100C0A002 /* ComponentKit */; };
-		C0C0A0052F9A000100C0A005 /* ComponentKit in Frameworks */ = {isa = PBXBuildFile; productRef = C0C0A0032F9A000100C0A003 /* ComponentKit */; };
-		4D5B0A042F90000100A0B004 /* HubServer in Frameworks */ = {isa = PBXBuildFile; productRef = 4D5B0A022F90000100A0B002 /* HubServer */; };
-		4D5B0A052F90000100A0B005 /* HubServer in Frameworks */ = {isa = PBXBuildFile; productRef = 4D5B0A032F90000100A0B003 /* HubServer */; };
 		132DD8B82F4CDDE300282A30 /* HubService in Frameworks */ = {isa = PBXBuildFile; productRef = 132DD8B72F4CDDE300282A30 /* HubService */; };
 		132DD8BA2F4CDDEB00282A30 /* HubService in Frameworks */ = {isa = PBXBuildFile; productRef = 132DD8B92F4CDDEB00282A30 /* HubService */; };
 		13B4EC572F817DF50060DAE1 /* HubUI in Frameworks */ = {isa = PBXBuildFile; productRef = 13B4EC562F817DF50060DAE1 /* HubUI */; };
@@ -19,6 +15,10 @@
 		262C58DD30179A8200CA8880 /* PacketTunnelExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 262C58D330179A8200CA8880 /* PacketTunnelExtension.appex */; platformFilters = (ios, macos, ); settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		48A604013018000100604001 /* WireGuardKit in Frameworks */ = {isa = PBXBuildFile; productRef = 48A604003018000100604000 /* WireGuardKit */; };
 		48A6040B301800010060400B /* HubService in Frameworks */ = {isa = PBXBuildFile; productRef = 48A6040A301800010060400A /* HubService */; };
+		4D5B0A042F90000100A0B004 /* HubServer in Frameworks */ = {isa = PBXBuildFile; productRef = 4D5B0A022F90000100A0B002 /* HubServer */; };
+		4D5B0A052F90000100A0B005 /* HubServer in Frameworks */ = {isa = PBXBuildFile; productRef = 4D5B0A032F90000100A0B003 /* HubServer */; };
+		C0C0A0042F9A000100C0A004 /* ComponentKit in Frameworks */ = {isa = PBXBuildFile; productRef = C0C0A0022F9A000100C0A002 /* ComponentKit */; };
+		C0C0A0052F9A000100C0A005 /* ComponentKit in Frameworks */ = {isa = PBXBuildFile; productRef = C0C0A0032F9A000100C0A003 /* ComponentKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -348,7 +348,7 @@
 			mainGroup = 13C54C682D638AA1000C4CA5;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				132DD8B62F4CDDE300282A30 /* XCLocalSwiftPackageReference "../HubService" */,
+				132DD8B62F4CDDE300282A30 /* XCLocalSwiftPackageReference "../../HubService/HubService" */,
 				4D5B0A012F90000100A0B001 /* XCLocalSwiftPackageReference "../../Core/HubServer" */,
 				48A604073018000100604007 /* XCLocalSwiftPackageReference "Vendor/wireguard-apple" */,
 				C0C0A0012F9A000100C0A001 /* XCRemoteSwiftPackageReference "Component" */,
@@ -688,6 +688,8 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Hub/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Hub reads the QR code another device shows to pair with a hub or join its network.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Hub connects to hubs on your network and, when this device runs a hub, lets your other devices connect to it.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -748,6 +750,8 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Hub/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Hub reads the QR code another device shows to pair with a hub or join its network.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Hub connects to hubs on your network and, when this device runs a hub, lets your other devices connect to it.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -998,17 +1002,17 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		4D5B0A012F90000100A0B001 /* XCLocalSwiftPackageReference "../../Core/HubServer" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = ../../Core/HubServer;
-		};
-		132DD8B62F4CDDE300282A30 /* XCLocalSwiftPackageReference "../HubService" */ = {
+		132DD8B62F4CDDE300282A30 /* XCLocalSwiftPackageReference "../../HubService/HubService" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../../HubService/HubService;
 		};
 		48A604073018000100604007 /* XCLocalSwiftPackageReference "Vendor/wireguard-apple" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = "Vendor/wireguard-apple";
+		};
+		4D5B0A012F90000100A0B001 /* XCLocalSwiftPackageReference "../../Core/HubServer" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../Core/HubServer;
 		};
 /* End XCLocalSwiftPackageReference section */
 
@@ -1024,34 +1028,24 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		4D5B0A022F90000100A0B002 /* HubServer */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 4D5B0A012F90000100A0B001 /* XCLocalSwiftPackageReference "../../Core/HubServer" */;
-			productName = HubServer;
-		};
-		4D5B0A032F90000100A0B003 /* HubServer */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 4D5B0A012F90000100A0B001 /* XCLocalSwiftPackageReference "../../Core/HubServer" */;
-			productName = HubServer;
-		};
 		132DD8B72F4CDDE300282A30 /* HubService */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 132DD8B62F4CDDE300282A30 /* XCLocalSwiftPackageReference "../HubService" */;
+			package = 132DD8B62F4CDDE300282A30 /* XCLocalSwiftPackageReference "../../HubService/HubService" */;
 			productName = HubService;
 		};
 		132DD8B92F4CDDEB00282A30 /* HubService */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 132DD8B62F4CDDE300282A30 /* XCLocalSwiftPackageReference "../HubService" */;
+			package = 132DD8B62F4CDDE300282A30 /* XCLocalSwiftPackageReference "../../HubService/HubService" */;
 			productName = HubService;
 		};
 		13B4EC562F817DF50060DAE1 /* HubUI */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 132DD8B62F4CDDE300282A30 /* XCLocalSwiftPackageReference "../HubService" */;
+			package = 132DD8B62F4CDDE300282A30 /* XCLocalSwiftPackageReference "../../HubService/HubService" */;
 			productName = HubUI;
 		};
 		13B4EC582F817DF80060DAE1 /* HubUI */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 132DD8B62F4CDDE300282A30 /* XCLocalSwiftPackageReference "../HubService" */;
+			package = 132DD8B62F4CDDE300282A30 /* XCLocalSwiftPackageReference "../../HubService/HubService" */;
 			productName = HubUI;
 		};
 		48A604003018000100604000 /* WireGuardKit */ = {
@@ -1061,8 +1055,18 @@
 		};
 		48A6040A301800010060400A /* HubService */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 132DD8B62F4CDDE300282A30 /* XCLocalSwiftPackageReference "../HubService" */;
+			package = 132DD8B62F4CDDE300282A30 /* XCLocalSwiftPackageReference "../../HubService/HubService" */;
 			productName = HubService;
+		};
+		4D5B0A022F90000100A0B002 /* HubServer */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4D5B0A012F90000100A0B001 /* XCLocalSwiftPackageReference "../../Core/HubServer" */;
+			productName = HubServer;
+		};
+		4D5B0A032F90000100A0B003 /* HubServer */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4D5B0A012F90000100A0B001 /* XCLocalSwiftPackageReference "../../Core/HubServer" */;
+			productName = HubServer;
 		};
 		C0C0A0022F9A000100C0A002 /* ComponentKit */ = {
 			isa = XCSwiftPackageProductDependency;
