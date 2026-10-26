@@ -76,7 +76,7 @@ enum NetTest {
     }
     if action == "fallback" {
       // `--net-on true|false`: use this device's own internet while the gateway doesn't answer, then print where
-      // traffic goes every 5 s for `--net-watch <seconds>` (default 0)
+      // traffic goes every 5 s for `--net-watch <seconds>` (default 0) and the public address. Needs no hub
       let arguments = CommandLine.arguments
       let value = arguments.firstIndex(of: "--net-on").flatMap { $0 + 1 < arguments.count ? arguments[$0 + 1] : nil }
       let watch = arguments.firstIndex(of: "--net-watch").flatMap { $0 + 1 < arguments.count ? Int(arguments[$0 + 1]) : nil } ?? 0
@@ -94,6 +94,8 @@ enum NetTest {
         let gateway = await linkLines()?.wireGuard?.first { $0.allowedIPs.contains("0.0.0.0/0") }
         log("exit \(exit) rx=\(gateway?.rxBytes ?? -1) path=\(await currentPath().availableInterfaces.first.map { $0.name } ?? "-")")
       }
+      // Which internet it is: the gateway's address, or this device's own while it falls back
+      await publicAddress()
       await diagnostics()
       return pass()
     }
