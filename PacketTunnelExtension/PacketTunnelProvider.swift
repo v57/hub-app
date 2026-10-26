@@ -47,6 +47,11 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
   private var dnsListener: LocalReservedDNSListener?
   private var gatewayServingState = GatewayServingState.disabled
   private var gatewayExpiryTask: Task<Void, Never>?
+  /// Watches whether the gateway answers, for a profile that falls back to this device's own network
+  private var gatewayPathTask: Task<Void, Never>?
+  /// Whether this device's traffic goes through the gateway or, falling back, through its own network
+  private var routesThroughGateway = true
+  private var gatewayDNSServer: Address?
   private var exitState = ExitState.disabled
   private var bootstrapIdentity = (tunnelInstanceId: UUID().uuidString, generation: UInt64(1))
   private var activeBootstrapProfile: Profile?
@@ -74,7 +79,12 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
       let profile = try Profile.decode()
       Self.writeDiagnostics("startTunnel: profile decoded, peer endpoint \(profile.peerEndpoint ?? "-")")
       gatewayServingState = profile.servesGateway ? .enabling : .disabled
-      if profile.usesGateway {
+      if profile.fallsBack {
+        // Its own network until the gateway answers
+        exitState = .fallback
+        routesThroughGateway = false
+        try await setTunnelNetworkSettings(Self.networkSettings(for: profile, throughGateway: false))
+      } else if profile.usesGateway {
         exitState = .blocking
         try await setTunnelNetworkSettings(Self.killSwitchSettings(for: profile))
       } else {
@@ -114,13 +124,18 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         dnsServer = listener.address
       }
       Self.writeDiagnostics("dns listener ready")
-      try await setTunnelNetworkSettings(Self.networkSettings(for: profile, dnsServer: dnsServer))
+      gatewayDNSServer = dnsServer
+      routesThroughGateway = !profile.fallsBack
+      try await setTunnelNetworkSettings(
+        Self.networkSettings(for: profile, dnsServer: dnsServer, throughGateway: routesThroughGateway)
+      )
       Self.writeDiagnostics("network settings applied")
       gatewayServingState = profile.servesGateway ? .available : .disabled
-      exitState = profile.usesGateway ? .connected : .disabled
+      exitState = profile.usesGateway ? (routesThroughGateway ? .connected : .fallback) : .disabled
       activeBootstrapProfile = profile
       if profile.usesGateway {
         scheduleGatewayHealth(profile)
+        watchGatewayPath(profile)
       }
       if profile.inviterEnabled {
         startInviter(profile: profile)
@@ -131,7 +146,12 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     } catch {
       gatewayServingState = profile.servesGateway ? .unavailable : .disabled
       await wireGuardAdapter.stop()
-      if profile.usesGateway {
+      if profile.fallsBack {
+        exitState = .fallback
+        routesThroughGateway = false
+        try? await setTunnelNetworkSettings(Self.networkSettings(for: profile, throughGateway: false))
+        Self.writeDiagnostics("startValidatedTunnel failed, using this device's network: \(error)")
+      } else if profile.usesGateway {
         exitState = .blocking
         try? await setTunnelNetworkSettings(Self.killSwitchSettings(for: profile))
       } else {
@@ -154,6 +174,8 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     gatewayServingState = .disabled
     gatewayExpiryTask?.cancel()
     gatewayExpiryTask = nil
+    gatewayPathTask?.cancel()
+    gatewayPathTask = nil
     exitState = .disabled
     reset()
     dnsListener?.stop()
@@ -472,9 +494,10 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
                 grant.gatewayWireGuardKey == current.gatewayWireGuardKey, grant.ipv4 == current.ipv4,
                 grant.ipv6 == current.ipv6, renewed.overlayIPv4Address == active.overlayIPv4Address else { return nil }
           activeBootstrapProfile = renewed
-          exitState = .connected
+          exitState = routesThroughGateway ? .connected : .fallback
           scheduleGatewayHealth(renewed)
-          Self.writeDiagnostics("gateway grant renewed until \(grant.expiresAt)")
+          watchGatewayPath(renewed)
+          Self.writeDiagnostics("gateway grant renewed until \(grant.expiresAt), fallback \(renewed.fallsBack ? "on" : "off")")
           return try JSONEncoder().encode(MemberPeersResponse(ok: true))
         case "exitStatus":
           return try JSONEncoder().encode(StateResponse(state: exitState))
@@ -999,7 +1022,11 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     try? await wireGuardAdapter.removeBootstrapPeer(assignmentId: assignmentId)
   }
 
-  static func networkSettings(for profile: Profile, dnsServer: Address? = nil) throws -> NEPacketTunnelNetworkSettings {
+  /// `throughGateway` false sends only the overlay through the tunnel, while a gateway the profile falls back from
+  /// can't be reached
+  static func networkSettings(
+    for profile: Profile, dnsServer: Address? = nil, throughGateway: Bool = true
+  ) throws -> NEPacketTunnelNetworkSettings {
     try profile.validate()
     let ipv4 = try Address(overlay: profile.overlayIPv4Address)
     let ipv6 = try Address(overlay: profile.overlayIPv6Address)
@@ -1015,7 +1042,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
       addresses: [ipv4.string],
       subnetMasks: ["255.255.255.255"]
     )
-    ipv4Settings.includedRoutes = profile.gatewayGrant?.ipv4 == true
+    ipv4Settings.includedRoutes = throughGateway && profile.gatewayGrant?.ipv4 == true
       ? [NEIPv4Route.default()]
       : [NEIPv4Route(destinationAddress: "100.96.0.0", subnetMask: "255.224.0.0")]
     ipv4Settings.excludedRoutes = (profile.controlPlaneIPv4Hosts ?? []).map {
@@ -1027,7 +1054,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
       addresses: [ipv6.string],
       networkPrefixLengths: [NSNumber(value: ipv6.prefix)]
     )
-    ipv6Settings.includedRoutes = profile.gatewayGrant?.ipv6 == true
+    ipv6Settings.includedRoutes = throughGateway && profile.gatewayGrant?.ipv6 == true
       ? [NEIPv6Route.default()]
       : [
         NEIPv6Route(
@@ -1041,7 +1068,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     settings.ipv6Settings = ipv6Settings
 
     let dnsSettings = NEDNSSettings(servers: [(dnsServer ?? ipv4).string])
-    dnsSettings.matchDomains = profile.usesGateway ? [""] : [profile.dnsSuffix]
+    dnsSettings.matchDomains = throughGateway && profile.usesGateway ? [""] : [profile.dnsSuffix]
     dnsSettings.matchDomainsNoSearch = true
     settings.dnsSettings = dnsSettings
 
@@ -1099,6 +1126,12 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         guard !Task.isCancelled, let self else { return }
         guard await wireGuardAdapter.hasRecentHandshake() else { return }
         guard expiry > Date() else {
+          if profile.fallsBack {
+            // This device's own network from now on; the overlay stays
+            self.gatewayPathTask?.cancel()
+            await self.routeThroughGateway(false, profile)
+            return
+          }
           self.exitState = .blocking
           await self.wireGuardAdapter.stop()
           self.setTunnelNetworkSettings(
@@ -1110,6 +1143,46 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     }
   }
 
+
+  /// For a profile that falls back: this device's traffic goes through the gateway while it answers, and through
+  /// this device's own network until it does and while it doesn't. Without fallback the gateway always takes it.
+  private func watchGatewayPath(_ profile: Profile) {
+    // A renewal is for the same gateway: the watch goes on, as a new one would take the bytes so far for an answer
+    if profile.fallsBack, gatewayPathTask != nil { return }
+    gatewayPathTask?.cancel()
+    guard profile.fallsBack, let gatewayKey = profile.gatewayGrant?.gatewayWireGuardKey else {
+      gatewayPathTask = nil
+      if !routesThroughGateway {
+        Task { await routeThroughGateway(true, profile) }
+      }
+      return
+    }
+    let current = routesThroughGateway
+    gatewayPathTask = Task { [weak self] in
+      var path = GatewayPath(reachable: current)
+      while !Task.isCancelled {
+        guard let self else { return }
+        let received = await self.wireGuardAdapter.runtimePeers().first { $0.wireGuardKey == gatewayKey }?.rxBytes ?? 0
+        if let reachable = path.update(receivedBytes: received, now: Date()), reachable != self.routesThroughGateway {
+          await self.routeThroughGateway(reachable, profile)
+        }
+        try? await Task.sleep(for: .seconds(5))
+      }
+    }
+  }
+
+  private func routeThroughGateway(_ through: Bool, _ profile: Profile) async {
+    do {
+      try await setTunnelNetworkSettings(
+        Self.networkSettings(for: profile, dnsServer: gatewayDNSServer, throughGateway: through)
+      )
+      routesThroughGateway = through
+      exitState = through ? .connected : .fallback
+      Self.writeDiagnostics(through ? "gateway answers: internet goes through it" : "gateway doesn't answer: internet goes through this device's network")
+    } catch {
+      Self.writeDiagnostics("gateway routes not switched: \(error)")
+    }
+  }
 
   private static func endpointHost(_ endpoint: String) -> String? {
     if endpoint.hasPrefix("["),
@@ -1172,7 +1245,8 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     let state: State
   }
   private enum ExitState: String, Encodable {
-    case disabled, connected, blocking
+    /// `fallback`: the gateway doesn't answer and this device's own network carries its traffic
+    case disabled, connected, blocking, fallback
   }
   private enum GatewayServingState: String, Encodable {
     case disabled, enabling, available, disabling, unavailable

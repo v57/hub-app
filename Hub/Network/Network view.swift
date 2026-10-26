@@ -358,12 +358,18 @@ struct HubNetworkView: View {
           if canUseGateways, let gateway = gateway(of: key) {
             InternetGatewayRow(gateway: gateway, title: String(localized: "Internet"))
               .padding(.leading, 24)
+            if hub.net.vpn?.id == gateway.id {
+              GatewayFallbackRow(gateway: gateway).padding(.leading, 24)
+            }
           }
         }
         // A gateway whose device isn't listed above
         if canUseGateways {
           ForEach(gateways.filter { gateway in !keys.contains { self.gateway(of: $0)?.id == gateway.id } }, id: \.id) { gateway in
             InternetGatewayRow(gateway: gateway, title: gateway.name ?? gateway.key.shortNetworkKey)
+            if hub.net.vpn?.id == gateway.id {
+              GatewayFallbackRow(gateway: gateway)
+            }
           }
         }
       } accessory: {
@@ -623,6 +629,44 @@ struct InternetGatewayRow: View {
     defer { busy = false }
     do {
       if inUse { try await hub.net.disableVpn() } else { try await hub.net.vpn(through: gateway) }
+    } catch {
+      self.error = error.networkMessage
+    }
+  }
+}
+
+/// Under the device whose internet this one uses: whether to use this device's own internet while that device can't
+/// be reached (asleep, away, restarting), or wait for it
+struct GatewayFallbackRow: View {
+  @Environment(Hub.self) private var hub
+  let gateway: HubNet.Device
+  @State private var busy = false
+  @State private var error: String?
+
+  var body: some View {
+    SidebarRow(
+      String(localized: "Fall Back When Unreachable"),
+      subtitle: error ?? (hub.net.fallsBack
+        ? String(localized: "Uses this device's own internet until \(gateway.name ?? String(localized: "it")) answers")
+        : String(localized: "Waits for \(gateway.name ?? String(localized: "it")) to answer")),
+      systemImage: "arrow.triangle.branch", hue: error != nil ? .red : nil, status: busy ? .working : .idle
+    ) {
+      Toggle("Fall back when unreachable", isOn: Binding(
+        get: { hub.net.fallsBack },
+        set: { enabled in Task { await set(enabled) } }
+      ))
+      .toggleStyle(.kitSwitch).kitLabelsHidden().controlSize(.small)
+      .disabled(busy)
+    }
+  }
+
+  @MainActor
+  private func set(_ enabled: Bool) async {
+    busy = true
+    error = nil
+    defer { busy = false }
+    do {
+      try await hub.net.setFallsBack(enabled)
     } catch {
       self.error = error.networkMessage
     }

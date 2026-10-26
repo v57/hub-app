@@ -183,7 +183,8 @@ final class GatewaySelectionController {
       // reached through the link to it
       servesInviter: current.inviterEnabled,
       nodeEndpoint: current.nodeEndpoint,
-      hubPeer: current.hubPeer
+      hubPeer: current.hubPeer,
+      gatewayFallback: HubNet.gatewayFallback
     )
   }
 

@@ -37,9 +37,12 @@ struct Profile: Decodable {
   let servesInviter: Bool?
   let nodeEndpoint: String?
   let hubPeer: HubPeer?
+  /// Through a gateway, whether traffic goes through this device's own network while the gateway can't be reached
+  let gatewayFallback: Bool?
 
   var servesGateway: Bool { gatewayServingEnabled == true }
   var usesGateway: Bool { gatewayGrant != nil }
+  var fallsBack: Bool { usesGateway && gatewayFallback == true }
   var inviterEnabled: Bool { servesInviter == true }
 
   static func load() throws -> Self {

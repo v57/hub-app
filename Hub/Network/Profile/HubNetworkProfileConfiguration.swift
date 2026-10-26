@@ -40,6 +40,9 @@ struct HubNetworkProfileConfiguration: Codable, Equatable, Sendable {
   let servesInviter: Bool?
   let nodeEndpoint: String?
   let hubPeer: HubNetworkPeer?
+  /// Through a gateway, whether traffic goes through this device's own network while the gateway can't be reached;
+  /// otherwise it waits for the gateway
+  private(set) var gatewayFallback: Bool?
 
   var servesGateway: Bool { gatewayServingEnabled == true }
   var usesGateway: Bool { gatewayGrant != nil }
@@ -67,7 +70,8 @@ struct HubNetworkProfileConfiguration: Codable, Equatable, Sendable {
     gatewayServingEnabled: Bool = false,
     servesInviter: Bool = false,
     nodeEndpoint: String? = nil,
-    hubPeer: HubNetworkPeer? = nil
+    hubPeer: HubNetworkPeer? = nil,
+    gatewayFallback: Bool = false
   ) {
     self.version = version
     self.hubURL = hubURL
@@ -91,6 +95,7 @@ struct HubNetworkProfileConfiguration: Codable, Equatable, Sendable {
     self.servesInviter = servesInviter
     self.nodeEndpoint = nodeEndpoint
     self.hubPeer = hubPeer
+    self.gatewayFallback = gatewayFallback ? true : nil
   }
 
   /// The membership alone, without the gateway this device used: its routes, DNS and grant
@@ -111,6 +116,13 @@ struct HubNetworkProfileConfiguration: Codable, Equatable, Sendable {
       nodeEndpoint: nodeEndpoint,
       hubPeer: hubPeer
     )
+  }
+
+  /// A copy with only the gateway fallback changed
+  func withGatewayFallback(_ enabled: Bool) -> Self {
+    var copy = self
+    copy.gatewayFallback = enabled ? true : nil
+    return copy
   }
 
   /// A copy with only gateway serving changed.

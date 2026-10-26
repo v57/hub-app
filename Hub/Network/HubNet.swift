@@ -130,6 +130,12 @@ final class HubNet {
   private(set) var isJoined = false
   private(set) var isSharing = false
   private(set) var vpn: Device?
+  /// Whether this device uses its own internet while the device whose internet it uses can't be reached; otherwise
+  /// its traffic waits for that device
+  private(set) var fallsBack = HubNet.gatewayFallback
+
+  /// The fallback setting, the same for every hub, as gateway profiles take it
+  nonisolated static var gatewayFallback: Bool { UserDefaults.standard.bool(forKey: "HubNet.gatewayFallback") }
   private(set) var address: Address?
   private(set) var sharedTcp = Set<Int>()
   private(set) var sharedUdp = Set<Int>()
@@ -334,6 +340,18 @@ final class HubNet {
       return true
     }
     return now >= issuedAt.addingTimeInterval(expiresAt.timeIntervalSince(issuedAt) / 2)
+  }
+
+  /// Sets the fallback, also for the gateway in use: the running tunnel takes it without restarting
+  func setFallsBack(_ enabled: Bool) async throws {
+    UserDefaults.standard.set(enabled, forKey: "HubNet.gatewayFallback")
+    fallsBack = enabled
+    let tunnel = try PacketTunnelController()
+    guard let current = try? tunnel.installedConfiguration(), current.usesGateway else { return }
+    let updated = current.withGatewayFallback(enabled)
+    guard await !tunnel.renewGateway(configuration: updated) else { return }
+    // Not running: the next start reads it
+    try HubNetworkProfileStore().save(updated)
   }
 
   func disableVpn() async throws {

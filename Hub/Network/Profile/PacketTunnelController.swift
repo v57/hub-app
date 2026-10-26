@@ -361,6 +361,12 @@ final class PacketTunnelController: PacketTunnelControlling {
     return (try? await providerData("gatewayRenewed")) != nil
   }
 
+  /// Where this device's traffic goes while it uses a gateway: `connected` (through it), `fallback` (its own network
+  /// while the gateway doesn't answer), `blocking` or `disabled`
+  func exitStatus() async throws -> Data {
+    try await providerData("exitStatus")
+  }
+
   /// The extension's gateway counters (`GatewayStats` in `gateway.go`) while this device serves its internet
   func gatewayStats() async throws -> Data {
     try await providerData("gatewayStats")
