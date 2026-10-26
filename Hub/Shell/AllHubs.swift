@@ -74,6 +74,15 @@ struct HubWelcome: View {
       emptyTitle: "No Hub Yet",
       emptyMessage: "Hub connects to hubs you run: hub-server on a Mac, a home server or a VPS, or this \(KitDevice.name) itself. Nothing is contacted until you connect."
     ) {
+#if os(macOS) && canImport(HubServer)
+      WelcomeAction("Use This Mac’s Internet Anywhere…", detail: "Browse through it from your phone or laptop when you’re away", systemImage: "globe") {
+        shell.sheet = .internetSetup
+      }
+#elseif os(iOS)
+      WelcomeAction("Browse Through My Own Internet", detail: "Use your home Mac’s or server’s connection when you’re away", systemImage: "globe") {
+        shell.sheet = .browseOwnInternet
+      }
+#endif
       WelcomeAction("Connect to a Hub…", detail: "Its address and pairing code, or an invitation", systemImage: "plus") {
         shell.sheet = .connect
       }

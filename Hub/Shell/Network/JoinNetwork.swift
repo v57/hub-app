@@ -4,7 +4,8 @@
 //
 //  Joining a hub's network from an invitation: what joining means before it happens, the VPN the system is about to
 //  ask for (only the first time), three steps, and You're in. A failure says what happened and what to do, with the
-//  raw message under Details.
+//  raw message under Details. Joined to use the inviting device's internet (Browse Through My Own Internet), it asks
+//  "Use studio-mac's Internet?" instead and switches to that internet once it's in.
 //
 //  The invitation doesn't carry the hub's name: it's known here only when this device already knows the device that
 //  invited it (through a hub it has open); otherwise the first screens say "the hub" and the name comes with the
@@ -18,20 +19,22 @@ import HubService
 
 struct JoinNetworkSheet: View {
   let link: String
+  /// Use the inviting device's internet once joined
+  var useInternet = false
   @Environment(\.kitDismiss) private var dismiss
   @State private var stage: Stage
   @State private var nets = HubNets.main
   @State private var joined: Hub?
   @State private var showsDetails = false
-  @State private var firstJoin = false
 
   enum Stage: Equatable {
-    case confirm, allowVPN, joining, joined
+    case confirm, allowVPN, joining, joined, browsing
     case failed(JoinFailure)
   }
 
-  init(link: String, stage: Stage = .confirm) {
+  init(link: String, useInternet: Bool = false, stage: Stage = .confirm) {
     self.link = link
+    self.useInternet = useInternet
     _stage = State(initialValue: stage)
   }
 
@@ -40,7 +43,7 @@ struct JoinNetworkSheet: View {
   /// The hub that sent it, when this device knows the device that invited it
   private var known: (hub: Hub, inviter: String?)? {
 #if DEBUG
-    if HubDemo.isOn, let home = Hubs.main.list.first(where: { $0.settings.name == "Home" }) { return (home, "home-nas") }
+    if HubDemo.isOn, let home = Hubs.main.list.first(where: { $0.settings.name == "Home" }) { return (home, useInternet ? "studio-mac" : "home-nas") }
 #endif
     guard let invitation else { return nil }
     for hub in Hubs.main.list {
@@ -50,14 +53,22 @@ struct JoinNetworkSheet: View {
   }
 
   private var hubName: String? { joined?.settings.name ?? known?.hub.settings.name }
+  /// The inviting device's name, once this device knows it
+  private var inviter: String? {
+    if let joined, let invitation, let agent = joined.state.networkAgents.value.first(where: { $0.key == invitation.agentKey }) {
+      return agent.name
+    }
+    return known?.inviter
+  }
   private var possessive: String { hubName.map { "\($0)’s" } ?? "the hub’s" }
 
   var body: some View {
     switch stage {
-    case .confirm: confirm
+    case .confirm: if useInternet { useConfirm } else { confirm }
     case .allowVPN: allowVPN
     case .joining: joining
     case .joined: done
+    case .browsing: browsing
     case .failed(let failure): failed(failure)
     }
   }
@@ -98,6 +109,29 @@ struct JoinNetworkSheet: View {
       }
       Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
       Button("Join") { Task { await next() } }.buttonStyle(.kitPrimary).keyboardShortcut(.defaultAction)
+    }
+  }
+
+  /// Joining to browse through the inviting device
+  private var useConfirm: some View {
+    KitSheet(
+      title: inviter.map { "Use \($0)’s Internet?" } ?? "Use This Device’s Internet?",
+      meta: "\(inviter ?? "The device that showed the code") invited this \(KitDevice.name)",
+      systemImage: "globe", hue: .indigo, width: 520
+    ) {
+      if let inviter {
+        FormCard {
+          FormRow(inviter, help: hubName.map { "Shares its internet · in \($0)" } ?? "Shares its internet", systemImage: "desktopcomputer", hue: .indigo)
+        }
+      }
+      VStack(alignment: .leading, spacing: 12) {
+        point("globe", "Browse through \(inviter ?? "it")", "Starts as soon as this \(KitDevice.name) joins.")
+        point("switch.2", "Switch it from the Hub screen", "Use and Stop on the Hub Network card.")
+      }
+      .padding(.horizontal, 4)
+    } footer: {
+      Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
+      Button("Join and Use") { Task { await next() } }.buttonStyle(.kitPrimary).keyboardShortcut(.defaultAction)
     }
   }
 
@@ -208,6 +242,29 @@ struct JoinNetworkSheet: View {
     }
   }
 
+  // MARK: Browsing
+
+  private var browsing: some View {
+    KitSheet(title: inviter.map { "Using \($0)’s Internet" } ?? "Using Its Internet", meta: "Hub Network", systemImage: "globe", hue: .indigo, width: 520) {
+      VStack(spacing: 10) {
+        Image(systemName: "checkmark.circle.fill").font(.system(size: 44)).foregroundStyle(.white, Hue.green.fill)
+        Text("You’re browsing through \(inviter ?? "it")").kitFont(.title3)
+        Text("Sites now see your home’s address. Stop any time from the Hub screen.").kitFont(.body).foregroundStyle(.kitSecondary)
+          .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
+      }
+      .frame(maxWidth: .infinity)
+      .padding(.vertical, 12)
+    } footer: {
+      Button("Stop") {
+        Task {
+          try? await (joined ?? known?.hub)?.net.stopUsingInternet()
+          dismiss()
+        }
+      }
+      Button("Done") { dismiss() }.buttonStyle(.kitPrimary).keyboardShortcut(.defaultAction)
+    }
+  }
+
   // MARK: If it fails
 
   private func failed(_ failure: JoinFailure) -> some View {
@@ -263,16 +320,47 @@ struct JoinNetworkSheet: View {
 #if DEBUG
     if HubDemo.isOn {
       try? await Task.sleep(for: .seconds(2))
-      stage = .joined
+      stage = useInternet ? .browsing : .joined
       return
     }
 #endif
     do {
-      joined = try await HubNets.main.join(link: link.trimmingCharacters(in: .whitespacesAndNewlines))
-      stage = .joined
+      let hub = try await HubNets.main.join(link: link.trimmingCharacters(in: .whitespacesAndNewlines))
+      joined = hub
+      if useInternet {
+        await use(hub)
+      } else {
+        stage = .joined
+      }
     } catch {
       stage = .failed(JoinFailure(error, hub: hubName))
     }
+  }
+
+  /// Switches to the inviting device's internet once the hub lists it as sharing it
+  private func use(_ hub: Hub) async {
+    guard let key = invitation?.agentKey else { return }
+    for _ in 0..<40 {
+      if let gateway = hub.net.devices.first(where: { $0.key == key }) {
+        do {
+          try await hub.net.vpn(through: gateway)
+          NetworkRecents.main.use(key, hub: hub, internet: true)
+          stage = .browsing
+        } catch {
+          stage = .failed(JoinFailure(title: "Couldn’t use \(inviter.map { "\($0)’s" } ?? "its") internet",
+                                      detail: "This \(KitDevice.name) joined \(hub.settings.name). Try Use on the Hub Network card in a moment.",
+                                      raw: NativeJoinPresentation.error(error), canRetry: false))
+        }
+        return
+      }
+      try? await Task.sleep(for: .milliseconds(250))
+    }
+    let name = inviter ?? "The device that showed the code"
+    stage = .failed(JoinFailure(
+      title: "\(name) doesn’t share its internet",
+      detail: "This \(KitDevice.name) joined \(hub.settings.name). On \(inviter ?? "that device"), turn on Let your devices use this Mac’s internet, then choose Use on the Hub Network card.",
+      raw: "No internet gateway from the inviting device", canRetry: false
+    ))
   }
 }
 
@@ -283,6 +371,13 @@ struct JoinFailure: Equatable {
   let raw: String
   /// Trying the same invitation again can work
   let canRetry: Bool
+
+  init(title: String, detail: String, raw: String, canRetry: Bool) {
+    self.title = title
+    self.detail = detail
+    self.raw = raw
+    self.canRetry = canRetry
+  }
 
   @MainActor init(_ error: Error, hub: String?) {
     let raw = NativeJoinPresentation.error(error)

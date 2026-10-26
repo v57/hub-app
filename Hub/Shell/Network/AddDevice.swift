@@ -13,6 +13,9 @@ import HubService
 
 struct AddDeviceSheet: View {
   var facts = NetworkFacts()
+  /// What the device is for: reaching this hub's devices, or browsing through this Mac's internet
+  @State private var purpose: Purpose
+  @State private var turningOnSharing = false
   @Environment(Hub.self) private var hub
   @Environment(\.kitDismiss) private var dismiss
   @Environment(\.kitIdiom) private var idiom
@@ -22,6 +25,21 @@ struct AddDeviceSheet: View {
   @State private var attempt = 0
   /// The devices on the network when the code appeared
   @State private var known: Set<String>?
+
+  enum Purpose: Hashable { case devices, internet }
+
+  init(purpose: Purpose = .devices) {
+    _purpose = State(initialValue: purpose)
+  }
+
+  /// Only a device that can share its internet offers the choice
+  private var offersInternet: Bool {
+#if os(macOS)
+    hub.api.contains("network/gateway/advertise")
+#else
+    false
+#endif
+  }
 
   /// The device that joined while the code was shown
   private var joined: NetDevice? {
@@ -63,7 +81,14 @@ struct AddDeviceSheet: View {
   }
 
   private var inviteSheet: some View {
-    KitSheet(title: "Add a Device", meta: "To \(hub.settings.name)’s network", systemImage: "person.badge.plus", hue: .teal, width: 560) {
+    KitSheet(
+      title: "Add a Device", meta: purpose == .internet ? "To browse through \(facts.thisName)" : "To \(hub.settings.name)’s network",
+      systemImage: "person.badge.plus", hue: .teal, width: 560
+    ) {
+      if offersInternet {
+        KitSegmented(selection: $purpose, options: [("Reach My Devices", Purpose.devices), ("Use This Mac’s Internet", Purpose.internet)])
+          .frame(maxWidth: .infinity)
+      }
       if idiom == .phone {
         VStack(spacing: 16) {
           code
@@ -94,7 +119,8 @@ struct AddDeviceSheet: View {
       }
     } footer: {
       SheetStatus(
-        error == nil ? "Waiting for the other device · works once, within 7 days" : "Couldn’t make an invitation",
+        error != nil ? "Couldn’t make an invitation"
+          : purpose == .internet ? "Waiting for your phone · works once, within 7 days" : "Waiting for the other device · works once, within 7 days",
         systemImage: "person.badge.plus", hue: error == nil ? .teal : .red, status: link != nil && error == nil ? .working : .idle
       )
       Button("Done") { dismiss() }.buttonStyle(.kitPrimary).keyboardShortcut(.defaultAction)
@@ -121,11 +147,32 @@ struct AddDeviceSheet: View {
     .background(RoundedRectangle(cornerRadius: KitMetrics.radiusCard).fill(.kitFillSoft))
   }
 
+  @ViewBuilder
   private var steps: some View {
     VStack(alignment: .leading, spacing: 14) {
-      NumberedStep(1, "Open Hub on the other device", "A Mac, iPhone or iPad. Install Hub first if it isn’t there.")
-      NumberedStep(2, "Choose Add a Hub, then Scan Code", "Point it at this code.")
-      NumberedStep(3, "That’s it", "It joins on its own. You don’t need to approve anything here.")
+      if purpose == .internet {
+        // The invitation doesn't say what it's for yet, so the phone is told where to scan it
+        NumberedStep(1, "Install Hub on your phone")
+        NumberedStep(2, "Open it and choose Browse Through My Own Internet", "Then Scan Its Code, and point it here.")
+        NumberedStep(3, "It browses through \(facts.thisName)", "Joining and the switch to this Mac’s internet happen together.")
+        if !hub.net.isSharing {
+          HStack(spacing: 8) {
+            Text("This Mac doesn’t share its internet yet.").kitFont(.caption).foregroundStyle(Hue.orange.text)
+            Button("Share It") {
+              turningOnSharing = true
+              Task {
+                do { try await hub.net.shareInternet(true) } catch { self.error = error.networkLine }
+                turningOnSharing = false
+              }
+            }
+            .buttonStyle(.kit).controlSize(.small).disabled(turningOnSharing)
+          }
+        }
+      } else {
+        NumberedStep(1, "Open Hub on the other device", "A Mac, iPhone or iPad. Install Hub first if it isn’t there.")
+        NumberedStep(2, "Choose Add a Hub, then Scan Code", "Point it at this code.")
+        NumberedStep(3, "That’s it", "It joins on its own. You don’t need to approve anything here.")
+      }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
   }

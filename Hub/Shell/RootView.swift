@@ -19,6 +19,10 @@ final class ShellModel {
   var removing: Hub?
   enum Sheet: Identifiable, Hashable {
     case connect
+    /// Browse Through My Own Internet
+    case browseOwnInternet
+    /// Use This Mac's Internet Anywhere
+    case internetSetup
     var id: Self { self }
   }
 }
@@ -50,6 +54,13 @@ struct RootView: View {
     .kitSheet(item: $shell.sheet) { sheet in
       switch sheet {
       case .connect: ConnectSheet()
+      case .browseOwnInternet: BrowseOwnInternetSheet()
+      case .internetSetup:
+#if os(macOS) && canImport(HubServer)
+        InternetSetupSheet()
+#else
+        EmptyView()
+#endif
       }
     }
     // A hub://pair link opened from outside: pair with that hub
@@ -74,10 +85,11 @@ struct RootView: View {
       // iPhone: until a hub is set up, the welcome is the first screen
       if Hubs.main.list.isEmpty { compactColumn = .detail }
 #if DEBUG
-      // `--open` on iPhone: the page, not the root list; `--sheet connect`: Connect to a Hub at launch
+      // `--open` on iPhone: the page, not the root list; `--sheet connect|browse|internet-setup`: that sheet at launch
       if CommandLine.arguments.contains("--open") && navigator.route != .allHubs { compactColumn = .detail }
-      if CommandLine.arguments.contains("--sheet") {
-        shell.sheet = .connect
+      if let index = CommandLine.arguments.firstIndex(of: "--sheet") {
+        let name = index + 1 < CommandLine.arguments.count ? CommandLine.arguments[index + 1] : "connect"
+        shell.sheet = name == "browse" ? .browseOwnInternet : name == "internet-setup" ? .internetSetup : .connect
       }
 #endif
     }

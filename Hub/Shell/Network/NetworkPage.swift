@@ -24,6 +24,7 @@ struct HubNetworkPage: View {
   @State private var sharingApp = false
 #if DEBUG
   @State private var joinStage: JoinNetworkSheet.Stage?
+  @State private var joinUses = false
 #endif
   @State private var advancedOpen = false
   /// `hub/info`'s `host`: `app` when the Hub app runs the hub
@@ -96,11 +97,14 @@ struct HubNetworkPage: View {
       case "internet": choosingInternet = true
       case "share": sharingApp = true
       case "advanced": advancedOpen = true
-      // `join`, `join:vpn`, `join:joining`, `join:done`, `join:used|expired|unreachable|denied|other|revoked`
+      // `join`, `join:vpn`, `join:joining`, `join:done`, `join:used|expired|unreachable|denied|other|revoked`, and to use
+      // the inviter's internet `join:use`, `join:browsing`
       case "join":
         let kind = parts.count > 1 ? parts[1] : "confirm"
+        joinUses = kind == "use" || kind == "browsing"
         joinStage = switch kind {
-        case "confirm": .confirm
+        case "confirm", "use": .confirm
+        case "browsing": .browsing
         case "vpn": .allowVPN
         case "joining": .joining
         case "done": .joined
@@ -110,7 +114,7 @@ struct HubNetworkPage: View {
       }
     }
     .kitSheet(isPresented: Binding { joinStage != nil } set: { if !$0 { joinStage = nil } }) {
-      JoinNetworkSheet(link: "", stage: joinStage ?? .confirm)
+      JoinNetworkSheet(link: "", useInternet: joinUses, stage: joinStage ?? .confirm)
     }
 #endif
     .kitSheet(item: $opened) { device in
