@@ -206,6 +206,24 @@ enum HubDemo {
     }
   }
 
+  /// `--demo-net-join`: a device joins Home's network while Add a Device is open
+  static func join(_ name: String, platform: String, hub: Hub) {
+    let seen = ISO8601DateFormatter.js.string(from: Date())
+    let index = hub.state.networkAgents.value.count
+    let address = "100.96.\(index / 250).\(index % 250 + 2)"
+    let agents = hub.state.networkAgents, statuses = hub.state.networkAgentStatus
+    append(agents, [
+      "version": 1, "key": "agent-\(name)", "wireGuardKey": "wg-\(name)", "name": name, "platform": platform,
+      "overlayAddresses": [address], "connectedAt": seen, "online": true,
+    ])
+    append(statuses, ["version": 1, "key": "agent-\(name)", "available": true, "addresses": [address], "peers": 1, "shares": 0, "updatedAt": seen])
+  }
+
+  private static func append<T: Decodable & Sendable>(_ sync: HubStateStorage.Sync<[T]>, _ value: [String: Any]) {
+    guard let data = try? JSONSerialization.data(withJSONObject: [value]), let items = try? JSONDecoder().decode([T].self, from: data) else { return }
+    sync.value += items
+  }
+
   /// Who may use one of the demo's shared apps
   static func setPolicy(_ policy: HubNetworkPolicy, share: String, hub: Hub) {
     hub.state.networkResources.value = hub.state.networkResources.value.map { resource in

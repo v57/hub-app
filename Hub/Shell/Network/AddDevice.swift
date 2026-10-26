@@ -2,7 +2,8 @@
 //  AddDevice.swift
 //  Hub
 //
-//  Add a Device: an invitation as a code beside three numbered steps, which says when the device joined.
+//  Add a Device: an invitation as a code beside three numbered steps, which says when the device joined: the devices
+//  on the network when the code appeared are known, and the first one that wasn't is the one that used it.
 //
 
 #if canImport(ComponentKit)
@@ -19,8 +20,49 @@ struct AddDeviceSheet: View {
   @State private var error: String?
   @State private var copied = false
   @State private var attempt = 0
+  /// The devices on the network when the code appeared
+  @State private var known: Set<String>?
+
+  /// The device that joined while the code was shown
+  private var joined: NetDevice? {
+    guard let known else { return nil }
+    return facts.devices.first { !known.contains($0.id) && $0.status != .thisDevice }
+  }
 
   var body: some View {
+    if let joined {
+      joinedSheet(joined)
+    } else {
+      inviteSheet
+    }
+  }
+
+  private func joinedSheet(_ device: NetDevice) -> some View {
+    KitSheet(title: "Add a Device", meta: "To \(hub.settings.name)’s network", systemImage: "person.badge.plus", hue: .teal, width: 560) {
+      VStack(spacing: 10) {
+        ZStack(alignment: .bottomTrailing) {
+          Tile(systemImage: device.symbol, hue: .teal, size: 56)
+          Image(systemName: "checkmark.circle.fill").font(.system(size: 20)).foregroundStyle(.white, Hue.green.fill).offset(x: 6, y: 6)
+        }
+        .padding(.bottom, 4)
+        Text("\(device.name) joined \(hub.settings.name)").kitFont(.title3)
+        Text("It can reach your devices now, and they can reach it.").kitFont(.body).foregroundStyle(.kitSecondary)
+          .multilineTextAlignment(.center)
+      }
+      .frame(maxWidth: .infinity)
+      .padding(.vertical, 12)
+    } footer: {
+      let count = facts.devices.count
+      SheetStatus("\(hub.settings.name) has \(count == 1 ? "1 device" : "\(count) devices")", systemImage: "checkmark", hue: .green)
+      Button("Add Another") {
+        known = nil
+        attempt += 1
+      }
+      Button("Done") { dismiss() }.buttonStyle(.kitPrimary).keyboardShortcut(.defaultAction)
+    }
+  }
+
+  private var inviteSheet: some View {
     KitSheet(title: "Add a Device", meta: "To \(hub.settings.name)’s network", systemImage: "person.badge.plus", hue: .teal, width: 560) {
       if idiom == .phone {
         VStack(spacing: 16) {
@@ -93,10 +135,18 @@ struct AddDeviceSheet: View {
     link = nil
     if hub.isDemo {
       link = NetworkInvitationParser.urlPrefix + "demo-invitation-\(hub.settings.name)"
+      known = Set(facts.devices.map(\.id))
+#if DEBUG
+      if ProcessInfo.processInfo.arguments.contains("--demo-net-join") {
+        try? await Task.sleep(for: .seconds(4))
+        HubDemo.join("maya-ipad", platform: "ios", hub: hub)
+      }
+#endif
       return
     }
     do {
       link = try await hub.net.createInviteCode()
+      known = Set(facts.devices.map(\.id))
     } catch is CancellationError {
       error = "The connection helper didn’t confirm this \(KitDevice.name) in time. Try again in a moment."
     } catch {
