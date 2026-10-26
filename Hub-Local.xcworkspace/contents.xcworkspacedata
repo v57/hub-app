@@ -10,4 +10,7 @@
    <FileRef
       location = "group:../../Channel/ChannelSwift">
    </FileRef>
+   <FileRef
+      location = "group:../../../v57/Vault">
+   </FileRef>
 </Workspace>

@@ -8,6 +8,7 @@
 import Foundation
 import HubService
 import Network
+import VaultHub
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -16,15 +17,42 @@ import IOKit.ps
 #endif
 
 extension DeviceIdentity {
-  /// The app's device key: Keychain `dev.v57.Hub.device.v1` in the access group shared with the packet tunnel
-  /// extension. `nil` when the Keychain refuses (then the app connects without a device).
+  /// The device key, shared with every v57 app through the v57 keychain group (VaultHub's `HubKeyStore`), so the Hub
+  /// app and the v57 apps are one device on a hub. The first time, the key the app kept on its own (Keychain
+  /// `dev.v57.Hub.device.v1`) becomes the shared one, so the device keeps its id, approvals and Hub Network address.
+  /// Without the shared group the app keeps its own key. `nil` when the Keychain refuses (then the app connects
+  /// without a device).
   @MainActor static let app: DeviceIdentity? = {
-    let accessGroup = Bundle.main.object(forInfoDictionaryKey: "HubKeychainAccessGroup") as? String
-    guard let key = try? DeviceKey.keychain(accessGroup: accessGroup?.isEmpty == false ? accessGroup : nil) else {
+    let accessGroup = (Bundle.main.object(forInfoDictionaryKey: "HubKeychainAccessGroup") as? String).flatMap { $0.isEmpty ? nil : $0 }
+    let key: DeviceKey
+    if let shared = try? HubKeyStore.adoptDeviceKey(ownDeviceKeySeed(accessGroup: accessGroup)),
+       let keyChain = try? KeyChain(rawRepresentation: shared.seed) {
+      key = DeviceKey(keyChain)
+    } else if let own = try? DeviceKey.keychain(accessGroup: accessGroup) {
+      key = own
+    } else {
       return nil
     }
     return DeviceIdentity(key: key, name: AppDevice.name, platform: AppDevice.platform)
   }()
+
+  /// The seed of the device key the app kept on its own, before it shared one
+  private static func ownDeviceKeySeed(accessGroup: String?) -> Data? {
+    var query: [String: Any] = [
+      kSecClass as String: kSecClassGenericPassword,
+      kSecAttrService as String: DeviceKey.keychainService,
+      kSecAttrAccount as String: "ed25519-private-key",
+      kSecUseDataProtectionKeychain as String: true,
+      kSecReturnData as String: true,
+      kSecMatchLimit as String: kSecMatchLimitOne,
+    ]
+    if let accessGroup { query[kSecAttrAccessGroup as String] = accessGroup }
+    var result: AnyObject?
+    guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess, let seed = result as? Data, seed.count == 32 else {
+      return nil
+    }
+    return seed
+  }
 }
 
 @MainActor

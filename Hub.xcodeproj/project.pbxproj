@@ -18,6 +18,8 @@
 		4D5B0A042F90000100A0B004 /* HubServer in Frameworks */ = {isa = PBXBuildFile; productRef = 4D5B0A022F90000100A0B002 /* HubServer */; };
 		4D5B0A052F90000100A0B005 /* HubServer in Frameworks */ = {isa = PBXBuildFile; productRef = 4D5B0A032F90000100A0B003 /* HubServer */; };
 		C0C0A0042F9A000100C0A004 /* ComponentKit in Frameworks */ = {isa = PBXBuildFile; productRef = C0C0A0022F9A000100C0A002 /* ComponentKit */; };
+		D0D0A0042F9B000100D0A004 /* VaultKit in Frameworks */ = {isa = PBXBuildFile; productRef = D0D0A0022F9B000100D0A002 /* VaultKit */; };
+		D0D0A0052F9B000100D0A005 /* VaultHub in Frameworks */ = {isa = PBXBuildFile; productRef = D0D0A0032F9B000100D0A003 /* VaultHub */; };
 		C0C0A0052F9A000100C0A005 /* ComponentKit in Frameworks */ = {isa = PBXBuildFile; productRef = C0C0A0032F9A000100C0A003 /* ComponentKit */; };
 /* End PBXBuildFile section */
 
@@ -131,6 +133,8 @@
 			files = (
 				13B4EC572F817DF50060DAE1 /* HubUI in Frameworks */,
 				C0C0A0042F9A000100C0A004 /* ComponentKit in Frameworks */,
+				D0D0A0042F9B000100D0A004 /* VaultKit in Frameworks */,
+				D0D0A0052F9B000100D0A005 /* VaultHub in Frameworks */,
 				132DD8B82F4CDDE300282A30 /* HubService in Frameworks */,
 				4D5B0A042F90000100A0B004 /* HubServer in Frameworks */,
 			);
@@ -257,6 +261,8 @@
 				13B4EC562F817DF50060DAE1 /* HubUI */,
 				4D5B0A022F90000100A0B002 /* HubServer */,
 				C0C0A0022F9A000100C0A002 /* ComponentKit */,
+				D0D0A0022F9B000100D0A002 /* VaultKit */,
+				D0D0A0032F9B000100D0A003 /* VaultHub */,
 			);
 			productName = Hub;
 			productReference = 13C54C712D638AA1000C4CA5 /* Hub.app */;
@@ -352,6 +358,7 @@
 				4D5B0A012F90000100A0B001 /* XCLocalSwiftPackageReference "../../Core/HubServer" */,
 				48A604073018000100604007 /* XCLocalSwiftPackageReference "Vendor/wireguard-apple" */,
 				C0C0A0012F9A000100C0A001 /* XCRemoteSwiftPackageReference "Component" */,
+				D0D0A0012F9B000100D0A001 /* XCRemoteSwiftPackageReference "Vault" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 13C54C722D638AA1000C4CA5 /* Products */;
@@ -1027,9 +1034,27 @@
 				kind = branch;
 			};
 		};
+		D0D0A0012F9B000100D0A001 /* XCRemoteSwiftPackageReference "Vault" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/v57/Vault.git";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		D0D0A0022F9B000100D0A002 /* VaultKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D0D0A0012F9B000100D0A001 /* XCRemoteSwiftPackageReference "Vault" */;
+			productName = VaultKit;
+		};
+		D0D0A0032F9B000100D0A003 /* VaultHub */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D0D0A0012F9B000100D0A001 /* XCRemoteSwiftPackageReference "Vault" */;
+			productName = VaultHub;
+		};
 		132DD8B72F4CDDE300282A30 /* HubService */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 132DD8B62F4CDDE300282A30 /* XCLocalSwiftPackageReference "../../HubService/HubService" */;
