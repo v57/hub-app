@@ -181,17 +181,21 @@ class Hubs {
       return
     }
 #endif
-    guard let data = UserDefaults.standard.data(forKey: "hubs") else { return }
-    do {
-      list = []
-      for settings in try JSONDecoder().decode([Hub.Settings].self, from: data) {
-        let hub = Hub(settings: settings)
-        list.append(hub)
-      }
-      if let selected = UserDefaults.standard.url(forKey: "selected") {
-        self.selected = selected
-      }
-    } catch {}
+    if let data = UserDefaults.standard.data(forKey: "hubs") {
+      do {
+        list = []
+        for settings in try JSONDecoder().decode([Hub.Settings].self, from: data) {
+          let hub = Hub(settings: settings)
+          list.append(hub)
+        }
+        if let selected = UserDefaults.standard.url(forKey: "selected") {
+          self.selected = selected
+        }
+      } catch {}
+    }
+#if canImport(VaultHub)
+    AppVault.start(hubs: list.map(\.settings))
+#endif
   }
   func select(_ hub: Hub.ID?) {
     selected = hub
@@ -213,6 +217,9 @@ class Hubs {
     }
     selected = settings.id
     save()
+#if canImport(VaultHub)
+    AppVault.add(settings)
+#endif
     return hub
   }
   func remove(with settings: Hub.Settings) {
@@ -223,6 +230,9 @@ class Hubs {
     list[index].client.stop()
     list.remove(at: index)
     save()
+#if canImport(VaultHub)
+    AppVault.remove(settings)
+#endif
   }
   func save() {
     do {

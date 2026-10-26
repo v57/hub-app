@@ -8,7 +8,9 @@
 import Foundation
 import HubService
 import Network
+#if canImport(VaultHub)
 import VaultHub
+#endif
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -24,15 +26,14 @@ extension DeviceIdentity {
   /// without a device).
   @MainActor static let app: DeviceIdentity? = {
     let accessGroup = (Bundle.main.object(forInfoDictionaryKey: "HubKeychainAccessGroup") as? String).flatMap { $0.isEmpty ? nil : $0 }
-    let key: DeviceKey
+    var key: DeviceKey?
+#if canImport(VaultHub)
     if let shared = try? HubKeyStore.adoptDeviceKey(ownDeviceKeySeed(accessGroup: accessGroup)),
        let keyChain = try? KeyChain(rawRepresentation: shared.seed) {
       key = DeviceKey(keyChain)
-    } else if let own = try? DeviceKey.keychain(accessGroup: accessGroup) {
-      key = own
-    } else {
-      return nil
     }
+#endif
+    guard let key = key ?? (try? DeviceKey.keychain(accessGroup: accessGroup)) else { return nil }
     return DeviceIdentity(key: key, name: AppDevice.name, platform: AppDevice.platform)
   }()
 

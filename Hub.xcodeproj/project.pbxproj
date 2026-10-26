@@ -18,8 +18,8 @@
 		4D5B0A042F90000100A0B004 /* HubServer in Frameworks */ = {isa = PBXBuildFile; productRef = 4D5B0A022F90000100A0B002 /* HubServer */; };
 		4D5B0A052F90000100A0B005 /* HubServer in Frameworks */ = {isa = PBXBuildFile; productRef = 4D5B0A032F90000100A0B003 /* HubServer */; };
 		C0C0A0042F9A000100C0A004 /* ComponentKit in Frameworks */ = {isa = PBXBuildFile; productRef = C0C0A0022F9A000100C0A002 /* ComponentKit */; };
-		D0D0A0042F9B000100D0A004 /* VaultKit in Frameworks */ = {isa = PBXBuildFile; productRef = D0D0A0022F9B000100D0A002 /* VaultKit */; };
-		D0D0A0052F9B000100D0A005 /* VaultHub in Frameworks */ = {isa = PBXBuildFile; productRef = D0D0A0032F9B000100D0A003 /* VaultHub */; };
+		D0D0A0042F9B000100D0A004 /* VaultKit in Frameworks */ = {isa = PBXBuildFile; platformFilters = (ios, macos, ); productRef = D0D0A0022F9B000100D0A002 /* VaultKit */; };
+		D0D0A0052F9B000100D0A005 /* VaultHub in Frameworks */ = {isa = PBXBuildFile; platformFilters = (ios, macos, ); productRef = D0D0A0032F9B000100D0A003 /* VaultHub */; };
 		C0C0A0052F9A000100C0A005 /* ComponentKit in Frameworks */ = {isa = PBXBuildFile; productRef = C0C0A0032F9A000100C0A003 /* ComponentKit */; };
 /* End PBXBuildFile section */
 
@@ -673,6 +673,9 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_ENTITLEMENTS = Hub/Resources/Hub.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = "Hub/Resources/Hub-iOS.entitlements";
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = "Hub/Resources/Hub-iOS.entitlements";
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "Hub/Resources/Hub-macOS.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				DEAD_CODE_STRIPPING = YES;
@@ -735,6 +738,9 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_ENTITLEMENTS = Hub/Resources/Hub.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = "Hub/Resources/Hub-iOS.entitlements";
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = "Hub/Resources/Hub-iOS.entitlements";
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "Hub/Resources/Hub-macOS.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				DEAD_CODE_STRIPPING = YES;
@@ -1047,11 +1053,19 @@
 /* Begin XCSwiftPackageProductDependency section */
 		D0D0A0022F9B000100D0A002 /* VaultKit */ = {
 			isa = XCSwiftPackageProductDependency;
+			platformFilters = (
+				ios,
+				macos,
+			);
 			package = D0D0A0012F9B000100D0A001 /* XCRemoteSwiftPackageReference "Vault" */;
 			productName = VaultKit;
 		};
 		D0D0A0032F9B000100D0A003 /* VaultHub */ = {
 			isa = XCSwiftPackageProductDependency;
+			platformFilters = (
+				ios,
+				macos,
+			);
 			package = D0D0A0012F9B000100D0A001 /* XCRemoteSwiftPackageReference "Vault" */;
 			productName = VaultHub;
 		};
