@@ -33,6 +33,13 @@ struct HubSidebar: View {
         OpenHubSections(hub: hub, page: navigator.route?.hubPage).hub(hub)
       }
       if search.isEmpty {
+        // This device's network, whichever hub is open: at the bottom on the Mac and iPad, under the hubs on iPhone
+        if idiom == .phone {
+          HubNetworkCard()
+        } else {
+          HubNetworkCard()
+            .kitSticky(top: .none, bottom: navigator.route?.hubPage == .network || navigator.openHub == nil ? .content : .title)
+        }
         ThisDeviceSection()
       }
     } bottomBar: {
@@ -236,7 +243,8 @@ struct OpenHubSections: View {
       }
       .kitSticky(top: .none, bottom: sticky(.access))
     }
-    if hub.canViewNetwork {
+    // The Hub Network card shows the network this device is on; another hub's network is a page of its own
+    if hub.canViewNetwork, HubNetworkCard.hub(profile: nil)?.id != hub.id {
       NetworkSection(hub: hub)
         .kitSticky(top: .none, bottom: sticky(.network))
     }
@@ -359,17 +367,16 @@ private struct NetworkSection: View {
   @State private var nets = HubNets.main
 
   var body: some View {
-    let online = agents.filter(\.available).count
     KitSection("Hub Network", systemImage: "globe", hue: .teal) {
       if let open {
-        SidebarRow("Network") {
+        SidebarRow("Devices & Apps") {
           RowTile(systemImage: "network")
         } trailing: {
           EmptyView()
         }
         .action { open(.network) }
       } else {
-        SidebarRow(value: Route.hub(hub.id, .network), "Network") {
+        SidebarRow(value: Route.hub(hub.id, .network), "Devices & Apps") {
           RowTile(systemImage: "network")
         } trailing: {
           EmptyView()
@@ -377,14 +384,10 @@ private struct NetworkSection: View {
       }
     } meta: {
       HStack(spacing: 4) {
-        if hub.net.isJoined {
-          StatusDot(hue: .green, size: 6)
-          Text("Joined")
-        } else {
-          Text("Not joined")
-        }
+        StatusDot(hue: hub.net.isJoined ? .green : .gray, isHollow: !hub.net.isJoined, size: 6)
+        Text(hub.net.isJoined ? "On" : "Off")
         if !agents.isEmpty {
-          Text("· \(online) of \(agents.count) online")
+          Text("· \(agents.count == 1 ? "1 device" : "\(agents.count) devices")")
         }
       }
     }
