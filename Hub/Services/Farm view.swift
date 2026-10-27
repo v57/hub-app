@@ -28,13 +28,16 @@ struct FarmView: View {
     VStack(spacing: 16) {
       if !farm.isRunning {
         Placeholder(image: "tree", title: "Farm", description: "Prevents your device from sleeping while enabled") { }
-        VStack {
-          HStack {
-            Slider(value: $farm.minimumBattery, in: 0...1, step: 0.10)
-              .frame(maxWidth: 200)
-            Image(battery: farm.minimumBattery, charging: false)
+        // The minimum battery level only means something on a device with a battery (not a Mac mini or a server).
+        if farm.battery != nil {
+          VStack {
+            HStack {
+              Slider(value: $farm.minimumBattery, in: 0...1, step: 0.10)
+                .frame(maxWidth: 200)
+              Image(battery: farm.minimumBattery, charging: false)
+            }
+            Text(text).secondary()
           }
-          Text(text).secondary()
         }
 #if os(iOS)
         HStack {

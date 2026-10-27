@@ -90,10 +90,8 @@ enum AppDevice {
     SystemInfo.model ?? DeviceIdentity.currentPlatform
   }
 
-  static var os: String {
-    let version = ProcessInfo.processInfo.operatingSystemVersion
-    return "\(version.majorVersion).\(version.minorVersion)" + (version.patchVersion > 0 ? ".\(version.patchVersion)" : "")
-  }
+  /// `26.1`; a Linux distribution's own version (`24.04`), not the kernel's.
+  static var os: String { SystemInfo.osVersion }
 
   static var arch: String {
 #if arch(arm64)
