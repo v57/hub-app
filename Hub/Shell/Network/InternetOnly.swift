@@ -17,7 +17,8 @@ import HubService
 /// Browse Through My Own Internet: what it is, then the code of the device to browse through
 struct BrowseOwnInternetSheet: View {
   @Environment(\.kitDismiss) private var dismiss
-  @Environment(ShellModel.self) private var shell
+  // Optional: a kit overlay may not carry the window's model
+  @Environment(ShellModel.self) private var shell: ShellModel?
   @State private var link: String?
   @State private var scanning = false
   @State private var input = ""
@@ -56,7 +57,7 @@ struct BrowseOwnInternetSheet: View {
       }
     } footer: {
 #if os(macOS) && canImport(HubServer)
-      Button("Set Up This Mac…") { shell.sheet = .internetSetup }
+      Button("Set Up This Mac…") { shell?.sheet = .internetSetup }
 #endif
 #if os(iOS)
       Button(scanning ? "Close Scanner" : "Scan Its Code") { scanning.toggle() }.buttonStyle(.kitPrimary).keyboardShortcut(.defaultAction)
