@@ -269,6 +269,8 @@ struct NetworkMap: View {
       }
     }
     .kitFont(.caption)
+    .lineLimit(1)
+    .fixedSize()
   }
 
   private var accessibilityText: String {

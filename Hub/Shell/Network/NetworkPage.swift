@@ -48,11 +48,14 @@ struct HubNetworkPage: View {
           devicesSection(devices)
         }
         if facts.isJoined {
-          if idiom == .phone {
-            appsSection
-            internetSection
-          } else {
+          // Side by side where each gets room for its rows' switches and buttons
+          ViewThatFits(in: .horizontal) {
             HStack(alignment: .top, spacing: KitMetrics.gutter) {
+              appsSection
+              internetSection
+            }
+            .frame(minWidth: 860)
+            VStack(spacing: KitMetrics.gutter) {
               appsSection
               internetSection
             }
