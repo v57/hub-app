@@ -127,23 +127,29 @@ final class Navigator {
       route = .hub(selected.id, .overview)
     }
 #if DEBUG
-    // `--open Home/devices`, `--open all`, `--open Home/app/pulse`: a page at launch, for captures
-    if let index = CommandLine.arguments.firstIndex(of: "--open"), index + 1 < CommandLine.arguments.count {
-      let parts = CommandLine.arguments[index + 1].split(separator: "/").map(String.init)
-      if let hub = Hubs.main.list.first(where: { $0.settings.name == parts[0] }) {
-        if parts.count > 2, parts[1] == "app" {
-          route = .app(hub.id, path: parts[2...].joined(separator: "/"))
-        } else {
-          route = .hub(hub.id, parts.count > 1 ? HubPage(rawValue: parts[1]) ?? .overview : .overview)
-        }
-      } else if let page = DevicePage(rawValue: parts[0]) {
-        route = .device(page)
-      } else {
-        route = .allHubs
-      }
-    }
+    if let open = Self.openAtLaunch { route = Self.route(open: open) }
 #endif
   }
+#if DEBUG
+  /// `--open Home/devices`, `--open all`, `--open Home/app/pulse`, or a `screenshot` page: a page at launch, for captures
+  static let openAtLaunch: String? = {
+    let arguments = CommandLine.arguments
+    if let index = arguments.firstIndex(of: "--open"), index + 1 < arguments.count { return arguments[index + 1] }
+    return ScreenshotPage.current?.open
+  }()
+  private static func route(open: String) -> Route {
+    let parts = open.split(separator: "/").map(String.init)
+    if let hub = Hubs.main.list.first(where: { $0.settings.name == parts.first }) {
+      if parts.count > 2, parts[1] == "app" {
+        return .app(hub.id, path: parts[2...].joined(separator: "/"))
+      }
+      return .hub(hub.id, parts.count > 1 ? HubPage(rawValue: parts[1]) ?? .overview : .overview)
+    } else if let page = parts.first.flatMap(DevicePage.init) {
+      return .device(page)
+    }
+    return .allHubs
+  }
+#endif
   /// Reset Data: no hub opened before, sorted as it comes
   func reset() {
     opened = [:]

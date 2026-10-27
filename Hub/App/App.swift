@@ -7,9 +7,7 @@
 
 import SwiftUI
 import Foundation
-#if canImport(ComponentKit)
 import ComponentKit
-#endif
 #if os(macOS)
 import AppKit
 import Combine
@@ -29,9 +27,7 @@ struct HubApp: App {
 #endif
   var body: some Scene {
     WindowGroup {
-      if ProcessInfo.isScreenshot {
-        ScreenshotsModeView()
-      } else if !ProcessInfo.isPreviews {
+      if !ProcessInfo.isPreviews {
 #if DEBUG
         if HubReset.isRequested {
           Text("Resetting Hub…").task { await HubReset.run() }
@@ -62,9 +58,6 @@ struct HubApp: App {
   }
   @ViewBuilder private var mainContent: some View {
     root.modifier(TranslationModifier())
-#if !canImport(ComponentKit)
-      .overlay { PairingConfirmation() }
-#endif
       .onOpenURL { url in
         if !PairingRouter.main.open(url) {
           NetworkInvitationRouter.main.open(url)
@@ -83,17 +76,13 @@ struct HubApp: App {
 #endif
   }
   @ViewBuilder private var root: some View {
-#if canImport(ComponentKit) && os(tvOS)
+#if os(tvOS)
     TVRootView()
       .componentKit(accent: .hubAccent)
-#elseif canImport(ComponentKit)
+#else
     RootView()
       .kitToasts()
       .componentKit(accent: .hubAccent)
-#else
-    NavigationStack {
-      HomeView().page()
-    }
 #endif
   }
 }

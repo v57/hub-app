@@ -171,10 +171,6 @@ class Hubs {
     return list.first(where: { $0.id == selected })
   }
   init() {
-    if ProcessInfo.screenshotType != nil {
-      list.append(.test)
-      return
-    }
 #if DEBUG
     if HubDemo.isOn {
       list = HubDemo.hubs()

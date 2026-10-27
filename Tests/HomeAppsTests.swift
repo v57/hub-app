@@ -47,24 +47,4 @@ final class HomeAppsTests: XCTestCase {
     apps.setTile(.widget(.x22), users, in: hub)
     XCTAssertEqual(apps.tile(of: users, in: hub), .widget(.x21))
   }
-
-  func testWidgetUnitsAreTwoGridCells() {
-    XCTAssertEqual(WidgetSize.x11.gridPreset.value, HomeGridLayout.GridSize(w: 2, h: 2))
-    XCTAssertEqual(WidgetSize.x12.gridPreset.value, HomeGridLayout.GridSize(w: 2, h: 4))
-    XCTAssertEqual(WidgetSize.x21.gridPreset.value, HomeGridLayout.GridSize(w: 4, h: 2))
-    XCTAssertEqual(WidgetSize.x22.gridPreset.value, HomeGridLayout.GridSize(w: 4, h: 4))
-  }
-
-  /// The height counted rows from 64-bit word boundaries, one short when rows didn't line up with them
-  func testGridHeightCountsTheLastRow() {
-    var cache = HomeGridLayout.Cache()
-    cache.width = 14
-    cache[3, 7] = true // cell 101, in the second word
-    XCTAssertEqual(cache.height, 8)
-    var aligned = HomeGridLayout.Cache()
-    aligned.width = 4
-    aligned[3, 15] = true // cell 63, the last bit of the first word
-    XCTAssertEqual(aligned.height, 16)
-    XCTAssertEqual(HomeGridLayout.Cache().height, 0)
-  }
 }

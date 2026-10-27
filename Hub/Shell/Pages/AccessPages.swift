@@ -519,7 +519,7 @@ struct PermissionsPage: View {
     .kitSheet(isPresented: $isAdding) {
       NameSheet(title: "New Group", meta: "Its connections get the permissions you tick for it.", systemImage: "person.2", hue: .purple, confirm: "Create", name: "") { name in
         Task {
-          try? await hub.client.send("hub/group/update", PermissionGroups.UpdateGroup(group: name, set: []))
+          try? await hub.client.send("hub/group/update", UpdateGroup(group: name, set: []))
           selectedGroup = name
         }
       }
@@ -673,7 +673,7 @@ private struct GroupInspector: View {
             Spacer()
             Button("Revert") { withAnimation(.kit) { edits[group.name] = nil } }.buttonStyle(.kit)
             AsyncButton("Save") {
-              try await hub.client.send("hub/group/update", PermissionGroups.UpdateGroup(group: group.name, set: Array(edited)))
+              try await hub.client.send("hub/group/update", UpdateGroup(group: group.name, set: Array(edited)))
               withAnimation(.kit) { edits[group.name] = nil }
             }
             .buttonStyle(.kitPrimary)
@@ -699,5 +699,11 @@ extension PermissionList.Section {
     pathsByName[permission] ?? permission
   }
   var paths: [String] { permissions.map(path(of:)) }
+}
+
+/// `hub/group/update`: the group's permissions, all of them
+private struct UpdateGroup: Encodable {
+  let group: String
+  let set: [String]
 }
 #endif

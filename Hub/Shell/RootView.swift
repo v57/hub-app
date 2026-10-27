@@ -86,7 +86,7 @@ struct RootView: View {
       if Hubs.main.list.isEmpty { compactColumn = .detail }
 #if DEBUG
       // `--open` on iPhone: the page, not the root list; `--sheet connect|browse|internet-setup`: that sheet at launch
-      if CommandLine.arguments.contains("--open") && navigator.route != .allHubs { compactColumn = .detail }
+      if Navigator.openAtLaunch != nil && navigator.route != .allHubs { compactColumn = .detail }
       if let index = CommandLine.arguments.firstIndex(of: "--sheet") {
         let name = index + 1 < CommandLine.arguments.count ? CommandLine.arguments[index + 1] : "connect"
         shell.sheet = name == "browse" ? .browseOwnInternet : name == "internet-setup" ? .internetSetup : .connect

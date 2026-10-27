@@ -90,7 +90,11 @@ struct DeviceSettingsPage: View {
 /// The services this device can run for hubs: each one's switch per hub, and a page to try it here
 struct SharedServicesPage: View {
   @State private var hubs = Hubs.main
+#if DEBUG
+  @State private var trying = ScreenshotPage.current?.service
+#else
   @State private var trying: AppServices.Service?
+#endif
   @Environment(\.kitIdiom) private var idiom
 
   var body: some View {

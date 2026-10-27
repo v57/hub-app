@@ -349,5 +349,14 @@ extension Status.BalancerType {
     case .unknown: ""
     }
   }
+  var icon: String {
+    switch self {
+    case .random: "dice"
+    case .counter: "arrow.triangle.2.circlepath"
+    case .first: "line.3.horizontal.decrease"
+    case .available: "arrow.clockwise.circle"
+    case .unknown: "questionmark"
+    }
+  }
 }
 #endif

@@ -253,3 +253,33 @@ extension View {
     }
   }
 }
+
+extension View {
+  func blockBackground(_ radius: CGFloat = 16) -> some View {
+    self.modifier(BlockStyle(cornerRadius: radius))
+  }
+  func gradientBlur(radius: CGFloat) -> some View {
+    opacity(0.8).background {
+      LinearGradient(colors: [.red, .orange, .green, .blue, .purple], startPoint: .topLeading, endPoint: .bottomTrailing)
+        .mask { blur(radius: radius) }
+        .padding(-radius)
+    }
+  }
+}
+
+struct BlockStyle: ViewModifier {
+  let cornerRadius: Double
+  func body(content: Content) -> some View {
+    Color.clear.overlay {
+      content.safeAreaPadding(8 * interfaceScale)
+    }.hoverEffect(in: .rounded(cornerRadius))
+      .padding(8 * interfaceScale)
+      .contextMenuShape(.rounded(cornerRadius))
+  }
+}
+
+extension Animation {
+  static var home: Animation {
+    .spring(response: 0.4, dampingFraction: 0.8)
+  }
+}

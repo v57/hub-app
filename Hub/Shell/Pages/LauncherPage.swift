@@ -197,8 +197,8 @@ private struct LauncherInspector: View {
   let status: Hub.Launcher.AppStatus?
   @Environment(Hub.self) private var hub
   @State private var instances = 1
-  @State private var env: [EditApp.Env] = []
-  @State private var secrets: [EditApp.Env] = []
+  @State private var env: [Env] = []
+  @State private var secrets: [Env] = []
   @State private var isUninstalling = false
 
   var body: some View {
@@ -256,8 +256,8 @@ private struct LauncherInspector: View {
     }
     .task(id: app) {
       instances = app.instances
-      env = (app.settings?.env ?? [:]).sorted { $0.key < $1.key }.map { EditApp.Env(key: $0.key, value: $0.value) }
-      secrets = (app.settings?.secrets ?? [:]).keys.sorted().map { EditApp.Env(key: $0, value: "") }
+      env = (app.settings?.env ?? [:]).sorted { $0.key < $1.key }.map { Env(key: $0.key, value: $0.value) }
+      secrets = (app.settings?.secrets ?? [:]).keys.sorted().map { Env(key: $0, value: "") }
     }
     .kitDialog("Uninstall \(app.id)?", isPresented: $isUninstalling, message: "hub-launcher stops it and removes its files.", systemImage: "trash", hue: .red, confirm: "Uninstall", role: .destructive) {
       Task { try? await hub.launcher.app(id: app.id).uninstall() }
@@ -280,8 +280,18 @@ private struct LauncherInspector: View {
       try await hub.launcher.app(id: app.id).updateSettings(settings)
     }
     if instances != app.instances {
-      try await hub.client.send("launcher/app/cluster", LauncherView.AppView.SetInstances(name: app.name, count: instances))
+      try await hub.client.send("launcher/app/cluster", SetInstances(name: app.name, count: instances))
     }
+  }
+  /// An environment value or a secret being edited
+  struct Env: Identifiable, Hashable {
+    let id = UUID()
+    var key: String = ""
+    var value: String = ""
+  }
+  struct SetInstances: Encodable {
+    let name: String
+    let count: Int
   }
 }
 
@@ -357,6 +367,16 @@ struct NewAppSheet: View {
       .buttonStyle(.kitPrimary).keyboardShortcut(.defaultAction)
       .disabled(defaultName == nil)
     }
+  }
+}
+
+private extension String {
+  func replacingEmpty(with value: String) -> String {
+    isEmpty ? value : self
+  }
+  /// One command per line, or nil when there are none
+  func commands() -> [String]? {
+    isEmpty ? nil : components(separatedBy: "\n")
   }
 }
 #endif

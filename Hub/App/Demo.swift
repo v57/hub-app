@@ -12,7 +12,8 @@ import HubService
 
 @MainActor
 enum HubDemo {
-  static let isOn = ProcessInfo.processInfo.arguments.contains("--demo")
+  /// `--demo`, and the App Store screenshots (`ScreenshotPage`)
+  static let isOn = ProcessInfo.processInfo.arguments.contains("--demo") || ScreenshotPage.current != nil
 
   static func hubs() -> [Hub] {
     // `--demo --empty`: no hubs yet, the welcome
