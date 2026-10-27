@@ -9,7 +9,7 @@
 
 #if os(macOS)
 import Foundation
-import IOKit.pwr_mgt
+import PlatformPower
 
 @MainActor @Observable
 final class KeepAwake {
@@ -24,21 +24,17 @@ final class KeepAwake {
   }
   /// Whether this Mac shares its internet now
   private var isSharing = false
-  private var assertion: IOPMAssertionID?
+  private var assertion: SleepAssertion?
 
   /// Holds the assertion while sharing with the setting on, and lets it go otherwise
   func update(sharing: Bool? = nil) {
     if let sharing { isSharing = sharing }
     let wanted = isOn && isSharing
     if wanted, assertion == nil {
-      var id = IOPMAssertionID(0)
-      let reason = "Hub shares this Mac's internet with your devices" as CFString
-      if IOPMAssertionCreateWithName(kIOPMAssertPreventUserIdleSystemSleep as CFString, IOPMAssertionLevel(kIOPMAssertionLevelOn), reason, &id) == kIOReturnSuccess {
-        assertion = id
-      }
-    } else if !wanted, let id = assertion {
-      IOPMAssertionRelease(id)
-      assertion = nil
+      assertion = SleepAssertion(.idleSleep, reason: "Hub shares this Mac's internet with your devices")
+    } else if !wanted, let assertion {
+      assertion.release()
+      self.assertion = nil
     }
   }
 

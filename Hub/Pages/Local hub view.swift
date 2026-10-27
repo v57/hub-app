@@ -9,7 +9,7 @@
 import SwiftUI
 import HubServer
 import HubUI
-import CoreImage.CIFilterBuiltins
+import ComponentKit
 
 struct LocalHubView: View {
   @State private var hub = LocalHub.main
@@ -25,7 +25,7 @@ struct LocalHubView: View {
         if hub.isRunning {
           addresses
           pairing
-          network
+          if HubNets.isAvailable { network }
           connections
         } else if !hub.isStarting {
           port
@@ -100,7 +100,7 @@ struct LocalHubView: View {
         Text("Valid until \(code.expires.formatted(date: .omitted, time: .shortened)), once. In the Hub app on the other device, open **Connect to a Hub** and enter \(hub.networkAddress ?? "this device's address") and this code, or scan the code below.")
           .secondary()
         if let link = hub.pairingLink {
-          QRCodeView(text: link.absoluteString).frame(width: 200, height: 200)
+          KitQRCode(link.absoluteString, size: 200)
           HStack {
             copyButton(link.absoluteString, title: "Copy Link")
 #if !os(tvOS)
@@ -170,8 +170,11 @@ struct LocalHubView: View {
 #endif
 #elseif os(tvOS)
       Text("The hub runs while Hub is open.").secondary()
-#else
+#elseif os(macOS)
       Text("The hub runs while Hub is open. Farm keeps this Mac from sleeping.").secondary()
+      NavigationLink("Open Farm") { FarmView() }.buttonStyle(.bordered)
+#else
+      Text("The hub runs while Hub is open. Farm keeps this computer from sleeping.").secondary()
       NavigationLink("Open Farm") { FarmView() }.buttonStyle(.bordered)
 #endif
     }
@@ -187,7 +190,7 @@ struct LocalHubView: View {
 
   func copyButton(_ text: String, title: String) -> some View {
     Button(copied == text ? "Copied" : title, systemImage: copied == text ? "checkmark" : "doc.on.doc") {
-      text.copyToClipboard()
+      KitPasteboard.copy(text)
       copied = text
       Task {
         try? await Task.sleep(for: .seconds(2))
@@ -217,25 +220,6 @@ struct LocalHubCard: View {
     if hub.isStarting { return "Starting the hub…" }
     if hub.isEnabled, hub.error != nil { return "The hub couldn't start" }
     return "Run a Hub on this device"
-  }
-}
-
-/// A QR code of the text, black on white
-struct QRCodeView: View {
-  let text: String
-  var body: some View {
-    if let image = Self.image(text) {
-      Image(decorative: image, scale: 1).interpolation(.none).resizable().scaledToFit()
-        .padding(12).background(.white, in: RoundedRectangle(cornerRadius: 12))
-    }
-  }
-  static func image(_ text: String) -> CGImage? {
-    let filter = CIFilter.qrCodeGenerator()
-    filter.message = Data(text.utf8)
-    filter.correctionLevel = "M"
-    guard let output = filter.outputImage else { return nil }
-    let scaled = output.transformed(by: CGAffineTransform(scaleX: 8, y: 8))
-    return CIContext().createCGImage(scaled, from: scaled.extent)
   }
 }
 #endif

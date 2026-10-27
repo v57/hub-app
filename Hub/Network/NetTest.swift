@@ -9,7 +9,7 @@
 //  `xcrun devicectl device process launch --console --terminate-existing --device <id> dev.v57.Hub --net-test`.
 //
 
-#if DEBUG && !os(tvOS)
+#if DEBUG && !os(tvOS) && canImport(Network)
 import Foundation
 import Network
 

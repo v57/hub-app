@@ -301,7 +301,7 @@ struct APIInspector: View {
         }
       }
       HStack {
-        Button("Copy Path") { row.name.copyToClipboard() }.buttonStyle(.kit)
+        Button("Copy Path") { KitPasteboard.copy(row.name) }.buttonStyle(.kit)
         if hub.canOpen(.permissions) {
           Button("Permissions…") { Navigator.main.open(hub, .permissions) }.buttonStyle(.kit)
         }

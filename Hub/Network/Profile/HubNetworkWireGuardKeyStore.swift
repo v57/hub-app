@@ -1,6 +1,9 @@
 import CryptoKit
 import Foundation
+import HubService
+#if canImport(Security)
 import Security
+#endif
 
 /// Persistent X25519 key material shared only with Hub's packet extension.
 ///
@@ -28,10 +31,13 @@ struct HubNetworkWireGuardKeyStore: Sendable {
   /// reads from this store when the bootstrap tunnel starts; the owner/local
   /// flows only ever create it via `loadOrCreate`).
   func install(_ key: Curve25519.KeyAgreement.PrivateKey) throws {
+#if canImport(Security)
     SecItemDelete(baseQuery as CFDictionary)
+#endif
     try save(key.rawRepresentation)
   }
 
+#if canImport(Security)
   private func load() throws -> Data? {
     if let data = try load(baseQuery) { return data }
     // Moves a key an older build kept in the Mac's login keychain, where only the binary that made it reads it
@@ -91,8 +97,14 @@ struct HubNetworkWireGuardKeyStore: Sendable {
     }
     return query
   }
+#else
+  // The Keychain stand-in (the Secret Service on Linux) through HubService
+  private var item: KeyChain.KeychainConfiguration { .init(service: Self.service, account: Self.account) }
+  private func load() throws -> Data? { try KeyChain.loadData(keychain: item) }
+  private func save(_ data: Data) throws { try KeyChain.replaceData(data, keychain: item) }
+#endif
 }
 
 enum HubNetworkWireGuardKeyStoreError: Error, Equatable {
-  case keychain(OSStatus)
+  case keychain(Int32)
 }

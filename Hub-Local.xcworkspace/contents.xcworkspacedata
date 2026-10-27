@@ -13,4 +13,7 @@
    <FileRef
       location = "group:../../../v57/Vault">
    </FileRef>
+   <FileRef
+      location = "group:../../../v57/Platform">
+   </FileRef>
 </Workspace>

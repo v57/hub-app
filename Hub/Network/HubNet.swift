@@ -1,14 +1,27 @@
 import Foundation
 import Channel
 import HubService
+#if canImport(Network)
 import Network
+#endif
+#if canImport(NetworkExtension)
 import NetworkExtension
+#endif
 import Observation
 
 @Observable
 @MainActor
 final class HubNets {
   static let main = HubNets()
+  /// Whether this platform can join a Hub Network: it needs NetworkExtension's packet tunnel, which Linux and Windows
+  /// lack, so their app hides Hub Network
+  nonisolated static let isAvailable: Bool = {
+    #if canImport(NetworkExtension)
+    true
+    #else
+    false
+    #endif
+  }()
 
   private(set) var vpn = false
   private(set) var joinProgress: NativeJoinProgress?
@@ -169,6 +182,7 @@ final class HubNet {
     self.hub = hub
     // A tunnel that comes up after the hub's connection (started from Settings, back after a rebuild or a wake)
     // finds the hub without its registration: restore it then too
+#if canImport(NetworkExtension)
     tunnelObserver = NotificationCenter.default.addObserver(
       forName: .NEVPNStatusDidChange, object: nil, queue: .main
     ) { [weak self] notification in
@@ -182,6 +196,7 @@ final class HubNet {
         self.reconnectTask = Task { [weak self] in await self?.restoreAfterConnecting() }
       }
     }
+#endif
   }
 
   /// `node`: the hub's node when the caller just set it, since `hub/net/node` may not have streamed it back yet

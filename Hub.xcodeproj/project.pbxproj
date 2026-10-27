@@ -20,6 +20,8 @@
 		C0C0A0042F9A000100C0A004 /* ComponentKit in Frameworks */ = {isa = PBXBuildFile; productRef = C0C0A0022F9A000100C0A002 /* ComponentKit */; };
 		D0D0A0042F9B000100D0A004 /* VaultKit in Frameworks */ = {isa = PBXBuildFile; platformFilters = (ios, macos, ); productRef = D0D0A0022F9B000100D0A002 /* VaultKit */; };
 		D0D0A0052F9B000100D0A005 /* VaultHub in Frameworks */ = {isa = PBXBuildFile; platformFilters = (ios, macos, ); productRef = D0D0A0032F9B000100D0A003 /* VaultHub */; };
+		E0E0A0042F9C000100E0A004 /* PlatformPower in Frameworks */ = {isa = PBXBuildFile; productRef = E0E0A0022F9C000100E0A002 /* PlatformPower */; };
+		E0E0A0052F9C000100E0A005 /* PlatformSystem in Frameworks */ = {isa = PBXBuildFile; productRef = E0E0A0032F9C000100E0A003 /* PlatformSystem */; };
 		C0C0A0052F9A000100C0A005 /* ComponentKit in Frameworks */ = {isa = PBXBuildFile; productRef = C0C0A0032F9A000100C0A003 /* ComponentKit */; };
 /* End PBXBuildFile section */
 
@@ -135,6 +137,8 @@
 				C0C0A0042F9A000100C0A004 /* ComponentKit in Frameworks */,
 				D0D0A0042F9B000100D0A004 /* VaultKit in Frameworks */,
 				D0D0A0052F9B000100D0A005 /* VaultHub in Frameworks */,
+				E0E0A0042F9C000100E0A004 /* PlatformPower in Frameworks */,
+				E0E0A0052F9C000100E0A005 /* PlatformSystem in Frameworks */,
 				132DD8B82F4CDDE300282A30 /* HubService in Frameworks */,
 				4D5B0A042F90000100A0B004 /* HubServer in Frameworks */,
 			);
@@ -263,6 +267,8 @@
 				C0C0A0022F9A000100C0A002 /* ComponentKit */,
 				D0D0A0022F9B000100D0A002 /* VaultKit */,
 				D0D0A0032F9B000100D0A003 /* VaultHub */,
+				E0E0A0022F9C000100E0A002 /* PlatformPower */,
+				E0E0A0032F9C000100E0A003 /* PlatformSystem */,
 			);
 			productName = Hub;
 			productReference = 13C54C712D638AA1000C4CA5 /* Hub.app */;
@@ -359,6 +365,7 @@
 				48A604073018000100604007 /* XCLocalSwiftPackageReference "Vendor/wireguard-apple" */,
 				C0C0A0012F9A000100C0A001 /* XCRemoteSwiftPackageReference "Component" */,
 				D0D0A0012F9B000100D0A001 /* XCRemoteSwiftPackageReference "Vault" */,
+				E0E0A0012F9C000100E0A001 /* XCRemoteSwiftPackageReference "Platform" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 13C54C722D638AA1000C4CA5 /* Products */;
@@ -1048,9 +1055,27 @@
 				kind = branch;
 			};
 		};
+		E0E0A0012F9C000100E0A001 /* XCRemoteSwiftPackageReference "Platform" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/v57/Platform.git";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		E0E0A0022F9C000100E0A002 /* PlatformPower */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E0E0A0012F9C000100E0A001 /* XCRemoteSwiftPackageReference "Platform" */;
+			productName = PlatformPower;
+		};
+		E0E0A0032F9C000100E0A003 /* PlatformSystem */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E0E0A0012F9C000100E0A001 /* XCRemoteSwiftPackageReference "Platform" */;
+			productName = PlatformSystem;
+		};
 		D0D0A0022F9B000100D0A002 /* VaultKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			platformFilters = (

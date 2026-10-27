@@ -9,6 +9,7 @@
 import Foundation
 import HubServer
 import HubService
+import Observation
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -238,18 +239,20 @@ final class LocalHub {
     for pointer in sequence(first: first, next: { $0.pointee.ifa_next }) {
       let interface = pointer.pointee
       let flags = Int32(interface.ifa_flags)
-      guard let address = interface.ifa_addr, address.pointee.sa_family == UInt8(AF_INET),
-        flags & IFF_UP != 0, flags & IFF_RUNNING != 0, flags & IFF_LOOPBACK == 0
+      guard let address = interface.ifa_addr, Int32(address.pointee.sa_family) == AF_INET,
+        flags & Int32(IFF_UP) != 0, flags & Int32(IFF_RUNNING) != 0, flags & Int32(IFF_LOOPBACK) == 0
       else { continue }
       var host = [CChar](repeating: 0, count: Int(NI_MAXHOST))
-      guard getnameinfo(address, socklen_t(address.pointee.sa_len), &host, socklen_t(host.count), nil, 0, NI_NUMERICHOST) == 0 else { continue }
+      let length = socklen_t(MemoryLayout<sockaddr_in>.size)
+      guard getnameinfo(address, length, &host, socklen_t(host.count), nil, 0, NI_NUMERICHOST) == 0 else { continue }
       let text = String(cString: host)
       // Link-local addresses aren't reachable from other devices
       guard !text.hasPrefix("169.254.") else { continue }
       result.append((String(cString: interface.ifa_name), text))
     }
     func rank(_ name: String) -> Int {
-      if name.hasPrefix("en") { return 0 }
+      // Wi-Fi and Ethernet: en* on Apple platforms, en*, eth* and wl* on Linux
+      if name.hasPrefix("en") || name.hasPrefix("eth") || name.hasPrefix("wl") { return 0 }
       if name.hasPrefix("bridge") { return 1 }
       return 2
     }

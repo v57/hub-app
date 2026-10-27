@@ -775,7 +775,7 @@ private struct NetworkMemberRow: View {
     SidebarRow(name, subtitle: subtitle, systemImage: Device.symbol(platform: platform), hue: online ? .blue : .gray) {
       if let address {
         Button(copied ? "Copied" : "Copy Address", systemImage: copied ? "checkmark" : "doc.on.doc") {
-          address.copyToClipboard()
+          KitPasteboard.copy(address)
           copied = true
           Task {
             try? await Task.sleep(for: .seconds(2))
@@ -813,7 +813,7 @@ private struct NetworkResourceRow: View {
       SidebarRow(resource.shareName, subtitle: subtitle, systemImage: "point.3.connected.trianglepath.dotted", hue: .purple) {
         Menu {
           Button("Copy Address", systemImage: "doc.on.doc") {
-            resource.authority.copyToClipboard()
+            KitPasteboard.copy(resource.authority)
           }
           if !providers.isEmpty {
             Button("Connect Directly…", systemImage: "network") {
@@ -1047,7 +1047,7 @@ private struct NetworkInvitationSheet: View {
 #endif
       Spacer()
       Button(copied ? "Copied" : "Copy Link", systemImage: copied ? "checkmark" : "doc.on.doc") {
-        link.copyToClipboard()
+        KitPasteboard.copy(link)
         copied = true
       }
       .buttonStyle(.kit)

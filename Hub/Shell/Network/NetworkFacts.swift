@@ -10,6 +10,7 @@
 import SwiftUI
 import ComponentKit
 import HubService
+import Channel
 
 /// A device on a hub's network, as the Network page, its overlays and the sidebar card show it
 struct NetDevice: Identifiable, Hashable {

@@ -25,7 +25,7 @@ struct DevicePageView: View {
     case .sharedServices:
       SharedServicesPage()
     case .farm:
-#if os(macOS) || os(iOS)
+#if !os(tvOS) && !os(visionOS)
       NavigationStack { FarmView() }.kitPane(.content)
         .pageToolbar("Farm", meta: [Farm.main.isRunning ? "Farming" : "Off"], systemImage: "tree", hue: .green) { }
 #else

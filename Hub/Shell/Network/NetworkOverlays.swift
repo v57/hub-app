@@ -89,7 +89,7 @@ struct NetworkDeviceSheet: View {
       SheetStatus(device.statusLine, systemImage: device.status == .cantReach ? "exclamationmark.triangle" : "circle.fill", hue: device.hue)
       if let address = device.address {
         Button(copied ? "Copied" : idiom == .phone ? "Copy" : "Copy Address", systemImage: copied ? "checkmark" : "doc.on.doc") {
-          address.copyToClipboard()
+          KitPasteboard.copy(address)
           copied = true
         }
         .buttonStyle(.kit)

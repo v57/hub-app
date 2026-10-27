@@ -13,7 +13,9 @@
 //
 
 import Foundation
+#if canImport(Security)
 import Security
+#endif
 import HubService
 #if canImport(NetworkExtension) && !os(tvOS)
 import NetworkExtension
@@ -42,7 +44,7 @@ enum HubReset {
   /// connection), wipes the rest and leaves the app at its welcome, with the same identity and device keys. What
   /// writes settings goes before the wipe, so nothing is written back.
   static func resetData() async -> [String] {
-#if os(macOS) || os(iOS)
+#if !os(tvOS) && !os(visionOS)
     Farm.main.isRunning = false
 #endif
 #if canImport(HubServer)
@@ -96,6 +98,7 @@ enum HubReset {
   /// Every item in the app's access group (but the identity and device keys when it keeps them), then the items
   /// the Mac keeps in the login keychain by service: the WireGuard key and the identities hubs joined with their own
   /// tag (`KeyChain.keychain(tag)`), with their pins.
+#if canImport(Security)
   private static func removeKeychainItems(keepingIdentity: Bool) -> [String] {
     var removed: [String] = []
     if let accessGroup {
@@ -155,6 +158,11 @@ enum HubReset {
       return item.account.map { "\(service) / \($0)" } ?? service
     }
   }
+
+#else
+  /// No keychain here: the device key is the file Hub's launcher shares (~/.hub/device.key), which stays
+  private static func removeKeychainItems(keepingIdentity: Bool) -> [String] { [] }
+#endif
 
   private static func savedHubs() -> [Hub.Settings] {
     guard let data = UserDefaults.standard.data(forKey: "hubs") else { return [] }

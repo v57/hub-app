@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import ComponentKit
 import HubUI
 
 struct InstallationGuide: View {
@@ -120,7 +121,7 @@ struct InstallationGuide: View {
       }.app().foregroundStyle(.hubTint.opacity(0.7))
     }
     func copy() async throws {
-      code.copyToClipboard()
+      KitPasteboard.copy(code)
       withAnimation {
         copied = true
       }

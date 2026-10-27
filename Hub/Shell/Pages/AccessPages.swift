@@ -216,7 +216,7 @@ struct ConnectionInspector: View {
           }
         }
         HStack {
-          Button("Copy Key") { key.copyToClipboard() }.buttonStyle(.kit)
+          Button("Copy Key") { KitPasteboard.copy(key) }.buttonStyle(.kit)
           if let group = user.group, hub.canManageGroups {
             AsyncButton("Remove from \(group.capitalized)") { try await hub.remove(key: key, group: group) }
               .buttonStyle(.kit).foregroundStyle(Hue.red.text)
@@ -383,7 +383,7 @@ struct LockdownPage: View {
         if !whitelist.enabled && !untrusted.isEmpty {
           Banner(
             untrusted.count == 1 ? "1 connection would be refused" : "\(untrusted.count) connections would be refused",
-            message: "\(ListFormatter.localizedString(byJoining: untrusted.prefix(3).map { $0.name.isEmpty ? "an unknown device" : $0.name })) aren’t trusted. Trust them first, or turn Lockdown on and they’ll be disconnected.",
+            message: "\(untrusted.prefix(3).map { $0.name.isEmpty ? "an unknown device" : $0.name }.formatted(.list(type: .and))) aren’t trusted. Trust them first, or turn Lockdown on and they’ll be disconnected.",
             systemImage: "clock", hue: .orange
           ) {
             let keys = untrusted.compactMap(\.key)

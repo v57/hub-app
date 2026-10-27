@@ -5,7 +5,7 @@
 //  Created by Linux on 02.06.26.
 //
 
-#if !os(tvOS)
+#if !os(tvOS) && canImport(PhotosUI)
 @preconcurrency import PhotosUI
 import SwiftUI
 struct LibraryPickerButton: View {

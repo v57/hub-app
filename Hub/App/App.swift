@@ -52,7 +52,7 @@ struct HubApp: App {
 #endif
       }
     }
-#if os(macOS)
+#if os(macOS) || os(Linux) || os(Windows)
     .defaultSize(width: 1440, height: 900)
 #endif
   }

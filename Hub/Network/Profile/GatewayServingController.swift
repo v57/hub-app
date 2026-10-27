@@ -1,5 +1,6 @@
 import Foundation
 import HubService
+import Channel
 
 private struct GatewayAdvertisementRequest: Encodable, Sendable {
   let capability: GatewayCapability

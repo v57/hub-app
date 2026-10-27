@@ -4,7 +4,9 @@ import AppKit
 #endif
 import Foundation
 import HubService
+#if canImport(Network)
 import Network
+#endif
 import SwiftUI
 
 /// Env-driven HN-9xx live acceptance for the Phase 1-2 matrix (Mac A <-> Mac
@@ -350,6 +352,7 @@ enum HN9xxAcceptance {
   }
 
   private static func tcpConnectOK(host: String, port: UInt16) async -> Bool {
+#if canImport(Network)
     let connection = NWConnection(
       to: .hostPort(host: NWEndpoint.Host(host), port: NWEndpoint.Port(rawValue: port)!),
       using: .tcp
@@ -375,6 +378,9 @@ enum HN9xxAcceptance {
       }
     }
     return ok
+#else
+    return false
+#endif
   }
 
   /// An authenticated round trip over the overlay. `hub/net/list` is owner-only since the device layer, and a

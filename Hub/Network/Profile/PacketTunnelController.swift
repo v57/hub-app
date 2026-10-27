@@ -1,6 +1,9 @@
 import Foundation
+#if canImport(NetworkExtension)
 @preconcurrency import NetworkExtension
+#endif
 
+#if canImport(NetworkExtension)
 @MainActor
 final class PacketTunnelController: PacketTunnelControlling {
   static let providerBundleIdentifier = "dev.v57.Hub.PacketTunnelExtension"
@@ -731,6 +734,54 @@ final class PacketTunnelController: PacketTunnelControlling {
     }
   }
 }
+#else
+/// Where there's no NetworkExtension (Linux, Windows) there is no Hub Network tunnel in the app: making a controller
+/// fails, so every `try? PacketTunnelController()` is nil and the network pages show Hub Network as unavailable.
+/// The same API, so the code around it builds unchanged.
+@MainActor
+final class PacketTunnelController: PacketTunnelControlling {
+  static let providerBundleIdentifier = "dev.v57.Hub.PacketTunnelExtension"
+  static let localizedDescription = "Hub Network"
+  private static var unavailable: PacketTunnelControllerError { .bootstrapRuntimeUnavailable }
+
+  init(store: HubNetworkProfileStore) {}
+  convenience init() throws { throw Self.unavailable }
+
+  var isOnDemandEnabled: Bool { get async { false } }
+  var status: PacketTunnelStatus { get async { .notInstalled } }
+  func install(configuration: HubNetworkProfileConfiguration) async throws { throw Self.unavailable }
+  func stageNativeJoinMembership(configuration: HubNetworkProfileConfiguration) throws { throw Self.unavailable }
+  func start() async throws { throw Self.unavailable }
+  func replaceAndStart(configuration: HubNetworkProfileConfiguration) async throws { throw Self.unavailable }
+  func stop() async {}
+  func waitUntilDisconnected() async {}
+  func remove() async throws {}
+  func deleteSystemProfile() async throws {}
+  func setGatewayServing(_ enabled: Bool) async throws { throw Self.unavailable }
+  func gatewayServingStatus() async -> GatewayServingState { .unavailable }
+  func installedConfiguration() throws -> HubNetworkProfileConfiguration { throw Self.unavailable }
+  func installedConfigurationForMigration() throws -> HubNetworkProfileConfiguration { throw Self.unavailable }
+  func bootstrapReadiness() async throws -> AppleAppAgentReadinessAssertion { throw Self.unavailable }
+  func bootstrapHealth(identity: PacketTunnelBootstrapIdentity) async throws -> PacketTunnelBootstrapHealth {
+    throw Self.unavailable
+  }
+  func inviterStatus() async throws -> PacketTunnelInviterStatus { throw Self.unavailable }
+  func setMemberPeers(_ peers: [HubNetworkPeer]) async throws { throw Self.unavailable }
+  func setLinks(_ links: HubNetworkPeerLinks) async throws { throw Self.unavailable }
+  func renewGateway(configuration: HubNetworkProfileConfiguration) async -> Bool { false }
+  func exitStatus() async throws -> Data { throw Self.unavailable }
+  func gatewayStats() async throws -> Data { throw Self.unavailable }
+  func linkStatus() async throws -> Data { throw Self.unavailable }
+  func extensionDiagnostics() async -> String? { nil }
+#if DEBUG
+  func keychainProof() async throws -> KeychainProof { throw Self.unavailable }
+#endif
+
+  static func gatewayServingStatus(enabled: Bool, tunnelStatus: PacketTunnelStatus) -> GatewayServingState {
+    enabled ? .unavailable : .disabled
+  }
+}
+#endif
 
 enum PacketTunnelControllerError: Error, Equatable {
   case notInstalled

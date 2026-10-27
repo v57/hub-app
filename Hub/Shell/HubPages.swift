@@ -68,7 +68,7 @@ struct HubUnreachable: View {
           systemImage: "arrow.clockwise", title: "\(hub.settings.name) Isn’t Reachable",
           message: "Hub keeps trying \(hub.settings.address.absoluteString). Its pages show what they last loaded."
         ) {
-          Button("Copy Address") { hub.settings.address.absoluteString.copyToClipboard() }.buttonStyle(.kit)
+          Button("Copy Address") { KitPasteboard.copy(hub.settings.address.absoluteString) }.buttonStyle(.kit)
           Button("Remove…") { shell.removing = hub }.buttonStyle(.kit)
         }
       }

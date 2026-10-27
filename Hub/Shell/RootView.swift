@@ -96,7 +96,7 @@ struct RootView: View {
 #if DEBUG
     // `--net-test`: drives this device's Hub Network and prints each step (NetTest)
     .task {
-#if !os(tvOS)
+#if !os(tvOS) && canImport(Network)
       if NetTest.isRequested { await NetTest.run() }
 #endif
     }

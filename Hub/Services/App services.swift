@@ -11,6 +11,7 @@ import Observation
 import AVFoundation
 #endif
 import HubService
+import HubUI
 #if canImport(FoundationNetworking)
 import FoundationNetworking
 #endif

@@ -9,7 +9,9 @@
 
 #if canImport(ComponentKit)
 import Foundation
+#if canImport(Darwin)
 import Darwin
+#endif
 
 enum ListeningApps {
   struct Found: Hashable, Identifiable {
@@ -45,14 +47,20 @@ enum ListeningApps {
 
   /// A non-blocking connect to this Mac's own address that gives up after 300 ms
   private static func connects(port: Int, ipv6: Bool) -> Bool {
+#if canImport(Darwin)
     let fd = socket(ipv6 ? AF_INET6 : AF_INET, SOCK_STREAM, IPPROTO_TCP)
+#else
+    let fd = socket(ipv6 ? AF_INET6 : AF_INET, Int32(SOCK_STREAM.rawValue), Int32(IPPROTO_TCP))
+#endif
     guard fd >= 0 else { return false }
     defer { close(fd) }
     _ = fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK)
     var result: Int32
     if ipv6 {
       var address = sockaddr_in6()
+#if canImport(Darwin)
       address.sin6_len = UInt8(MemoryLayout<sockaddr_in6>.size)
+#endif
       address.sin6_family = sa_family_t(AF_INET6)
       address.sin6_port = in_port_t(UInt16(port).bigEndian)
       address.sin6_addr = in6addr_loopback
@@ -61,7 +69,9 @@ enum ListeningApps {
       }
     } else {
       var address = sockaddr_in()
+#if canImport(Darwin)
       address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+#endif
       address.sin_family = sa_family_t(AF_INET)
       address.sin_port = in_port_t(UInt16(port).bigEndian)
       address.sin_addr = in_addr(s_addr: inet_addr("127.0.0.1"))

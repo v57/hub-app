@@ -1,6 +1,8 @@
 #if DEBUG
 import Foundation
+#if canImport(NetworkExtension)
 @preconcurrency import NetworkExtension
+#endif
 
 /// Debug probe for the system "Add VPN Configurations" consent prompt.
 ///
@@ -10,10 +12,15 @@ import Foundation
 @MainActor
 enum VPNProfileProbe {
   nonisolated static var mode: String? {
+#if canImport(NetworkExtension)
     ProcessInfo.processInfo.environment["HUB_VPN_PROBE"]
+#else
+    nil
+#endif
   }
 
   static func run() async {
+#if canImport(NetworkExtension)
     do {
       let managers = try await NETunnelProviderManager.loadAllFromPreferences()
       let existing = managers.first {
@@ -45,6 +52,7 @@ enum VPNProfileProbe {
     } catch {
       log("error \(error)")
     }
+#endif
   }
 
   private static func log(_ message: String) {

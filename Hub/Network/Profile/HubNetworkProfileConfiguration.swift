@@ -1,6 +1,8 @@
 import Foundation
 import HubService
+#if canImport(Network)
 import Network
+#endif
 
 /// Configuration exchanged between Hub and its packet-tunnel extension.
 ///

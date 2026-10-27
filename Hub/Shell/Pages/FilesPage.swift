@@ -277,7 +277,7 @@ private struct FileInspector: View {
         if hub.require(permissions: "s3/read") {
           AsyncButton(copied ? "Copied" : "Copy Link") {
             let link: String = try await hub.client.send("s3/read", path + file.id, context: context)
-            link.copyToClipboard()
+            KitPasteboard.copy(link)
             copied = true
           }
           .buttonStyle(.kit)

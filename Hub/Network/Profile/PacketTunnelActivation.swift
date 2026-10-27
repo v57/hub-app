@@ -1,5 +1,6 @@
 import Foundation
 import HubService
+import Channel
 
 private struct HubNetworkAgentRegistration: Encodable {
   let version = 1

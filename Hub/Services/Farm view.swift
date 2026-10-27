@@ -5,12 +5,10 @@
 //  Created by Linux on 31.10.25.
 //
 
-#if os(macOS) || os(iOS)
+#if !os(tvOS) && !os(visionOS)
 import SwiftUI
-#if os(macOS)
-import IOKit.ps
-import IOKit.pwr_mgt
-#elseif os(iOS)
+import PlatformPower
+#if os(iOS)
 import Combine
 #endif
 
@@ -24,7 +22,7 @@ struct FarmView: View {
   @Bindable var farm = Farm.main
   var canStart: Bool {
     guard let battery = farm.battery else { return true }
-    return battery.charging || battery.level >= farm.minimumBattery
+    return battery.isCharging || battery.level >= Double(farm.minimumBattery)
   }
   var body: some View {
     VStack(spacing: 16) {
@@ -139,12 +137,12 @@ extension View {
 @Observable
 @MainActor class Farm {
   static let main = Farm()
-  var battery: BatteryStatus? {
+  var battery: Battery? {
     didSet {
       guard battery != oldValue else { return }
       guard let battery else { return }
       guard isRunning else { return }
-      guard !battery.charging && battery.level < minimumBattery else { return }
+      guard !battery.isCharging && battery.level < Double(minimumBattery) else { return }
       isRunning = false
     }
   }
@@ -158,22 +156,20 @@ extension View {
   }
   var lowerBrightness: Bool = true
   
-#if os(macOS)
-  private var powerSourceRunLoopSource: CFRunLoopSource?
-  private var sleepAssertionID: IOPMAssertionID = 0
-#elseif os(iOS)
+  /// Keeps the device awake while farming
+  private var awake: SleepAssertion?
+  private var batteryObservation: BatteryObservation?
+#if os(iOS)
   private var brightness: CGFloat?
   weak var screen: UIScreen?
-  private var powerTracking: AnyCancellable?
   private var farmTracking: AnyCancellable?
 #endif
   
   init() {
-#if canImport(UIKit)
-    UIDevice.current.isBatteryMonitoringEnabled = true
-#endif
-    battery = batteryStatus()
-    trackBattery()
+    battery = Battery.current
+    batteryObservation = Battery.observe { [weak self] battery in
+      withAnimation { self?.battery = battery }
+    }
 #if os(iOS)
     farmTracking = NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification).sink { [unowned self] _ in
       isRunning = false
@@ -181,89 +177,12 @@ extension View {
 #endif
   }
   
-  struct BatteryStatus: Hashable {
-    var level: Float
-    var charging: Bool
-  }
-  
-  private func batteryStatus() -> BatteryStatus? {
-#if os(macOS)
-    let snapshot = IOPSCopyPowerSourcesInfo().takeRetainedValue()
-    let sources = IOPSCopyPowerSourcesList(snapshot).takeRetainedValue() as Array
-    for ps in sources {
-      let info = IOPSGetPowerSourceDescription(snapshot, ps).takeUnretainedValue() as! [String: AnyObject]
-      guard let capacity = info[kIOPSCurrentCapacityKey] as? Int else { continue }
-      guard let max = info[kIOPSMaxCapacityKey] as? Int else { continue }
-      return BatteryStatus(level: Float(capacity) / Float(max), charging: info[kIOPSPowerSourceStateKey] as? String != "Battery Power")
-    }
-    return nil
-#elseif os(iOS)
-    let state = UIDevice.current.batteryState
-    return BatteryStatus(level: UIDevice.current.batteryLevel, charging: state == .charging || state == .full)
-#endif
-  }
-  
-  private func trackBattery() {
-#if os(macOS)
-    let context = Unmanaged.passUnretained(self).toOpaque()
-    let callback: IOPowerSourceCallbackType = { context in
-      guard let context = context else { return }
-      Unmanaged<Farm>.fromOpaque(context).takeUnretainedValue().updateBatteryStatus()
-    }
-    
-    powerSourceRunLoopSource = IOPSNotificationCreateRunLoopSource(callback, context).takeRetainedValue()
-    if let runLoopSource = powerSourceRunLoopSource {
-      CFRunLoopAddSource(CFRunLoopGetCurrent(), runLoopSource, .defaultMode)
-    }
-#elseif os(iOS)
-    powerTracking = NotificationCenter.default.publisher(for: UIDevice.batteryLevelDidChangeNotification)
-      .merge(with: NotificationCenter.default.publisher(for: UIDevice.batteryStateDidChangeNotification))
-      .sink { [unowned self] _ in
-        updateBatteryStatus()
-    }
-#endif
-  }
-  
-  private func stopTrackingBattery() {
-#if os(macOS)
-    if let runLoopSource = powerSourceRunLoopSource {
-      CFRunLoopRemoveSource(CFRunLoopGetCurrent(), runLoopSource, .defaultMode)
-    }
-#elseif os(iOS)
-    NotificationCenter.default.removeObserver(self)
-#endif
-  }
-  
   private func preventSleep(enabled: Bool) {
-#if os(macOS)
     if enabled {
-      // Prevent sleep - create assertion if not already active
-      if sleepAssertionID == 0 {
-        let result = IOPMAssertionCreateWithName(
-          kIOPMAssertionTypeNoIdleSleep as CFString,
-          IOPMAssertionLevel(kIOPMAssertionLevelOn),
-          "Preventing system sleep" as CFString,
-          &sleepAssertionID
-        )
-        if result != kIOReturnSuccess {
-          print("Failed to create sleep assertion: \(result)")
-        }
-      }
+      if awake == nil { awake = SleepAssertion(.idleSleep, reason: "Hub is farming: running services for your hubs") }
     } else {
-      // Allow sleep - release assertion if active
-      if sleepAssertionID != 0 {
-        IOPMAssertionRelease(sleepAssertionID)
-        sleepAssertionID = 0
-      }
-    }
-#elseif os(iOS)
-    UIApplication.shared.isIdleTimerDisabled = enabled
-#endif
-  }
-  
-  private func updateBatteryStatus() {
-    withAnimation {
-      battery = batteryStatus()
+      awake?.release()
+      awake = nil
     }
   }
   

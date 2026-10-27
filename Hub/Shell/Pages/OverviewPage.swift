@@ -143,7 +143,7 @@ struct NeedsYouBanner: View {
     var parts = [String]()
     let services = hostPending.list.map(\.name)
     if !services.isEmpty {
-      parts.append(ListFormatter.localizedString(byJoining: services) + (services.count == 1 ? " wants" : " want") + " to post APIs")
+      parts.append(services.formatted(.list(type: .and)) + (services.count == 1 ? " wants" : " want") + " to post APIs")
     }
     if let device = facts.pendingDevices.first {
       parts.append("\(device.name ?? "A device") wants to join")

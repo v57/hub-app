@@ -7,6 +7,7 @@
 
 import SwiftUI
 import HubUI
+import HubService
 
 struct InstallS3: View {
   typealias CodeView = InstallationGuide.CodeView

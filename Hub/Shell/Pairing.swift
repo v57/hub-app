@@ -9,6 +9,7 @@
 import Foundation
 import HubService
 import HubUI
+import Observation
 
 /// `hub://pair` links opened from outside (a QR scanned with the camera, `hub pair` in a terminal), which the window
 /// asks about in a pairing sheet

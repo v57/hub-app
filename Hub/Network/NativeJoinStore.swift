@@ -1,7 +1,9 @@
 import CryptoKit
 import Foundation
 import HubService
+#if canImport(Security)
 import Security
+#endif
 
 enum NativeJoinStage: String, Codable, Sendable {
   case staged
@@ -41,7 +43,7 @@ enum NativeJoinStoreError: Error, Equatable {
   case corruptRecord
   case transactionConflict
   case invalidTransition
-  case keychain(OSStatus)
+  case keychain(Int32)
 }
 
 protocol NativeJoinSecretStorage: Sendable {
@@ -69,6 +71,7 @@ struct NativeJoinKeychainStorage: NativeJoinSecretStorage {
     )
   }
 
+#if canImport(Security)
   func load(account: String) throws -> Data? {
     var query = baseQuery(account: account)
     query[kSecReturnData as String] = true
@@ -110,6 +113,23 @@ struct NativeJoinKeychainStorage: NativeJoinSecretStorage {
     }
     return query
   }
+#else
+  // The Keychain stand-in (the Secret Service on Linux) through HubService
+  func load(account: String) throws -> Data? {
+    try KeyChain.loadData(keychain: Self.serviceKeychain(account: account))
+  }
+
+  func insert(_ data: Data, account: String) throws {
+    let item = Self.serviceKeychain(account: account)
+    // As SecItemAdd: an item that's already there is a conflict
+    guard try KeyChain.loadData(keychain: item) == nil else { throw NativeJoinStoreError.keychain(-25299) }
+    try KeyChain.replaceData(data, keychain: item)
+  }
+
+  func delete(account: String) throws {
+    try KeyChain.deleteData(keychain: Self.serviceKeychain(account: account))
+  }
+#endif
 }
 
 actor NativeJoinStore {

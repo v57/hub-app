@@ -9,6 +9,7 @@
 #if DEBUG
 import Foundation
 import HubService
+import Channel
 
 @MainActor
 enum HubDemo {

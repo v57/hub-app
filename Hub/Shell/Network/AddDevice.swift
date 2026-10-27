@@ -110,7 +110,7 @@ struct AddDeviceSheet: View {
           }
 #endif
           Button(copied ? "Copied" : "Copy Link") {
-            link?.copyToClipboard()
+            if let link { KitPasteboard.copy(link) }
             copied = true
           }
           .buttonStyle(.plain).foregroundStyle(.kitLink)

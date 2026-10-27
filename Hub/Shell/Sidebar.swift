@@ -34,7 +34,8 @@ struct HubSidebar: View {
       }
       if search.isEmpty {
         // This device's network, whichever hub is open: at the bottom on the Mac and iPad, under the hubs on iPhone
-        if idiom == .phone {
+        if !HubNets.isAvailable {
+        } else if idiom == .phone {
           HubNetworkCard()
         } else {
           HubNetworkCard()
@@ -57,7 +58,7 @@ struct HubSidebar: View {
   }
 
   private func copyKey() {
-    KeyChain.main.publicKey().copyToClipboard()
+    KitPasteboard.copy(KeyChain.main.publicKey())
     withAnimation(.kit) { copied = true }
     Task {
       try? await Task.sleep(for: .seconds(2))
@@ -162,7 +163,7 @@ struct HubMenu: View {
 
   var body: some View {
     Button("Open", systemImage: "arrow.right.circle") { Navigator.main.open(hub) }
-    Button("Copy Address", systemImage: "doc.on.doc") { hub.settings.address.absoluteString.copyToClipboard() }
+    Button("Copy Address", systemImage: "doc.on.doc") { KitPasteboard.copy(hub.settings.address.absoluteString) }
     if case .hubKeyChanged = hub.refusal {
       // Only when the hub was really reinstalled: otherwise another server answers at this address
       Button("Trust New Hub Key", systemImage: "checkmark.shield") {
@@ -398,7 +399,7 @@ private struct NetworkSection: View {
 
 /// What this device does on its own: run a hub, share its services, its key, Farm
 private struct ThisDeviceSection: View {
-#if os(macOS) || os(iOS)
+#if !os(tvOS) && !os(visionOS)
   @State private var farm = Farm.main
   private var meta: [String] { [farm.isRunning ? "Farming" : "Farm off"] }
 #else
@@ -416,7 +417,7 @@ private struct ThisDeviceSection: View {
         let shared = AppServices.Service.sharedCount
         if shared > 0 { Count(shared) }
       }
-#if os(macOS) || os(iOS)
+#if !os(tvOS) && !os(visionOS)
       SidebarRow(value: Route.device(.farm), "Farm", systemImage: "tree") {
         Text(farm.isRunning ? "On" : "Off").kitFont(.caption)
       }
@@ -460,7 +461,7 @@ extension Hub {
     case .connections: require(permissions: "hub/connections")
     case .permissions: require(permissions: "hub/group/list", "hub/group/names")
     case .lockdown: canLockdown
-    case .network: canViewNetwork
+    case .network: HubNets.isAvailable && canViewNetwork
     }
   }
 }

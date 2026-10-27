@@ -1,7 +1,11 @@
 import Foundation
 import HubService
+#if canImport(Network)
 import Network
+#endif
+#if canImport(Darwin)
 import Darwin
+#endif
 
 private struct GatewayGrantRequest: Encodable, Sendable {
   let clientKey: String
@@ -240,16 +244,16 @@ final class GatewaySelectionController {
     if IPv4Address(host) != nil || IPv6Address(host) != nil {
       return [host]
     }
-    var hints = addrinfo(
-      ai_flags: AI_ADDRCONFIG,
-      ai_family: AF_UNSPEC,
-      ai_socktype: SOCK_STREAM,
-      ai_protocol: IPPROTO_TCP,
-      ai_addrlen: 0,
-      ai_canonname: nil,
-      ai_addr: nil,
-      ai_next: nil
-    )
+    var hints = addrinfo()
+    hints.ai_flags = AI_ADDRCONFIG
+    hints.ai_family = AF_UNSPEC
+#if canImport(Darwin)
+    hints.ai_socktype = SOCK_STREAM
+    hints.ai_protocol = IPPROTO_TCP
+#else
+    hints.ai_socktype = Int32(SOCK_STREAM.rawValue)
+    hints.ai_protocol = Int32(IPPROTO_TCP)
+#endif
     var result: UnsafeMutablePointer<addrinfo>?
     guard getaddrinfo(host, nil, &hints, &result) == 0 else { return [] }
     defer { freeaddrinfo(result) }

@@ -7,15 +7,13 @@
 
 import Foundation
 import HubService
-import Network
+import PlatformPower
+import PlatformSystem
 #if canImport(VaultHub)
 import VaultHub
 #endif
 #if canImport(UIKit)
 import UIKit
-#endif
-#if os(macOS)
-import IOKit.ps
 #endif
 
 extension DeviceIdentity {
@@ -26,7 +24,7 @@ extension DeviceIdentity {
   @MainActor static let app: DeviceIdentity? = {
     let accessGroup = (Bundle.main.object(forInfoDictionaryKey: "HubKeychainAccessGroup") as? String).flatMap { $0.isEmpty ? nil : $0 }
     var key: DeviceKey?
-#if canImport(VaultHub)
+#if canImport(VaultHub) && canImport(Security)
     let own = ownDeviceKeySeed(accessGroup: accessGroup)
     if let shared = try? HubKeyStore.shareDeviceKey(own) {
       // Taken from the group: it becomes the app's own, which the extension and later launches read
@@ -36,10 +34,16 @@ extension DeviceIdentity {
       key = keyChain.map(DeviceKey.init)
     }
 #endif
+#if canImport(Security)
     guard let key = key ?? (try? DeviceKey.keychain(accessGroup: accessGroup)) else { return nil }
+#else
+    // No keychain: the device key file Hub's launcher and services on this machine use (~/.hub/device.key)
+    guard let key = key ?? (try? DeviceKey.file()) else { return nil }
+#endif
     return DeviceIdentity(key: key, name: AppDevice.name, platform: AppDevice.platform)
   }()
 
+#if canImport(Security)
   private static func ownDeviceKey(accessGroup: String?) -> KeyChain.KeychainConfiguration {
     .init(service: DeviceKey.keychainService, account: "ed25519-private-key", accessGroup: accessGroup, useDataProtectionKeychain: true)
   }
@@ -61,20 +65,13 @@ extension DeviceIdentity {
     }
     return seed
   }
+#endif
 }
 
 @MainActor
 enum AppDevice {
   /// Device model plus the owner's choice of name where the system shares it
-  static var name: String {
-#if os(macOS)
-    Host.current().localizedName ?? model
-#elseif canImport(UIKit) && !os(watchOS)
-    UIDevice.current.name
-#else
-    model
-#endif
-  }
+  static var name: String { SystemInfo.deviceName }
 
   static var platform: String {
 #if os(macOS) || targetEnvironment(macCatalyst)
@@ -90,13 +87,7 @@ enum AppDevice {
 
   /// Hardware identifier, `iPhone17,1` or `Mac15,9`
   static var model: String {
-#if targetEnvironment(simulator)
-    ProcessInfo.processInfo.environment["SIMULATOR_MODEL_IDENTIFIER"] ?? sysctl("hw.machine") ?? "Simulator"
-#elseif os(macOS)
-    sysctl("hw.model") ?? "Mac"
-#else
-    sysctl("hw.machine") ?? "Apple device"
-#endif
+    SystemInfo.model ?? DeviceIdentity.currentPlatform
   }
 
   static var os: String {
@@ -119,10 +110,10 @@ enum AppDevice {
     return DeviceDescription(
       name: name, os: os, arch: arch,
       capabilities: Capabilities(
-        cpu: .init(cores: ProcessInfo.processInfo.activeProcessorCount, model: sysctl("machdep.cpu.brand_string")),
+        cpu: .init(cores: ProcessInfo.processInfo.activeProcessorCount, model: SystemInfo.cpuModel),
         memory: Int64(ProcessInfo.processInfo.physicalMemory),
         disks: storage.map { [.init(name: "System", total: $0.total, free: $0.free)] },
-        power: battery().level == nil ? .ac : .battery,
+        power: Battery.current == nil ? .ac : .battery,
         ssh: await ssh(),
         model: model
       )
@@ -130,14 +121,14 @@ enum AppDevice {
   }
 
   static func data() -> DeviceData {
-    let battery = battery()
+    let battery = Battery.current
     let storage = storage()
     return DeviceData(
       cpu: cpu.usage(),
-      memoryUsed: memoryUsed(),
-      battery: battery.level,
-      charging: battery.charging,
-      network: AppDevice.network.type,
+      memoryUsed: SystemInfo.memoryUsed(),
+      battery: battery?.level,
+      charging: battery?.isCharging,
+      network: network,
       thermal: thermal,
       storageFree: storage?.free,
       storageTotal: storage?.total
@@ -147,9 +138,10 @@ enum AppDevice {
   // MARK: SSH
   /// This Mac's SSH server (Remote Login), as hub-launcher reports it: every host key it offers, signed by the device
   /// key so other devices pin it through the hub, which opens the port in its members' links to this Mac. macOS starts
-  /// sshd from launchd on the `ssh` service, so the port is 22 whatever sshd_config says
+  /// sshd from launchd on the `ssh` service, so the port is 22 whatever sshd_config says. A Linux machine reports
+  /// its sshd the same way, on the port distributions start it on
   static func ssh() async -> Capabilities.SSH? {
-#if os(macOS)
+#if os(macOS) || os(Linux)
     guard let device = DeviceIdentity.app?.key else { return nil }
     let keys = await hostKeys(port: 22)
     guard let preferred = keys.first else { return nil }
@@ -159,7 +151,7 @@ enum AppDevice {
 #endif
   }
 
-#if os(macOS)
+#if os(macOS) || os(Linux)
   /// The host keys the SSH server on this machine's port offers, Ed25519 first, then ECDSA and RSA (the v57 apps'
   /// libssh2 on mbedTLS can't use Ed25519). The sandbox can't read /etc/ssh, so sshd itself tells them through
   /// `ssh-keyscan`; none when nothing answers
@@ -191,128 +183,23 @@ enum AppDevice {
   }
 #endif
 
-  // MARK: Battery
-  static func battery() -> (level: Double?, charging: Bool?) {
-#if os(iOS) || os(visionOS)
-    let device = UIDevice.current
-    device.isBatteryMonitoringEnabled = true
-    // -1 and .unknown on the simulator and on devices without a battery
-    guard device.batteryLevel >= 0 else { return (nil, nil) }
-    return (Double(device.batteryLevel), device.batteryState == .charging || device.batteryState == .full)
-#elseif os(macOS)
-    guard let info = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
-          let sources = IOPSCopyPowerSourcesList(info)?.takeRetainedValue() as? [CFTypeRef] else { return (nil, nil) }
-    for source in sources {
-      guard let description = IOPSGetPowerSourceDescription(info, source)?.takeUnretainedValue() as? [String: Any],
-            description[kIOPSTypeKey] as? String == kIOPSInternalBatteryType,
-            let current = description[kIOPSCurrentCapacityKey] as? Int,
-            let max = description[kIOPSMaxCapacityKey] as? Int, max > 0 else { continue }
-      let charging = description[kIOPSIsChargingKey] as? Bool
-        ?? (description[kIOPSPowerSourceStateKey] as? String == kIOPSACPowerValue)
-      return (Double(current) / Double(max), charging)
-    }
-    return (nil, nil)
-#else
-    return (nil, nil)
-#endif
-  }
-
-  // MARK: Storage
-  static func storage() -> (free: Int64, total: Int64)? {
-    let url = URL(fileURLWithPath: NSHomeDirectory())
-#if os(tvOS)
-    guard let values = try? url.resourceValues(forKeys: [.volumeAvailableCapacityKey, .volumeTotalCapacityKey]),
-          let total = values.volumeTotalCapacity else { return nil }
-    return (Int64(values.volumeAvailableCapacity ?? 0), Int64(total))
-#else
-    guard let values = try? url.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey, .volumeTotalCapacityKey]),
-          let total = values.volumeTotalCapacity else { return nil }
-    return (values.volumeAvailableCapacityForImportantUsage ?? 0, Int64(total))
-#endif
-  }
-
-  // MARK: Memory and CPU
-  static func memoryUsed() -> Int64? {
-    var stats = vm_statistics64()
-    var count = mach_msg_type_number_t(MemoryLayout<vm_statistics64>.size / MemoryLayout<integer_t>.size)
-    let result = withUnsafeMutablePointer(to: &stats) {
-      $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
-        host_statistics64(mach_host_self(), HOST_VM_INFO64, $0, &count)
-      }
-    }
-    guard result == KERN_SUCCESS else { return nil }
-    let pages = Int64(stats.active_count) + Int64(stats.wire_count) + Int64(stats.compressor_page_count)
-    return pages * Int64(getpagesize())
-  }
+  // MARK: Storage, CPU
+  static func storage() -> (free: Int64, total: Int64)? { SystemInfo.storage() }
 
   static let cpu = CPULoad()
-  final class CPULoad {
-    private var previous: host_cpu_load_info?
-    /// Share of busy ticks since the previous call, 0–1
-    func usage() -> Double? {
-      var info = host_cpu_load_info()
-      var count = mach_msg_type_number_t(MemoryLayout<host_cpu_load_info>.size / MemoryLayout<integer_t>.size)
-      let result = withUnsafeMutablePointer(to: &info) {
-        $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
-          host_statistics(mach_host_self(), HOST_CPU_LOAD_INFO, $0, &count)
-        }
-      }
-      guard result == KERN_SUCCESS else { return nil }
-      defer { previous = info }
-      guard let previous else { return nil }
-      func ticks(_ i: host_cpu_load_info) -> (busy: Double, total: Double) {
-        let user = Double(i.cpu_ticks.0), system = Double(i.cpu_ticks.1), idle = Double(i.cpu_ticks.2), nice = Double(i.cpu_ticks.3)
-        return (user + system + nice, user + system + idle + nice)
-      }
-      let now = ticks(info), before = ticks(previous)
-      let total = now.total - before.total
-      guard total > 0 else { return nil }
-      return min(max((now.busy - before.busy) / total, 0), 1)
-    }
-  }
 
-  static var thermal: String {
-    switch ProcessInfo.processInfo.thermalState {
-    case .nominal: "nominal"
-    case .fair: "fair"
-    case .serious: "serious"
-    case .critical: "critical"
-    @unknown default: "nominal"
-    }
-  }
+  static var thermal: String { SystemInfo.thermalState.rawValue }
+
 
   // MARK: Network
-  static let network = NetworkType()
-  final class NetworkType: @unchecked Sendable {
-    private let monitor = NWPathMonitor()
-    private let lock = NSLock()
-    private var path: NWPath?
-    init() {
-      monitor.pathUpdateHandler = { [weak self] path in
-        guard let self else { return }
-        lock.lock()
-        self.path = path
-        lock.unlock()
-      }
-      monitor.start(queue: DispatchQueue(label: "dev.v57.Hub.device.network"))
-    }
-    var type: DeviceData.Network? {
-      lock.lock()
-      defer { lock.unlock() }
-      guard let path, path.status == .satisfied else { return nil }
-      if path.usesInterfaceType(.wifi) { return .wifi }
-      if path.usesInterfaceType(.cellular) { return .cellular }
-      if path.usesInterfaceType(.wiredEthernet) { return .ethernet }
-      return .other
+  static var network: DeviceData.Network? {
+    switch NetworkMonitor.shared.interface {
+    case .wifi: .wifi
+    case .cellular: .cellular
+    case .ethernet: .ethernet
+    case .other: .other
+    case nil: nil
     }
   }
 
-  private static func sysctl(_ name: String) -> String? {
-    var size = 0
-    guard sysctlbyname(name, nil, &size, nil, 0) == 0, size > 0 else { return nil }
-    var value = [CChar](repeating: 0, count: size)
-    guard sysctlbyname(name, &value, &size, nil, 0) == 0 else { return nil }
-    let string = String(decoding: value.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
-    return string.isEmpty ? nil : string
-  }
 }
