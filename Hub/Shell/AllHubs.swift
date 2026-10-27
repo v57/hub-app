@@ -72,7 +72,7 @@ struct HubWelcome: View {
   var body: some View {
     KitWelcome(
       emptyTitle: "No Hub Yet",
-      emptyMessage: "Hub connects to hubs you run: hub-server on a Mac, a home server or a VPS, or this \(KitDevice.name) itself. Nothing is contacted until you connect."
+      emptyMessage: "Hub connects to hubs you run: hub-server on a Mac, a home server or a VPS, or this \(KitDevice.nameInSentence) itself. Nothing is contacted until you connect."
     ) {
 #if os(macOS) && canImport(HubServer)
       WelcomeAction("Use This Mac’s Internet Anywhere…", detail: "Browse through it from your phone or laptop when you’re away", systemImage: "globe") {
