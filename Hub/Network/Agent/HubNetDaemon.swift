@@ -41,6 +41,8 @@ struct HubNetDaemon: Sendable {
     let gatewayAllowed: Bool
     let overlayIpv4: String?
     let overlayIpv6: String?
+    /// Where the membership reaches the hub (a `ws://` URL), as the agent recorded it at the join
+    let hubAddress: String?
 
     init(from decoder: Decoder) throws {
       let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -54,10 +56,11 @@ struct HubNetDaemon: Sendable {
       gatewayAllowed = try container.decodeIfPresent(Bool.self, forKey: .gatewayAllowed) ?? false
       overlayIpv4 = try container.decodeIfPresent(String.self, forKey: .overlayIpv4)
       overlayIpv6 = try container.decodeIfPresent(String.self, forKey: .overlayIpv6)
+      hubAddress = try container.decodeIfPresent(String.self, forKey: .hubAddress)
     }
 
     private enum CodingKeys: String, CodingKey {
-      case id, alias, header, status, error, nodeUrl, gatewayAllowed, overlayIpv4, overlayIpv6
+      case id, alias, header, status, error, nodeUrl, gatewayAllowed, overlayIpv4, overlayIpv6, hubAddress
     }
   }
 

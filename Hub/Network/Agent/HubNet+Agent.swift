@@ -52,7 +52,13 @@ enum HubNetAgentMemberships {
 extension HubNet {
   /// This hub's membership among the agent's
   func membership(in list: [HubNetDaemon.Membership]) -> HubNetDaemon.Membership? {
-    if let id = HubNetAgentMemberships.id(for: hub.settings.address), let membership = list.first(where: { $0.id == id }) {
+    let address = hub.settings.address
+    if let id = HubNetAgentMemberships.id(for: address), let membership = list.first(where: { $0.id == id }) {
+      return membership
+    }
+    // A membership this app didn't make (the agent's CLI joined, or joined again): the one that reaches this hub
+    if let membership = list.first(where: { $0.hubAddress.flatMap(URL.init(string:)) == address }) {
+      HubNetAgentMemberships.set(membership.id, for: address)
       return membership
     }
     // The hub on this machine: the agent serves it with `local`, which it may have done from its CLI
