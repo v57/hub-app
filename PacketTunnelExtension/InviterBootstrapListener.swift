@@ -164,7 +164,14 @@ final class InviterBootstrapListener {
   }
 
   private func dispatch(_ data: Data, from source: sockaddr_in) {
-    extensionDiagnostics("listener rx from=\(Self.sourceString(source)) bytes=\(data.count)")
+    serve(data, from: Self.sourceString(source)) { [weak self] frame in
+      self?.send(frame, to: source)
+    }
+  }
+
+  /// Answers one datagram, from this listener's socket or WireGuard's (`BootstrapDatagrams`), through `reply`
+  func serve(_ data: Data, from source: String, reply: @escaping (Data) -> Void) {
+    extensionDiagnostics("listener rx from=\(source) bytes=\(data.count)")
     // Non-HUBB datagrams are probe responses from the node; the listener does
     // not initiate probe requests itself, so ignore them (the WireGuard
     // backend handles the joiner-side probe; the inviter only serves HUBB).
@@ -183,19 +190,19 @@ final class InviterBootstrapListener {
     do {
       request = try JSONDecoder().decode(DirectBootstrapRequest.self, from: parsed.payload)
     } catch {
-      writeError(source, requestID: parsed.requestID, code: "bootstrap_request_invalid", message: "invalid request payload", retryable: false)
+      writeError(reply, requestID: parsed.requestID, code: "bootstrap_request_invalid", message: "invalid request payload", retryable: false)
       return
     }
     Task {
       do {
         let response = try await handle(request)
         let payload = try JSONEncoder().encode(response)
-        try writeFrame(source, type: .response, requestID: parsed.requestID, payload: payload)
-        extensionDiagnostics("listener response sent to \(Self.sourceString(source))")
+        reply(try marshalFrame(type: .response, requestID: parsed.requestID, payload: payload))
+        extensionDiagnostics("listener response sent to \(source)")
       } catch {
         let mapped = Self.mapError(error)
-        writeError(source, requestID: parsed.requestID, code: mapped.code, message: mapped.message, retryable: mapped.retryable)
-        extensionDiagnostics("listener error \(mapped.code) to \(Self.sourceString(source))")
+        writeError(reply, requestID: parsed.requestID, code: mapped.code, message: mapped.message, retryable: mapped.retryable)
+        extensionDiagnostics("listener error \(mapped.code) to \(source)")
       }
     }
   }
@@ -225,8 +232,7 @@ final class InviterBootstrapListener {
     return ("bootstrap_internal", String(describing: error), true)
   }
 
-  private func writeFrame(_ source: sockaddr_in, type: FrameType, requestID: Data, payload: Data) throws {
-    let frame = try marshalFrame(type: type, requestID: requestID, payload: payload)
+  private func send(_ frame: Data, to source: sockaddr_in) {
     let sent = frame.withUnsafeBytes { (bytes: UnsafeRawBufferPointer) -> Int in
       var target = source
       return withUnsafePointer(to: &target) {
@@ -243,10 +249,11 @@ final class InviterBootstrapListener {
     }
   }
 
-  private func writeError(_ source: sockaddr_in, requestID: Data, code: String, message: String, retryable: Bool) {
+  private func writeError(_ reply: (Data) -> Void, requestID: Data, code: String, message: String, retryable: Bool) {
     let networkError = NetworkError(code: code, message: message, retryable: retryable)
-    guard let payload = try? JSONEncoder().encode(networkError) else { return }
-    try? writeFrame(source, type: .error, requestID: requestID, payload: payload)
+    guard let payload = try? JSONEncoder().encode(networkError),
+          let frame = try? marshalFrame(type: .error, requestID: requestID, payload: payload) else { return }
+    reply(frame)
   }
 
   // MARK: Frame codec (mirrors DirectBootstrapClient)

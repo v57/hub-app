@@ -24,6 +24,8 @@ final class PacketTunnelWireGuardAdapter {
   /// Peers of verified links (`LinkManager`), keyed by base64 WireGuard key. A link to a key the base configuration
   /// or another set already has extends that peer and sets its endpoint.
   private var linkPeers: [String: (endpoint: Endpoint?, routes: [IPAddressRange])] = [:]
+  /// The direct bootstrap exchange's datagrams on WireGuard's socket
+  let bootstrapDatagrams = BootstrapDatagrams()
 
   init(provider: NEPacketTunnelProvider) {
     let logger = Logger(
@@ -36,6 +38,14 @@ final class PacketTunnelWireGuardAdapter {
         "[\(String(describing: level), privacy: .public)] \(message, privacy: .public)"
       )
     }
+    adapter.setDatagramHandler { [bootstrapDatagrams] source, datagram in
+      bootstrapDatagrams.receive(source: source, datagram: datagram)
+    }
+  }
+
+  /// Sends a HUBB datagram from WireGuard's socket to a numeric `ip:port`
+  func sendBootstrapDatagram(to endpoint: String, _ datagram: Data) async throws {
+    try await adapter.sendBackendDatagram(endpoint: endpoint, payload: datagram)
   }
 
   func start(configuration: TunnelConfiguration) async throws {

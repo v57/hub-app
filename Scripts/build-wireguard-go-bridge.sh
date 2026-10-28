@@ -18,7 +18,7 @@ fi
 
 archs="$(echo ${ARCHS} | tr ' ' '-')"
 deployment_target="$(eval echo "\${${DEPLOYMENT_TARGET_CLANG_ENV_NAME:-unset}:-any}")"
-source_stamp="$(cksum api-apple.go wireguard.h go.mod Makefile | cksum | awk '{print $1}')"
+source_stamp="$(cksum *.go wireguard.h go.mod go.sum Makefile | cksum | awk '{print $1}')"
 cache_root="/tmp/hub-wireguard-go-${UID}/${CONFIGURATION}-${PLATFORM_NAME}-${deployment_target}-${archs}-${source_stamp}"
 products="${cache_root}/products"
 objects="${cache_root}/objects"

@@ -119,7 +119,7 @@ final class CoordinatorClient: NSObject, URLSessionWebSocketDelegate, @unchecked
   /// Signs the challenge nonce under `registrationDomain`, standard base64
   private let sign: (Data) throws -> String
   private let probe: (String, Data) async throws -> Void
-  private let candidates: () -> Candidate?
+  private let candidates: () async -> Candidate?
   private let onBootstrap: (BootstrapEvent) async -> Void
   private let onLink: (Envelope) async -> Void
   private let onStatusChange: (Bool) -> Void
@@ -137,7 +137,7 @@ final class CoordinatorClient: NSObject, URLSessionWebSocketDelegate, @unchecked
     serviceKey: String,
     sign: @escaping (Data) throws -> String,
     probe: @escaping (String, Data) async throws -> Void,
-    candidates: @escaping () -> Candidate?,
+    candidates: @escaping () async -> Candidate?,
     onBootstrap: @escaping (BootstrapEvent) async -> Void = { _ in },
     onLink: @escaping (Envelope) async -> Void = { _ in },
     onStatusChange: @escaping (Bool) -> Void,
@@ -348,7 +348,7 @@ final class CoordinatorClient: NSObject, URLSessionWebSocketDelegate, @unchecked
     _ link: CoordinatorLink, pending: Envelope, sessionId: String,
     invitationCode: String, tokenDigest: String, transactionId: String, joinerKey: String
   ) async throws -> BootstrapEvent? {
-    if let candidate = candidates() {
+    if let candidate = await candidates() {
       try await link.send(Envelope(
         majorVersion: 1, minorVersion: 0, type: "candidate.offer", sessionId: sessionId,
         candidate: Candidate(version: 1, candidateId: candidate.candidateId, sessionId: sessionId, key: serviceKey,

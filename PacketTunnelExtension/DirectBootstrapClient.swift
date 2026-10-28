@@ -29,6 +29,60 @@ enum DirectBootstrapClient {
     let retryable: Bool
   }
 
+  /// The exchange on WireGuard's socket (`BootstrapDatagrams`): sends the request to every target each second and
+  /// returns the first verified response with the address it came from. The targets are the inviter's candidates (a
+  /// joiner on its network) and its node-observed endpoint (one across NAT, through the hole the inviter punched toward
+  /// this socket's own observed endpoint).
+  static func exchange(
+    targets: [String],
+    request: DirectBootstrapRequest,
+    expectedInviterServiceKey: String,
+    timeout: TimeInterval,
+    datagrams: BootstrapDatagrams,
+    send: @escaping @Sendable (String, Data) async throws -> Void
+  ) async throws -> (response: DirectBootstrapResponse, source: String) {
+    guard !targets.isEmpty else { throw DirectBootstrapClientError.invalidEndpoint }
+    let requestID = randomRequestID()
+    let frame = try marshalFrame(type: .request, requestID: requestID, payload: try JSONEncoder().encode(request))
+    let (replies, continuation) = AsyncStream.makeStream(of: (source: String, datagram: Data).self)
+    datagrams.wait(for: requestID) { source, datagram in continuation.yield((source, datagram)) }
+    let sender = Task {
+      let deadline = Date().addingTimeInterval(timeout)
+      while !Task.isCancelled, Date() < deadline {
+        for target in targets { try? await send(target, frame) }
+        try? await Task.sleep(for: .seconds(1))
+      }
+      continuation.finish()
+    }
+    defer {
+      sender.cancel()
+      datagrams.stopWaiting(for: requestID)
+      continuation.finish()
+    }
+    var lastError: Error = DirectBootstrapClientError.timedOut
+    for await reply in replies {
+      guard let parsed = try? unmarshalFrame(reply.datagram), parsed.requestID == requestID else { continue }
+      switch parsed.type {
+      case .response:
+        guard let response = try? JSONDecoder().decode(DirectBootstrapResponse.self, from: parsed.payload) else {
+          throw DirectBootstrapClientError.invalidResponse
+        }
+        try DirectBootstrapVerifier.verify(response, request: request, expectedInviterServiceKey: expectedInviterServiceKey)
+        return (response, reply.source)
+      case .error:
+        // Error frames are unsigned: only one of the inviter's own addresses may end the exchange with one
+        guard targets.contains(reply.source),
+              let networkError = try? JSONDecoder().decode(NetworkError.self, from: parsed.payload) else { continue }
+        let error = ExchangeError(code: networkError.code, message: networkError.message, retryable: networkError.retryable)
+        guard error.retryable else { throw error }
+        lastError = error
+      case .request:
+        continue
+      }
+    }
+    throw lastError
+  }
+
   /// Sends one signed request to the inviter listener and returns the verified
   /// response. Identical retries are safe: the inviter handler is idempotent
   /// for the same replay id and nonce.

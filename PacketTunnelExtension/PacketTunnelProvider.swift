@@ -267,6 +267,14 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     }
     inviterListener = listener
     let listenerEndpoint = listener.start()
+    // Joiners send their request to WireGuard's socket, the one this inviter offers and probes from; the listener's
+    // own socket still answers a joiner that dials it
+    let adapter = wireGuardAdapter
+    adapter.bootstrapDatagrams.setRequestHandler { [weak listener] source, datagram in
+      listener?.serve(datagram, from: source) { frame in
+        Task { try? await adapter.sendBootstrapDatagram(to: source, frame) }
+      }
+    }
 
     inviterSweepTask?.cancel()
     inviterSweepTask = Task { [weak self] in
@@ -281,6 +289,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
   private func stopInviter() {
     inviterSweepTask?.cancel()
     inviterSweepTask = nil
+    wireGuardAdapter.bootstrapDatagrams.setRequestHandler(nil)
     inviterListener?.stop()
     inviterListener = nil
     Task { await inviter?.closeAll() }
@@ -314,15 +323,17 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     let client = CoordinatorClient(
       nodeEndpoint: nodeEndpoint,
       identity: identity,
+      // The inviter probes and offers WireGuard's socket, like the joiner: the node then shows the joiner the NAT
+      // mapping the exchange and the temporary link both use (`BootstrapDatagrams`)
       probe: { [weak self] endpoint, payload in
-        guard let self, let listener = self.inviterListener else {
+        guard let self, self.inviterListener != nil else {
           throw CoordinatorError.closed
         }
-        try await listener.sendProbe(endpoint: endpoint, payload: payload)
+        try await self.wireGuardAdapter.sendObservationProbe(endpoint: endpoint, payload: payload)
       },
       candidates: { [weak self] in
-        guard let self, let listener = self.inviterListener,
-              let port = listener.port else { return nil }
+        guard let self, self.inviterListener != nil,
+              let port = await self.wireGuardAdapter.listenPort() else { return nil }
         return CoordinatorClient.Candidate(
           version: 1, candidateId: UUID().uuidString, sessionId: "",
           key: identity.publicKey(), kind: "host", transport: "udp",
@@ -457,6 +468,24 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
       replayId: event.tokenDigest,
       joinerServiceKey: event.joinerKey
     )
+    // Opens this side's NAT for the joiner's request: a few datagrams from WireGuard's socket to where the node saw the
+    // joiner's (and its declared addresses), while the joiner sends its request here
+    func endpoint(_ address: String, _ port: UInt16) -> String {
+      address.contains(":") ? "[\(address)]:\(port)" : "\(address):\(port)"
+    }
+    var joiner = event.candidates.map { endpoint($0.address, $0.port) }
+    if !event.observedEndpoint.address.isEmpty, event.observedEndpoint.port != 0 {
+      joiner.insert(endpoint(event.observedEndpoint.address, event.observedEndpoint.port), at: 0)
+    }
+    let targets = joiner.filter { !$0.hasPrefix("0.0.0.0:") && !$0.hasPrefix("[::]:") }
+    extensionDiagnostics("inviter punch \(targets)")
+    let adapter = wireGuardAdapter
+    Task {
+      for _ in 0..<8 {
+        for target in targets { try? await adapter.sendBootstrapDatagram(to: target, BootstrapDatagrams.punch) }
+        try? await Task.sleep(for: .milliseconds(500))
+      }
+    }
     print("inviter bootstrap for \(event.transactionId)")
   }
 
@@ -830,17 +859,24 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
           timeout: min(30, max(0, ISO8601DateFormatter.js.date(from: start.expiresAt)?.timeIntervalSinceNow ?? 0))
         )
         Self.writeDiagnostics("rendezvous ok candidates=\(peer.candidates.count) observed=\(peer.observedEndpoint.address):\(peer.observedEndpoint.port)")
-        // A declared candidate with an unspecified address (an inviter bound
-        // to all interfaces) keeps its port on the node-observed host.
-        let inviterEndpoint = peer.candidates.first.map { candidate in
-          candidate.address == "0.0.0.0" || candidate.address == "::"
+        // The inviter's candidates reach it on its own network, the address the node saw it at reaches it across NAT:
+        // try them all at once. A declared candidate with an unspecified address (an inviter bound to all interfaces)
+        // keeps its port on the node-observed host.
+        let declared = peer.candidates.map(Self.bootstrapEndpoint)
+        var targets: [String] = []
+        for candidate in peer.candidates {
+          targets.append(candidate.address == "0.0.0.0" || candidate.address == "::"
             ? Self.bootstrapEndpoint(InvitationBootstrapClient.ObservedEndpoint(
                 version: peer.observedEndpoint.version, key: peer.observedEndpoint.key,
                 transport: "udp", address: peer.observedEndpoint.address, port: candidate.port
               ))
-            : Self.bootstrapEndpoint(candidate)
-        } ?? Self.bootstrapEndpoint(peer.observedEndpoint)
-        Self.writeDiagnostics("exchange target \(inviterEndpoint)")
+            : Self.bootstrapEndpoint(candidate))
+        }
+        if !peer.observedEndpoint.address.isEmpty, peer.observedEndpoint.port != 0 {
+          targets.append(Self.bootstrapEndpoint(peer.observedEndpoint))
+        }
+        targets = targets.reduce(into: []) { if !$0.contains($1) { $0.append($1) } }
+        Self.writeDiagnostics("exchange targets \(targets)")
         let serviceKey = try DirectBootstrapClient.joinerServiceKey(
           transactionId: start.transactionId,
           profilePublicKey: start.key
@@ -851,14 +887,17 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
           joinerServiceKey: joinerServiceKey,
           joinerWireGuardKey: start.wireGuardKey
         )
-        let response = try await DirectBootstrapClient.exchange(
-          endpoint: inviterEndpoint,
+        let adapter = wireGuardAdapter
+        let (response, answered) = try await DirectBootstrapClient.exchange(
+          targets: targets,
           request: request,
           expectedInviterServiceKey: start.invitingKey,
-          timeout: min(20, max(5, ISO8601DateFormatter.js.date(from: start.expiresAt)?.timeIntervalSinceNow ?? 20))
+          timeout: min(20, max(5, ISO8601DateFormatter.js.date(from: start.expiresAt)?.timeIntervalSinceNow ?? 20)),
+          datagrams: adapter.bootstrapDatagrams,
+          send: { target, frame in try await adapter.sendBootstrapDatagram(to: target, frame) }
         )
-        Self.writeDiagnostics("bootstrap ok hubProHost=\(response.hubProHost) inviterV4=\(response.inviterAddress.ipv4) joinerV4=\(response.joinerAddress.ipv4) endpoint=\(response.endpoints.first.map(Self.directBootstrapEndpoint) ?? "none")")
-        let wireGuardEndpoint = Self.wireGuardEndpoint(response, exchangeTarget: inviterEndpoint)
+        Self.writeDiagnostics("bootstrap ok from \(answered) hubProHost=\(response.hubProHost) inviterV4=\(response.inviterAddress.ipv4) joinerV4=\(response.joinerAddress.ipv4) endpoint=\(response.endpoints.first.map(Self.directBootstrapEndpoint) ?? "none")")
+        let wireGuardEndpoint = Self.wireGuardEndpoint(response, answered: answered, declared: declared)
         try await self.installNativeJoinPeer(
           start,
           inviterWireGuardKey: response.inviterWireGuardKey,
@@ -1222,10 +1261,19 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
   /// reachable address advertises an unspecified one; then use the host the
   /// exchange reached (node-observed) with the advertised WireGuard port, as
   /// the Go joiner does.
+  /// The inviter's WireGuard endpoint for the temporary link. An inviter that serves the exchange on its WireGuard
+  /// socket declares that socket as its candidate and endpoint: the address that answered is then WireGuard's, with
+  /// the NAT hole the exchange just opened. An inviter with a separate listener (the Go agent, older apps) gets its
+  /// declared WireGuard port on the host that answered when it declares no address.
   private static func wireGuardEndpoint(
     _ response: DirectBootstrapResponse,
-    exchangeTarget: String
+    answered: String,
+    declared: [String]
   ) -> String {
+    if let endpoint = response.endpoints.first, declared.contains(directBootstrapEndpoint(endpoint)) {
+      return answered
+    }
+    let exchangeTarget = answered
     guard let endpoint = response.endpoints.first else { return exchangeTarget }
     guard endpoint.address == "0.0.0.0" || endpoint.address == "::" else {
       return directBootstrapEndpoint(endpoint)

@@ -16,6 +16,8 @@ extern int wgTurnOn(const char *settings, int32_t tun_fd);
 extern void wgTurnOff(int handle);
 extern int64_t wgSetConfig(int handle, const char *settings);
 extern int32_t wgSendDatagram(int handle, const char *endpoint, const void *payload, int32_t payload_len);
+typedef void(*datagram_fn_t)(void *context, const char *endpoint, const void *payload, int32_t payload_len);
+extern void wgSetDatagramHandler(void *context, datagram_fn_t handler_fn);
 extern int32_t wgSetInboundFilter(int handle, const char *settings);
 extern int32_t wgSetGateway(int handle, const char *settings);
 extern char *wgGatewayStats(int handle);

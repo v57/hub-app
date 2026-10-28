@@ -71,6 +71,11 @@ public class WireGuardAdapter {
     /// The internet gateway (`gateway.go`), applied again whenever the backend restarts.
     private var gateway = ""
 
+    /// Receives the HUBB datagrams that reach WireGuard's socket (`bootstrapBind` in `api-apple.go`), with their source.
+    /// Called on the backend's receive thread.
+    private let datagramLock = NSLock()
+    private var datagramHandler: ((String, Data) -> Void)?
+
     /// Tunnel device file descriptor.
     private var tunnelFileDescriptor: Int32? {
         var ctlInfo = ctl_info()
@@ -149,12 +154,14 @@ public class WireGuardAdapter {
         self.logHandler = logHandler
 
         setupLogHandler()
+        setupDatagramHandler()
     }
 
     deinit {
         // Force remove logger to make sure that no further calls to the instance of this class
         // can happen after deallocation.
         wgSetLogger(nil, nil)
+        wgSetDatagramHandler(nil, nil)
 
         // Cancel network monitor
         networkMonitor?.cancel()
@@ -200,6 +207,12 @@ public class WireGuardAdapter {
             }
             completionHandler(result == 0 ? nil : .sendBackendDatagram(result))
         }
+    }
+
+    /// Receives the HUBB datagrams (the invitation bootstrap exchange) that reach WireGuard's socket, so the exchange
+    /// shares WireGuard's NAT mapping. `nil` lets WireGuard drop them.
+    public func setDatagramHandler(_ handler: ((_ source: String, _ datagram: Data) -> Void)?) {
+        datagramLock.withLock { datagramHandler = handler }
     }
 
     /// Sets which packets from peers reach the system, as `{"sources":[{"prefix","ports":[{"protocol","port"}]}]}`
@@ -410,6 +423,16 @@ public class WireGuardAdapter {
             let tunnelLogLevel = WireGuardLogLevel(rawValue: logLevel) ?? .verbose
 
             unretainedSelf.logHandler(tunnelLogLevel, swiftString)
+        }
+    }
+
+    private func setupDatagramHandler() {
+        let context = Unmanaged.passUnretained(self).toOpaque()
+        wgSetDatagramHandler(context) { context, source, payload, length in
+            guard let context = context, let source = source, let payload = payload, length > 0 else { return }
+            let unretainedSelf = Unmanaged<WireGuardAdapter>.fromOpaque(context).takeUnretainedValue()
+            let handler = unretainedSelf.datagramLock.withLock { unretainedSelf.datagramHandler }
+            handler?(String(cString: source), Data(bytes: payload, count: Int(length)))
         }
     }
 

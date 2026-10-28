@@ -7,9 +7,14 @@ package main
 
 // #include <stdlib.h>
 // #include <sys/types.h>
+// #include <stdint.h>
 // static void callLogger(void *func, void *ctx, int level, const char *msg)
 // {
 // 	((void(*)(void *, int, const char *))func)(ctx, level, msg);
+// }
+// static void callDatagram(void *func, void *ctx, const char *endpoint, const void *payload, int32_t length)
+// {
+// 	((void(*)(void *, const char *, const void *, int32_t))func)(ctx, endpoint, payload, length);
 // }
 import "C"
 
@@ -22,6 +27,7 @@ import (
 	"runtime"
 	"runtime/debug"
 	"strings"
+	"sync"
 	"time"
 	"unsafe"
 
@@ -86,6 +92,62 @@ func wgSetLogger(context, loggerFn uintptr) {
 	loggerFunc = unsafe.Pointer(loggerFn)
 }
 
+var datagramLock sync.RWMutex
+var datagramFunc unsafe.Pointer
+var datagramCtx unsafe.Pointer
+
+// wgSetDatagramHandler receives the HUBB datagrams (the invitation bootstrap exchange) that arrive on WireGuard's
+// socket, with their source as `ip:port`; nil stops it and WireGuard drops them again.
+//
+//export wgSetDatagramHandler
+func wgSetDatagramHandler(context, handlerFn uintptr) {
+	datagramLock.Lock()
+	defer datagramLock.Unlock()
+	datagramCtx = unsafe.Pointer(context)
+	datagramFunc = unsafe.Pointer(handlerFn)
+}
+
+// bootstrapBind passes datagrams that start with "HUBB" to the datagram handler instead of WireGuard. No WireGuard
+// message starts with it (they start with a type byte 1–4 and three zeros), and the exchange then shares WireGuard's
+// socket: the NAT mapping the node observed, the one the exchange opens and the one WireGuard uses are the same.
+type bootstrapBind struct {
+	conn.Bind
+}
+
+func (b bootstrapBind) Open(port uint16) ([]conn.ReceiveFunc, uint16, error) {
+	fns, actualPort, err := b.Bind.Open(port)
+	if err != nil {
+		return fns, actualPort, err
+	}
+	wrapped := make([]conn.ReceiveFunc, len(fns))
+	for i, fn := range fns {
+		fn := fn
+		wrapped[i] = func(buffer []byte) (int, conn.Endpoint, error) {
+			for {
+				n, endpoint, err := fn(buffer)
+				if err != nil || n < 4 || string(buffer[:4]) != "HUBB" || !deliverDatagram(endpoint, buffer[:n]) {
+					return n, endpoint, err
+				}
+			}
+		}
+	}
+	return wrapped, actualPort, nil
+}
+
+func deliverDatagram(endpoint conn.Endpoint, payload []byte) bool {
+	datagramLock.RLock()
+	defer datagramLock.RUnlock()
+	if uintptr(datagramFunc) == 0 || endpoint == nil {
+		return false
+	}
+	source := C.CString(endpoint.DstToString())
+	defer C.free(unsafe.Pointer(source))
+	bytes := C.CBytes(payload)
+	defer C.free(bytes)
+	C.callDatagram(datagramFunc, datagramCtx, source, bytes, C.int32_t(len(payload)))
+	return true
+}
+
 //export wgTurnOn
 func wgTurnOn(settings *C.char, tunFd int32) int32 {
 	logger := &device.Logger{
@@ -111,7 +173,7 @@ func wgTurnOn(settings *C.char, tunFd int32) int32 {
 		return -1
 	}
 	logger.Verbosef("Attaching to interface")
-	bind := conn.NewStdNetBind()
+	bind := bootstrapBind{conn.NewStdNetBind()}
 	filter := newFilteredTUN(systemTUN)
 	gateway := newGatewayTUN(filter)
 	dev := device.NewDevice(gateway, bind, logger)

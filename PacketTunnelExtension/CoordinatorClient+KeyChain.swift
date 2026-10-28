@@ -7,7 +7,7 @@ extension CoordinatorClient {
     nodeEndpoint: String,
     identity: KeyChain,
     probe: @escaping (String, Data) async throws -> Void,
-    candidates: @escaping () -> Candidate?,
+    candidates: @escaping () async -> Candidate?,
     onBootstrap: @escaping (BootstrapEvent) async -> Void,
     onLink: @escaping (Envelope) async -> Void,
     onStatusChange: @escaping (Bool) -> Void
