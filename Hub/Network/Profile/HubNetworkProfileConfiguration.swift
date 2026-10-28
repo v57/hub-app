@@ -46,6 +46,8 @@ struct HubNetworkProfileConfiguration: Codable, Equatable, Sendable {
   /// otherwise it waits for the gateway
   private(set) var gatewayFallback: Bool?
 
+  /// The profile's key as the hub and `Hub.key` write it (SPKI): a join stores the raw 32-byte key
+  var profileKey: String { KeyChain.spkiPublicKey(rawBase64: profilePublicKey) ?? profilePublicKey }
   var servesGateway: Bool { gatewayServingEnabled == true }
   var usesGateway: Bool { gatewayGrant != nil }
   var inviterEnabled: Bool { servesInviter == true }
@@ -195,7 +197,7 @@ struct HubNetworkProfileConfiguration: Codable, Equatable, Sendable {
         binding: ConnectionGrantBinding(
           trustedHubKey: trustedHubKey,
           hubNetworkId: hubNetworkID,
-          callerKey: profilePublicKey,
+          callerKey: profileKey,
           callerWireGuardKey: wireGuardPublicKey,
           generation: connectionGrant.generation
         )
@@ -213,7 +215,7 @@ struct HubNetworkProfileConfiguration: Codable, Equatable, Sendable {
           gatewayKey: gatewayGrant.gatewayKey,
           gatewayWireGuardKey: gatewayGrant.gatewayWireGuardKey,
           generation: gatewayGrant.generation,
-          clientKey: profilePublicKey,
+          clientKey: profileKey,
           clientWireGuardKey: wireGuardPublicKey,
           ipv4: gatewayGrant.ipv4,
           ipv6: gatewayGrant.ipv6,

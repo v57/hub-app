@@ -392,7 +392,7 @@ final class ShareNetworkAppAgentCoordinator {
     let profile = try runtime.loadProfile()
     guard profile.hubURL == runtime.hubAddress(),
           profile.hubNetworkID == assertion.hubNetworkId,
-          profile.profilePublicKey == runtime.key(),
+          profile.profileKey == runtime.key(),
           profile.wireGuardPublicKey == nil
             || profile.wireGuardPublicKey == assertion.wireGuardKey else {
       throw ShareNetworkAppAgentCoordinatorError.profileReplaced
@@ -424,7 +424,7 @@ final class ShareNetworkAppAgentCoordinator {
       }
       let profile = try runtime.loadProfile()
       guard profile.hubNetworkID == assertion.hubNetworkId,
-            profile.profilePublicKey == runtime.key() else {
+            profile.profileKey == runtime.key() else {
         throw ShareNetworkAppAgentCoordinatorError.profileReplaced
       }
       try await runtime.sleep(Self.healthPollInterval)

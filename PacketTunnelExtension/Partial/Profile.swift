@@ -19,6 +19,8 @@ struct Profile: Decodable {
   let hubURL: URL
   let hubNetworkID: String
   let profilePublicKey: String
+  /// The profile's key as the hub writes it (SPKI): a join stores the raw 32-byte key
+  var profileKey: String { KeyChain.spkiPublicKey(rawBase64: profilePublicKey) ?? profilePublicKey }
   let overlayIPv4Address: String
   let overlayIPv6Address: String
   let dnsSuffix: String
@@ -88,7 +90,7 @@ struct Profile: Decodable {
         binding: ConnectionGrantBinding(
           trustedHubKey: trustedHubKey,
           hubNetworkId: hubNetworkID,
-          callerKey: profilePublicKey,
+          callerKey: profileKey,
           callerWireGuardKey: wireGuardPublicKey,
           generation: connectionGrant.generation
         )
@@ -106,7 +108,7 @@ struct Profile: Decodable {
           gatewayKey: gatewayGrant.gatewayKey,
           gatewayWireGuardKey: gatewayGrant.gatewayWireGuardKey,
           generation: gatewayGrant.generation,
-          clientKey: profilePublicKey,
+          clientKey: profileKey,
           clientWireGuardKey: wireGuardPublicKey,
           ipv4: gatewayGrant.ipv4,
           ipv6: gatewayGrant.ipv6,

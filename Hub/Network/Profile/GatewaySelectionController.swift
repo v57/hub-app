@@ -109,7 +109,7 @@ final class GatewaySelectionController {
   ) async throws -> HubNetworkProfileConfiguration {
     let wireGuardKey = try HubNetworkWireGuardKeyStore().publicKeyBase64()
     let current = try HubNetworkProfileStore().load()
-    guard current.profilePublicKey == hub.key,
+    guard current.profileKey == hub.key,
           current.hubNetworkID == gateway.status.hubNetworkId,
           current.trustedHubKey != nil else {
       throw GatewaySelectionError.membershipMismatch

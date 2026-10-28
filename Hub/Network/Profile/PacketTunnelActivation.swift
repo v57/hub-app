@@ -53,7 +53,7 @@ extension PacketTunnelController {
       try await authorizeAndInstallLocalHub(hub: hub)
       return
     }
-    guard current.profilePublicKey == hub.key,
+    guard current.profileKey == hub.key,
           let currentWireGuardKey = current.wireGuardPublicKey else {
       try await authorizeAndInstallLocalHub(hub: hub)
       return
@@ -64,9 +64,11 @@ extension PacketTunnelController {
       return
     }
 
+    // A membership from an invitation registers again as a member: only owners bind as `apple-app`
     let registration = try await registerLocalMembership(
       hub: hub,
-      wireGuardKey: wireGuardKey
+      wireGuardKey: wireGuardKey,
+      kind: current.hubPeer != nil ? .join : .appleApp
     )
     guard registration.hubNetworkId == current.hubNetworkID,
           registration.hubKey == current.trustedHubKey,
@@ -218,7 +220,8 @@ extension PacketTunnelController {
 
   private func registerLocalMembership(
     hub: Hub,
-    wireGuardKey: String
+    wireGuardKey: String,
+    kind: HubNetworkLocalAgentBindingKind = .appleApp
   ) async throws -> (
     hubKey: String,
     hubNetworkId: String,
@@ -228,7 +231,7 @@ extension PacketTunnelController {
     let registration: HubNetworkAgentRegistrationResponse = try await hub.client.send(
       "hub/net/bind",
       HubNetworkAgentRegistration(
-        bindingKind: .appleApp,
+        bindingKind: kind,
         wireGuardKey: wireGuardKey,
         name: "Hub App",
         overlayAddresses: [],
