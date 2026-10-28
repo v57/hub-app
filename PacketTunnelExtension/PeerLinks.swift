@@ -172,6 +172,8 @@ actor LinkManager {
     var apply: @Sendable ([Peer]) async throws -> Void
     /// The last handshake with the peer of this WireGuard key
     var lastHandshake: @Sendable (String) async -> Date?
+    /// Where WireGuard reaches the peer of this WireGuard key now, after following the address its packets come from
+    var liveEndpoint: @Sendable (String) async -> String? = { _ in nil }
     var candidates: @Sendable () async -> [LinkEndpoint]
     var log: @Sendable (String) -> Void
     var now: @Sendable () -> Date = { Date() }
@@ -382,7 +384,8 @@ actor LinkManager {
       await isLive(link)
     {
       delivered[link.other.key] = link.grant.grantId
-      dependencies.log("link \(linkId.prefix(8)) renewed with \(link.other.key.suffix(8)) at \(current)")
+      let reached = await pinLiveEndpoint(of: link, tried: current)
+      dependencies.log("link \(linkId.prefix(8)) renewed with \(link.other.key.suffix(8)) at \(reached)")
       finish(linkId)
       return
     }
@@ -405,7 +408,8 @@ actor LinkManager {
         if let last = await dependencies.lastHandshake(link.other.wireGuardKey), last >= started.addingTimeInterval(-1) {
           linkUps += 1
           delivered[link.other.key] = link.grant.grantId
-          dependencies.log("link \(linkId.prefix(8)) up with \(link.other.key.suffix(8)) at \(endpoint.endpoint)")
+          let reached = await pinLiveEndpoint(of: link, tried: endpoint.endpoint)
+          dependencies.log("link \(linkId.prefix(8)) up with \(link.other.key.suffix(8)) at \(reached)")
           finish(linkId)
           return
         }
@@ -414,6 +418,18 @@ actor LinkManager {
     }
     dependencies.log("link \(linkId.prefix(8)) to \(link.other.key.suffix(8)) found no path through \(endpoints.map(\.endpoint))")
     finish(linkId)
+  }
+
+  /// Keeps the address the handshake came from rather than the endpoint being tried: when the other side's packets
+  /// arrive from its public mapping while a private candidate is tried, the private one would stay pinned, and every
+  /// later configuration would point WireGuard back at an address it can't reach
+  private func pinLiveEndpoint(of link: VerifiedLink, tried: String) async -> String {
+    guard let live = await dependencies.liveEndpoint(link.other.wireGuardKey), live != tried,
+          var peer = peers[link.other.key] else { return tried }
+    peer.endpoint = live
+    peers[link.other.key] = peer
+    await apply()
+    return live
   }
 
   /// Whether handshakes with the link's peer still come

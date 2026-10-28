@@ -795,6 +795,12 @@ final class PacketTunnelWireGuardAdapter {
     return nil
   }
 
+  /// Where WireGuard reaches the peer of a base64 WireGuard key now: it follows the address the peer's last packet came
+  /// from, which may differ from the endpoint it was given
+  func liveEndpoint(wireGuardKey: String) async -> String? {
+    await runtimePeers().first { $0.wireGuardKey == wireGuardKey }?.endpoint
+  }
+
   /// WireGuard's view of each peer: endpoint, allowed IPs and byte counts
   struct RuntimePeer: Encodable {
     var wireGuardKey = ""

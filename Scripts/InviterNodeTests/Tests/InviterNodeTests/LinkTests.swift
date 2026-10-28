@@ -128,6 +128,29 @@ final class LinkTests: XCTestCase {
     XCTAssertEqual(machine.appliedPeers.first { $0.key == member.serviceKey }?.ports, ports)
   }
 
+  /// Two NATs: the machine tries the member's private candidate while the member's handshake arrives from its public
+  /// mapping, so WireGuard answers there. The link keeps that mapping, not the candidate it happened to be trying.
+  func testALinkKeepsTheAddressTheHandshakeCameFrom() async throws {
+    let hub = Curve25519.Signing.PrivateKey()
+    let member = LinkDevice(port: port, trusting: hub, name: "member")
+    let machine = LinkDevice(port: port, trusting: hub, name: "machine")
+    member.candidate = "192.168.0.35"
+    machine.roam(member, to: "91.122.18.4:51947")
+    machine.start()
+    member.start()
+    defer {
+      member.client.stop()
+      machine.client.stop()
+    }
+    try await member.waitPresent()
+    try await machine.waitPresent()
+    await member.manager.update(grants: [signedGrant(hub: hub, member: member, machine: machine)])
+
+    let onMachine = try await machine.waitLinked(to: member)
+    XCTAssertEqual(onMachine.endpoint, "91.122.18.4:51947")
+    XCTAssertTrue(machine.logged("up with \(member.serviceKey.suffix(8)) at 91.122.18.4:51947"))
+  }
+
   /// The Mac on its home network, the phone on cellular: each tries the other's public mapping before a private
   /// address it can't reach, so both punch the same path at once; on one LAN the host candidate stays first
   func testPrivateAddressesOfAnotherNetworkGoLast() {
@@ -219,7 +242,7 @@ func spki(_ key: Curve25519.Signing.PublicKey) -> String {
 }
 
 /// A device with its own key, coordinator client and link manager. WireGuard is faked: a peer counts as handshaken
-/// once it has an endpoint.
+/// once it has an endpoint, or once its packets came from somewhere (`roam`), which WireGuard then answers.
 final class LinkDevice: @unchecked Sendable {
   let key = Curve25519.Signing.PrivateKey()
   let serviceKey: String
@@ -230,6 +253,8 @@ final class LinkDevice: @unchecked Sendable {
   private let lock = NSLock()
   private var peers: [LinkManager.Peer] = []
   private var lines: [String] = []
+  /// Where each peer's packets come from, by WireGuard key
+  private var roamed: [String: String] = [:]
   private var candidateAddress = ""
   /// The host candidate this device offers, as if it moved to another network when changed
   var candidate: String {
@@ -268,7 +293,12 @@ final class LinkDevice: @unchecked Sendable {
       probe: { try sendUDP($0, port: port) },
       apply: { [weak self] peers in self?.lock.withLock { self?.peers = peers } },
       lastHandshake: { [weak self] wireGuardKey in
-        self?.lock.withLock { self?.peers.first { $0.wireGuardKey == wireGuardKey }?.endpoint != nil } == true ? Date() : nil
+        self?.lock.withLock {
+          self?.roamed[wireGuardKey] != nil || self?.peers.first { $0.wireGuardKey == wireGuardKey }?.endpoint != nil
+        } == true ? Date() : nil
+      },
+      liveEndpoint: { [weak self] wireGuardKey in
+        self?.lock.withLock { self?.roamed[wireGuardKey] ?? self?.peers.first { $0.wireGuardKey == wireGuardKey }?.endpoint }
       },
       candidates: { [weak self] in [LinkEndpoint(address: self?.candidate ?? "", port: 41000)] },
       log: { [weak self] in self?.log($0) }
@@ -276,6 +306,11 @@ final class LinkDevice: @unchecked Sendable {
   }
 
   func start() { client.start() }
+
+  /// `other`'s packets come from `endpoint`
+  func roam(_ other: LinkDevice, to endpoint: String) {
+    lock.withLock { roamed[other.wireGuardKey] = endpoint }
+  }
 
   var appliedPeers: [LinkManager.Peer] { lock.withLock { peers } }
 

@@ -366,6 +366,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
       probe: { try await adapter.sendObservationProbe(endpoint: udpEndpoint, payload: $0) },
       apply: { try await adapter.setLinkPeers($0) },
       lastHandshake: { await adapter.lastHandshake(wireGuardKey: $0) },
+      liveEndpoint: { await adapter.liveEndpoint(wireGuardKey: $0) },
       candidates: {
         guard let address = ReachableAddress.primaryIPv4(), let port = await adapter.listenPort() else { return [] }
         return [LinkEndpoint(address: address, port: port)]
