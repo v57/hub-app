@@ -681,12 +681,19 @@ final class PacketTunnelWireGuardAdapter {
       guard merged[id] == nil else { return PacketTunnelWireGuardConfigurationError.peerConflict }
       merged[id] = peer
     }
+    // The hub's member list is current: an address it gives one key no longer goes to a link with another key (a
+    // device joined again with new tunnel keys while the link of its old ones lingers)
+    let memberRouteKeys = memberPeers.reduce(into: [String: String]()) { owners, member in
+      for route in member.value { owners[Self.routeIdentity(route)] = member.key }
+    }
     for (key, link) in linkPeers {
       guard let keyData = Data(base64Encoded: key), let publicKey = PublicKey(rawValue: keyData),
             !baseKeys.contains(publicKey) else { continue }
+      let routes = link.routes.filter { memberRouteKeys[Self.routeIdentity($0)].map { $0 == key } ?? true }
+      guard !routes.isEmpty || link.routes.isEmpty || merged[key] != nil else { continue }
       var peer = merged[key] ?? PeerConfiguration(publicKey: publicKey)
       if let endpoint = link.endpoint { peer.endpoint = endpoint }
-      peer.allowedIPs += link.routes.filter { route in
+      peer.allowedIPs += routes.filter { route in
         !peer.allowedIPs.contains { Self.routeIdentity($0) == Self.routeIdentity(route) }
       }
       peer.persistentKeepAlive = 25
