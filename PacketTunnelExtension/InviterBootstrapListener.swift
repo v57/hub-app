@@ -116,7 +116,8 @@ final class InviterBootstrapListener {
   /// node client as the probe hook so the node observes the listener's
   /// address:port.
   func sendProbe(endpoint: String, payload: Data) async throws {
-    guard let target = parseEndpoint(endpoint) else {
+    // The node is usually a name (v57.dev:1964): resolve it like the joiner's probe, inet_pton below takes only numbers
+    guard let target = parseEndpoint(PacketTunnelWireGuardAdapter.resolvedEndpoint(endpoint)) else {
       throw ListenerError.listenerUnavailable
     }
     var destination = sockaddr_in()

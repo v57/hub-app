@@ -842,7 +842,7 @@ final class PacketTunnelWireGuardAdapter {
   /// to the raw `.local` hostname (which wg-go cannot parse → -2).
   private static var cachedResolution: String?
 
-  private static func resolvedEndpoint(_ endpoint: String) -> String {
+  static func resolvedEndpoint(_ endpoint: String) -> String {
     var host = endpoint
     var port = ""
     if let colon = endpoint.lastIndex(of: ":") {
