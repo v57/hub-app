@@ -18,11 +18,11 @@
 		4D5B0A042F90000100A0B004 /* HubServer in Frameworks */ = {isa = PBXBuildFile; productRef = 4D5B0A022F90000100A0B002 /* HubServer */; };
 		4D5B0A052F90000100A0B005 /* HubServer in Frameworks */ = {isa = PBXBuildFile; productRef = 4D5B0A032F90000100A0B003 /* HubServer */; };
 		C0C0A0042F9A000100C0A004 /* ComponentKit in Frameworks */ = {isa = PBXBuildFile; productRef = C0C0A0022F9A000100C0A002 /* ComponentKit */; };
+		C0C0A0052F9A000100C0A005 /* ComponentKit in Frameworks */ = {isa = PBXBuildFile; productRef = C0C0A0032F9A000100C0A003 /* ComponentKit */; };
 		D0D0A0042F9B000100D0A004 /* VaultKit in Frameworks */ = {isa = PBXBuildFile; platformFilters = (ios, macos, ); productRef = D0D0A0022F9B000100D0A002 /* VaultKit */; };
 		D0D0A0052F9B000100D0A005 /* VaultHub in Frameworks */ = {isa = PBXBuildFile; platformFilters = (ios, macos, ); productRef = D0D0A0032F9B000100D0A003 /* VaultHub */; };
 		E0E0A0042F9C000100E0A004 /* PlatformPower in Frameworks */ = {isa = PBXBuildFile; productRef = E0E0A0022F9C000100E0A002 /* PlatformPower */; };
 		E0E0A0052F9C000100E0A005 /* PlatformSystem in Frameworks */ = {isa = PBXBuildFile; productRef = E0E0A0032F9C000100E0A003 /* PlatformSystem */; };
-		C0C0A0052F9A000100C0A005 /* ComponentKit in Frameworks */ = {isa = PBXBuildFile; productRef = C0C0A0032F9A000100C0A003 /* ComponentKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -360,8 +360,8 @@
 			mainGroup = 13C54C682D638AA1000C4CA5;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				132DD8B62F4CDDE300282A30 /* XCLocalSwiftPackageReference "../../HubService/HubService" */,
-				4D5B0A012F90000100A0B001 /* XCLocalSwiftPackageReference "../../Core/HubServer" */,
+				132DD8B62F4CDDE300282A30 /* XCRemoteSwiftPackageReference "HubService" */,
+				4D5B0A012F90000100A0B001 /* XCRemoteSwiftPackageReference "HubServer" */,
 				48A604073018000100604007 /* XCLocalSwiftPackageReference "Vendor/wireguard-apple" */,
 				C0C0A0012F9A000100C0A001 /* XCRemoteSwiftPackageReference "Component" */,
 				D0D0A0012F9B000100D0A001 /* XCRemoteSwiftPackageReference "Vault" */,
@@ -1024,21 +1024,29 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		132DD8B62F4CDDE300282A30 /* XCLocalSwiftPackageReference "../../HubService/HubService" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = ../../HubService/HubService;
-		};
 		48A604073018000100604007 /* XCLocalSwiftPackageReference "Vendor/wireguard-apple" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = "Vendor/wireguard-apple";
 		};
-		4D5B0A012F90000100A0B001 /* XCLocalSwiftPackageReference "../../Core/HubServer" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = ../../Core/HubServer;
-		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		132DD8B62F4CDDE300282A30 /* XCRemoteSwiftPackageReference "HubService" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/v57/HubService.git";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
+		4D5B0A012F90000100A0B001 /* XCRemoteSwiftPackageReference "HubServer" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/v57/HubServer.git";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
 		C0C0A0012F9A000100C0A001 /* XCRemoteSwiftPackageReference "Component" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/v57/Component.git";
@@ -1066,52 +1074,24 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		E0E0A0022F9C000100E0A002 /* PlatformPower */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = E0E0A0012F9C000100E0A001 /* XCRemoteSwiftPackageReference "Platform" */;
-			productName = PlatformPower;
-		};
-		E0E0A0032F9C000100E0A003 /* PlatformSystem */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = E0E0A0012F9C000100E0A001 /* XCRemoteSwiftPackageReference "Platform" */;
-			productName = PlatformSystem;
-		};
-		D0D0A0022F9B000100D0A002 /* VaultKit */ = {
-			isa = XCSwiftPackageProductDependency;
-			platformFilters = (
-				ios,
-				macos,
-			);
-			package = D0D0A0012F9B000100D0A001 /* XCRemoteSwiftPackageReference "Vault" */;
-			productName = VaultKit;
-		};
-		D0D0A0032F9B000100D0A003 /* VaultHub */ = {
-			isa = XCSwiftPackageProductDependency;
-			platformFilters = (
-				ios,
-				macos,
-			);
-			package = D0D0A0012F9B000100D0A001 /* XCRemoteSwiftPackageReference "Vault" */;
-			productName = VaultHub;
-		};
 		132DD8B72F4CDDE300282A30 /* HubService */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 132DD8B62F4CDDE300282A30 /* XCLocalSwiftPackageReference "../../HubService/HubService" */;
+			package = 132DD8B62F4CDDE300282A30 /* XCRemoteSwiftPackageReference "HubService" */;
 			productName = HubService;
 		};
 		132DD8B92F4CDDEB00282A30 /* HubService */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 132DD8B62F4CDDE300282A30 /* XCLocalSwiftPackageReference "../../HubService/HubService" */;
+			package = 132DD8B62F4CDDE300282A30 /* XCRemoteSwiftPackageReference "HubService" */;
 			productName = HubService;
 		};
 		13B4EC562F817DF50060DAE1 /* HubUI */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 132DD8B62F4CDDE300282A30 /* XCLocalSwiftPackageReference "../../HubService/HubService" */;
+			package = 132DD8B62F4CDDE300282A30 /* XCRemoteSwiftPackageReference "HubService" */;
 			productName = HubUI;
 		};
 		13B4EC582F817DF80060DAE1 /* HubUI */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 132DD8B62F4CDDE300282A30 /* XCLocalSwiftPackageReference "../../HubService/HubService" */;
+			package = 132DD8B62F4CDDE300282A30 /* XCRemoteSwiftPackageReference "HubService" */;
 			productName = HubUI;
 		};
 		48A604003018000100604000 /* WireGuardKit */ = {
@@ -1121,17 +1101,17 @@
 		};
 		48A6040A301800010060400A /* HubService */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 132DD8B62F4CDDE300282A30 /* XCLocalSwiftPackageReference "../../HubService/HubService" */;
+			package = 132DD8B62F4CDDE300282A30 /* XCRemoteSwiftPackageReference "HubService" */;
 			productName = HubService;
 		};
 		4D5B0A022F90000100A0B002 /* HubServer */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 4D5B0A012F90000100A0B001 /* XCLocalSwiftPackageReference "../../Core/HubServer" */;
+			package = 4D5B0A012F90000100A0B001 /* XCRemoteSwiftPackageReference "HubServer" */;
 			productName = HubServer;
 		};
 		4D5B0A032F90000100A0B003 /* HubServer */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 4D5B0A012F90000100A0B001 /* XCLocalSwiftPackageReference "../../Core/HubServer" */;
+			package = 4D5B0A012F90000100A0B001 /* XCRemoteSwiftPackageReference "HubServer" */;
 			productName = HubServer;
 		};
 		C0C0A0022F9A000100C0A002 /* ComponentKit */ = {
@@ -1143,6 +1123,26 @@
 			isa = XCSwiftPackageProductDependency;
 			package = C0C0A0012F9A000100C0A001 /* XCRemoteSwiftPackageReference "Component" */;
 			productName = ComponentKit;
+		};
+		D0D0A0022F9B000100D0A002 /* VaultKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D0D0A0012F9B000100D0A001 /* XCRemoteSwiftPackageReference "Vault" */;
+			productName = VaultKit;
+		};
+		D0D0A0032F9B000100D0A003 /* VaultHub */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D0D0A0012F9B000100D0A001 /* XCRemoteSwiftPackageReference "Vault" */;
+			productName = VaultHub;
+		};
+		E0E0A0022F9C000100E0A002 /* PlatformPower */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E0E0A0012F9C000100E0A001 /* XCRemoteSwiftPackageReference "Platform" */;
+			productName = PlatformPower;
+		};
+		E0E0A0032F9C000100E0A003 /* PlatformSystem */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E0E0A0012F9C000100E0A001 /* XCRemoteSwiftPackageReference "Platform" */;
+			productName = PlatformSystem;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

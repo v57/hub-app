@@ -1,5 +1,5 @@
 {
-  "originHash" : "5e21d9320c60006b98a14c99268026ed49063cd1821ef02be3b7551b9ec2fcc1",
+  "originHash" : "3f157f4d239cac794f7adaa22a473ddb3d3ae7a79138076fa39af248f47dbff2",
   "pins" : [
     {
       "identity" : "channelswift",
@@ -7,7 +7,7 @@
       "location" : "https://github.com/v57/ChannelSwift.git",
       "state" : {
         "branch" : "main",
-        "revision" : "184bc846275ffee4318ec5c5e3ba03b7504b548d"
+        "revision" : "0cd14cad9014cfd920b09b1703c6b364c26c68c9"
       }
     },
     {
@@ -16,7 +16,43 @@
       "location" : "https://github.com/v57/Component.git",
       "state" : {
         "branch" : "main",
-        "revision" : "a1066eebe9f7e0f43c2801871e5a2f650c53f7b4"
+        "revision" : "588fc5839c6c8cc3e9a15855bc865cef343113d4"
+      }
+    },
+    {
+      "identity" : "hubserver",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/v57/HubServer.git",
+      "state" : {
+        "branch" : "main",
+        "revision" : "9887e22e56f0c28f5df27f71ddeced5ffde9edea"
+      }
+    },
+    {
+      "identity" : "hubservice",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/v57/HubService.git",
+      "state" : {
+        "branch" : "main",
+        "revision" : "3909dd0f0555ec4dacfc537a1d460fd3b7d9434e"
+      }
+    },
+    {
+      "identity" : "platform",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/v57/Platform.git",
+      "state" : {
+        "branch" : "main",
+        "revision" : "0d9af9dd51dec3e28505d3e3777548ceaa6fddbe"
+      }
+    },
+    {
+      "identity" : "vault",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/v57/Vault.git",
+      "state" : {
+        "branch" : "main",
+        "revision" : "d05d6017f3fc2bf18741705083cd2f59e27cbb15"
       }
     }
   ],

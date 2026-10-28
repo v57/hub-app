@@ -16,4 +16,10 @@
    <FileRef
       location = "group:../../../v57/Platform">
    </FileRef>
+   <FileRef
+      location = "group:../../HubService/HubService">
+   </FileRef>
+   <FileRef
+      location = "group:../../Core/HubServer">
+   </FileRef>
 </Workspace>
