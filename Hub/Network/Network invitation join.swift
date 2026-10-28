@@ -24,6 +24,8 @@ enum NativeJoinPresentation {
       raw = invitation.message
     } else if let native = error as? NativeJoinError {
       raw = native.errorDescription ?? fallback
+    } else if let agent = error as? HubNetDaemon.Failure {
+      raw = agent.errorDescription ?? fallback
     } else {
       raw = fallback
     }

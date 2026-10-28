@@ -403,6 +403,8 @@ struct JoinFailure: Equatable {
       (title, detail, canRetry) = (
         "Couldn’t reach \(name)", "The Mac that runs \(name) may be asleep or offline. Try again once it’s on.", true
       )
+    case HubNetDaemon.Failure.notRunning, HubNetDaemon.Failure.notPermitted:
+      (title, detail, canRetry) = ("Hub Network isn’t set up on this \(device)", raw, true)
     case NativeJoinError.staged(.vpnInstall, _):
       (title, detail, canRetry) = ("You didn’t allow the VPN", "Hub needs it to connect your devices. Try again and choose Allow.", true)
     default:

@@ -687,7 +687,10 @@ struct NetworkAdvanced: View {
       }
       if let address = hub.net.address {
         InspectorRow("\(facts.thisName)’s address", value: address.ipv4)
-        InspectorRow("IPv6", value: address.ipv6)
+        if !address.ipv6.isEmpty { InspectorRow("IPv6", value: address.ipv6) }
+      }
+      if let membership = hub.net.agentMembership {
+        InspectorRow("hub-net service", value: agentLine(membership))
       }
       if let name = facts.agents.first(where: { $0.key == facts.thisDevice?.id })?.deviceAuthority {
         InspectorRow("Name", value: name)
@@ -698,6 +701,19 @@ struct NetworkAdvanced: View {
     .kitSheet(isPresented: $editsHelper) {
       CoordinatorSheet(current: node?.isEmpty == false ? node : nil)
     }
+  }
+
+  /// The agent's session for this hub, as `hub-net list` shows it: "Connected · home"
+  private func agentLine(_ membership: HubNetDaemon.Membership) -> String {
+    let state = switch membership.status {
+    case .connected: "Connected"
+    case .starting: "Connecting…"
+    case .disconnected: "Can’t reach the hub"
+    case .error: membership.error.map { "Error: \($0)" } ?? "Error"
+    case .stopping: "Stopping…"
+    case .paused: "Off"
+    }
+    return "\(state) · \(membership.alias)"
   }
 
   private var helperLine: String {

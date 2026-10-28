@@ -13,15 +13,9 @@ import Observation
 @MainActor
 final class HubNets {
   static let main = HubNets()
-  /// Whether this platform can join a Hub Network: it needs NetworkExtension's packet tunnel, which Linux and Windows
-  /// lack, so their app hides Hub Network
-  nonisolated static let isAvailable: Bool = {
-    #if canImport(NetworkExtension)
-    true
-    #else
-    false
-    #endif
-  }()
+  /// Whether this platform can join a Hub Network: through NetworkExtension's packet tunnel on Apple platforms, the
+  /// hub-net agent on Linux. Windows has neither yet, so its app hides Hub Network.
+  nonisolated static var isAvailable: Bool { HubNetworkBackend.current != nil }
 
   private(set) var vpn = false
   private(set) var joinProgress: NativeJoinProgress?
@@ -36,6 +30,7 @@ final class HubNets {
   }
 
   func vpn(enabled: Bool) async throws {
+    if HubNetworkBackend.current?.agent != nil { throw HubNetError.unavailableThroughAgent }
     let tunnel = try PacketTunnelController()
     if enabled {
       try await tunnel.start()
@@ -46,7 +41,10 @@ final class HubNets {
   }
 
   static func vpnActive() async throws -> Bool {
-    await (try PacketTunnelController()).status == .connected
+    if let agent = HubNetworkBackend.current?.agent {
+      return try await agent.list().contains { $0.status == .connected }
+    }
+    return await (try PacketTunnelController()).status == .connected
   }
 
   /// Starts or resumes one native Apple Hub Network join.
@@ -67,7 +65,7 @@ final class HubNets {
 
     let task = Task { @MainActor [weak self] in
       guard let self else { throw CancellationError() }
-      return try await NativeJoinCoordinator.live.run(
+      return try await NativeJoinCoordinator.current.run(
         decoded,
         { progress in self.joinProgress = progress }
       )
@@ -81,7 +79,7 @@ final class HubNets {
     return try await task.value
   }
 
-  fileprivate func refresh() async {
+  func refresh() async {
     vpn = (try? await Self.vpnActive()) ?? false
   }
 
@@ -152,6 +150,34 @@ final class HubNet {
   private(set) var address: Address?
   private(set) var sharedTcp = Set<Int>()
   private(set) var sharedUdp = Set<Int>()
+  /// This device's membership as the hub-net agent lists it, where the agent runs Hub Network (Linux)
+  private(set) var agentMembership: HubNetDaemon.Membership?
+
+  /// Takes the hub-net agent's view of this hub's network: on it while the agent has the membership
+  func apply(agent membership: HubNetDaemon.Membership?) {
+    agentMembership = membership
+    let membership = membership?.status == .paused ? nil : membership
+    isJoined = membership != nil
+    isSharing = membership?.gatewayAllowed ?? false
+    address = membership.flatMap { membership in
+      membership.overlayIpv4.flatMap { $0.isEmpty ? nil : Address(ipv4: $0, ipv6: membership.overlayIpv6 ?? "") }
+    }
+    if membership == nil {
+      sharedTcp = []
+      sharedUdp = []
+    }
+  }
+
+  /// A port the hub-net agent shares or stopped sharing: TCP and UDP together
+  func apply(agentPort port: Int, shared: Bool) {
+    if shared {
+      sharedTcp.insert(port)
+      sharedUdp.insert(port)
+    } else {
+      sharedTcp.remove(port)
+      sharedUdp.remove(port)
+    }
+  }
 
   var devices: Set<Device> {
     Set(
@@ -201,6 +227,10 @@ final class HubNet {
 
   /// `node`: the hub's node when the caller just set it, since `hub/net/node` may not have streamed it back yet
   func joinNetwork(enabled: Bool, node: String? = nil) async throws {
+    if let agent = HubNetworkBackend.current?.agent {
+      try await joinNetwork(enabled: enabled, through: agent)
+      return
+    }
     let tunnel = try PacketTunnelController()
     if enabled {
       // The profile saves whether this device serves invitations, which needs the hub's node: learn it first, or a
@@ -263,6 +293,10 @@ final class HubNet {
 
   func shareNetwork(enabled: Bool) async throws {
     print("HubNet.shareNetwork", enabled)
+    if let agent = HubNetworkBackend.current?.agent {
+      try await shareNetwork(enabled: enabled, through: agent)
+      return
+    }
     let controller = GatewayServingController()
     try await controller.setEnabled(enabled, hub: hub, tunnel: PacketTunnelController())
     isSharing = enabled
@@ -270,6 +304,7 @@ final class HubNet {
 
   func createInviteCode() async throws -> String {
     guard isJoined else { throw HubNetError.notJoined }
+    if HubNetworkBackend.current?.agent != nil { return try await createInviteCodeThroughAgent() }
     let deadline = ContinuousClock.now.advanced(by: .seconds(5))
     var identity: PacketTunnelBootstrapIdentity?
     while identity == nil {
@@ -298,6 +333,7 @@ final class HubNet {
 
   func vpn(through device: Device) async throws {
     print("HubNet.vpn through", device)
+    if HubNetworkBackend.current?.agent != nil { throw HubNetError.unavailableThroughAgent }
     guard let device = devices.first(where: { $0.id == device.id }) else {
       throw HubNetError.deviceUnavailable
     }
@@ -361,6 +397,8 @@ final class HubNet {
   func setFallsBack(_ enabled: Bool) async throws {
     UserDefaults.standard.set(enabled, forKey: "HubNet.gatewayFallback")
     fallsBack = enabled
+    // The hub-net agent doesn't use other devices' internet yet
+    guard HubNetworkBackend.current?.agent == nil else { return }
     let tunnel = try PacketTunnelController()
     guard let current = try? tunnel.installedConfiguration(), current.usesGateway else { return }
     let updated = current.withGatewayFallback(enabled)
@@ -374,6 +412,10 @@ final class HubNet {
     vpnRenewalTask?.cancel()
     vpnRenewalTask = nil
     chosenGateway = nil
+    guard HubNetworkBackend.current?.agent == nil else {
+      vpn = nil
+      return
+    }
     let tunnel = try PacketTunnelController()
     try await GatewaySelectionController().disable(tunnel: tunnel)
     vpn = nil
@@ -417,6 +459,10 @@ final class HubNet {
   }
 
   func restoreIfActive() async {
+    if let agent = HubNetworkBackend.current?.agent {
+      await refreshUntilConnected(agent)
+      return
+    }
     guard let tunnel = try? PacketTunnelController(),
           let profile = try? tunnel.installedConfiguration(),
           profile.hubURL == hub.settings.address,
@@ -457,6 +503,10 @@ final class HubNet {
     defer {
       isRestoring = false
       hub.networkAppAgent.channelConnectionChanged(true)
+    }
+    if let agent = HubNetworkBackend.current?.agent {
+      await refresh(from: agent)
+      return
     }
     guard let tunnel = try? PacketTunnelController(),
           let profile = try? tunnel.installedConfiguration(),
@@ -547,6 +597,11 @@ final class HubNet {
     guard isJoined else { throw HubNetError.notJoined }
     var ports = networkProtocol == .tcp ? sharedTcp : sharedUdp
     guard ports.contains(port) != enabled else { return }
+    if let agent = HubNetworkBackend.current?.agent {
+      // The agent shares a port's TCP and UDP together
+      try await share(port: validatedPort, enabled: enabled, through: agent)
+      return
+    }
     let name = "\(networkProtocol.rawValue)-\(port)"
     if enabled {
       try await hub.service.network.publish(
@@ -729,6 +784,8 @@ enum HubNetError: LocalizedError, Equatable {
   case localAgentUnavailable
   case notJoined
   case nodeNotSet
+  /// What the hub-net agent can't do yet (using another device's internet)
+  case unavailableThroughAgent
 
   var errorDescription: String? {
     switch self {
@@ -744,6 +801,8 @@ enum HubNetError: LocalizedError, Equatable {
       "Join Hub Network before sharing ports."
     case .nodeNotSet:
       "This Hub has no Hub Network node. An owner has to set one before invitations work."
+    case .unavailableThroughAgent:
+      "Using another device’s internet isn’t available through the hub-net service yet."
     }
   }
 }
