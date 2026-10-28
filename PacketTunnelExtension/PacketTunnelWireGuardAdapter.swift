@@ -745,7 +745,7 @@ final class PacketTunnelWireGuardAdapter {
     return route
   }
 
-  private static func isOverlayAddress(_ value: Data) -> Bool {
+  static func isOverlayAddress(_ value: Data) -> Bool {
     let bytes = Array(value)
     if bytes.count == 4 { return bytes[0] == 100 && (bytes[1] & 0b1110_0000) == 96 }
     return bytes.count == 16 && bytes.starts(with: [0xfd, 0x48, 0x55, 0x42, 0x4e, 0x45])

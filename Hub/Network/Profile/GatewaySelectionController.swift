@@ -78,6 +78,15 @@ final class GatewaySelectionController {
     }
   }
 
+  private static func isOverlay(_ host: String) -> Bool {
+    if let address = IPv4Address(host) {
+      let bytes = Array(address.rawValue)
+      return bytes[0] == 100 && (bytes[1] & 0b1110_0000) == 96
+    }
+    if let address = IPv6Address(host) { return Array(address.rawValue).starts(with: [0xfd, 0x48, 0x55, 0x42, 0x4e, 0x45]) }
+    return false
+  }
+
   private static func gatewayAddress(
     for status: GatewayStatus,
     agent: HubNetworkAgent
@@ -154,8 +163,9 @@ final class GatewaySelectionController {
     for host in namedControlHosts {
       resolvedControlHosts.append(contentsOf: Self.resolve(host))
     }
-    let allControlHosts = controlPlaneHosts + namedControlHosts
-      + resolvedControlHosts
+    // A member that joined by invitation reaches its hub at the hub machine's overlay address: that one stays in the
+    // tunnel, or the hub is out of reach while the gateway is in use
+    let allControlHosts = (controlPlaneHosts + namedControlHosts + resolvedControlHosts).filter { !Self.isOverlay($0) }
     let ipv4Hosts = Array(Set(allControlHosts.filter { IPv4Address($0) != nil })).sorted()
     let ipv6Hosts = Array(Set(allControlHosts.filter { IPv6Address($0) != nil })).sorted()
 

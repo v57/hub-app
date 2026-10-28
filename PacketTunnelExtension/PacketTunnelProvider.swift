@@ -1085,7 +1085,11 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     ipv4Settings.includedRoutes = throughGateway && profile.gatewayGrant?.ipv4 == true
       ? [NEIPv4Route.default()]
       : [NEIPv4Route(destinationAddress: "100.96.0.0", subnetMask: "255.224.0.0")]
-    ipv4Settings.excludedRoutes = (profile.controlPlaneIPv4Hosts ?? []).map {
+    // An overlay address stays in the tunnel: a member's hub is `ws://100.96.0.2:1997`, and profiles saved before
+    // carry it as a control-plane host, which sent the member's hub traffic out its own network
+    ipv4Settings.excludedRoutes = (profile.controlPlaneIPv4Hosts ?? []).filter {
+      IPv4Address($0).map { !PacketTunnelWireGuardAdapter.isOverlayAddress($0.rawValue) } ?? true
+    }.map {
       NEIPv4Route(destinationAddress: $0, subnetMask: "255.255.255.255")
     }
     settings.ipv4Settings = ipv4Settings
@@ -1102,7 +1106,9 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
           networkPrefixLength: 48
         )
       ]
-    ipv6Settings.excludedRoutes = (profile.controlPlaneIPv6Hosts ?? []).map {
+    ipv6Settings.excludedRoutes = (profile.controlPlaneIPv6Hosts ?? []).filter {
+      IPv6Address($0).map { !PacketTunnelWireGuardAdapter.isOverlayAddress($0.rawValue) } ?? true
+    }.map {
       NEIPv6Route(destinationAddress: $0, networkPrefixLength: 128)
     }
     settings.ipv6Settings = ipv6Settings
