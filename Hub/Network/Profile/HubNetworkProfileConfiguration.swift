@@ -102,7 +102,8 @@ struct HubNetworkProfileConfiguration: Codable, Equatable, Sendable {
     self.gatewayFallback = gatewayFallback ? true : nil
   }
 
-  /// The membership alone, without the gateway this device used: its routes, DNS and grant
+  /// The membership alone, without the gateway this device used: its routes, DNS and grant. The WireGuard key stays:
+  /// registering on the hub again needs it (`restoreInstalledLocalMembership`)
   func withoutGateway() -> Self {
     HubNetworkProfileConfiguration(
       version: version,
@@ -115,6 +116,7 @@ struct HubNetworkProfileConfiguration: Codable, Equatable, Sendable {
       overlayIPv4Route: overlayIPv4Route,
       overlayIPv6Route: overlayIPv6Route,
       trustedHubKey: trustedHubKey,
+      wireGuardPublicKey: wireGuardPublicKey,
       gatewayServingEnabled: servesGateway,
       servesInviter: inviterEnabled,
       nodeEndpoint: nodeEndpoint,

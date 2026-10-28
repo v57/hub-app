@@ -53,13 +53,14 @@ extension PacketTunnelController {
       try await authorizeAndInstallLocalHub(hub: hub)
       return
     }
-    guard current.profileKey == hub.key,
-          let currentWireGuardKey = current.wireGuardPublicKey else {
+    guard current.profileKey == hub.key else {
       try await authorizeAndInstallLocalHub(hub: hub)
       return
     }
     let wireGuardKey = try HubNetworkWireGuardKeyStore().publicKeyBase64()
-    guard wireGuardKey == currentWireGuardKey else {
+    // A profile saved after leaving a gateway had no WireGuard key until `withoutGateway` kept it: this device's
+    // key stands in, as a member can't install again (only owners bind as `apple-app`)
+    guard wireGuardKey == current.wireGuardPublicKey ?? wireGuardKey else {
       try await authorizeAndInstallLocalHub(hub: hub)
       return
     }
