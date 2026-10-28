@@ -16,6 +16,8 @@ import Network
 @MainActor
 enum NetTest {
   static var isRequested: Bool { CommandLine.arguments.contains("--net-test") }
+  /// `diag` only prints the extension's log, often from a second copy of the app beside the running one
+  static var readsLogsOnly: Bool { isRequested && action == "diag" }
 
   private static var action: String {
     let arguments = CommandLine.arguments

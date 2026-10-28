@@ -455,6 +455,10 @@ final class HubNet {
   }
 
   func restoreIfActive() async {
+#if DEBUG && !os(tvOS) && canImport(Network)
+    // Its watchers would push this copy's member and link lists into the running app's tunnel, starting from empty
+    if NetTest.readsLogsOnly { return }
+#endif
     if let agent = HubNetworkBackend.current?.agent {
       await refreshUntilConnected(agent)
       return
