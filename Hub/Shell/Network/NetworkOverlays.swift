@@ -53,7 +53,7 @@ struct NetworkDeviceSheet: View {
           }
           FormRow(
             "If \(device.name) stops answering",
-            help: hub.net.fallsBack ? "Use this \(KitDevice.name)’s own internet until it’s back" : "Wait for it to answer",
+            help: hub.net.fallsBack ? "Use this \(KitDevice.nameInSentence)’s own internet until it’s back" : "Wait for it to answer",
             systemImage: "arrow.triangle.branch", hue: .gray
           ) {
             Button { showsFallback = true } label: {
@@ -70,7 +70,7 @@ struct NetworkDeviceSheet: View {
         }
       }
       if !device.apps.isEmpty {
-        Text(device.isThisDevice ? "Apps this \(KitDevice.name) shares" : "Apps on \(device.name)").kitFont(.sectionHeader).padding(.top, 4)
+        Text(device.isThisDevice ? "Apps this \(KitDevice.nameInSentence) shares" : "Apps on \(device.name)").kitFont(.sectionHeader).padding(.top, 4)
         FormCard {
           ForEach(device.apps) { app in
             FormRow(app.name, help: app.line(hub: hub.settings.name), systemImage: KnownPorts.symbol(app.port), hue: .blue) {
@@ -197,7 +197,7 @@ struct NetworkWhySheet: View {
     case .asleep:
       "\(device.name) isn’t online. It answers again once it wakes up and Hub runs on it."
     case .off:
-      "Hub Network is off on this \(KitDevice.name). Turn it on to reach \(device.name)."
+      "Hub Network is off on this \(KitDevice.nameInSentence). Turn it on to reach \(device.name)."
     case .online, .thisDevice:
       "\(device.name) answers again. You can reach it."
     }
@@ -338,7 +338,7 @@ struct UseInternetSheet: View {
           .kitFont(.caption).fixedSize(horizontal: false, vertical: true)
       }
     } footer: {
-      SheetStatus(using.map { "Using \($0.name)" } ?? "Using this \(KitDevice.name)’s own", systemImage: "globe", hue: .indigo, status: busy != nil ? .working : .idle)
+      SheetStatus(using.map { "Using \($0.name)" } ?? "Using this \(KitDevice.nameInSentence)’s own", systemImage: "globe", hue: .indigo, status: busy != nil ? .working : .idle)
       Button("Done") { dismiss() }.buttonStyle(.kitPrimary).keyboardShortcut(.defaultAction)
     }
   }
@@ -410,10 +410,10 @@ struct ShareAppSheet: View {
       if running == nil {
         HStack(spacing: 6) {
           ProgressView().controlSize(.small)
-          Text("Looking for apps on this \(KitDevice.name)…").kitFont(.caption)
+          Text("Looking for apps on this \(KitDevice.nameInSentence)…").kitFont(.caption)
         }
       } else if let running, !running.isEmpty {
-        Text("Running on this \(KitDevice.name)").kitFont(.sectionHeader)
+        Text("Running on this \(KitDevice.nameInSentence)").kitFont(.sectionHeader)
       }
       FormCard {
         ForEach(running ?? []) { app in
@@ -424,7 +424,7 @@ struct ShareAppSheet: View {
       if choice == .another || idiom.isTouch && choice == nil {
         FormCard {
           FormRow("Name", systemImage: "textformat", field: TextField("Jellyfin", text: $name).autocorrectionDisabled())
-          FormRow("Port", help: "The port the app listens on, on this \(KitDevice.name)", systemImage: "number", error: error, field: TextField("8096", text: $port).kitFont(.mono).autocorrectionDisabled())
+          FormRow("Port", help: "The port the app listens on, on this \(KitDevice.nameInSentence)", systemImage: "number", error: error, field: TextField("8096", text: $port).kitFont(.mono).autocorrectionDisabled())
           FormRow("Kind", systemImage: "arrow.left.arrow.right", hue: .gray) {
             KitSegmented(selection: $udp, options: [("TCP", false), ("UDP", true)]).fixedSize()
           }

@@ -78,7 +78,7 @@ struct JoinNetworkSheet: View {
   private var confirm: some View {
     KitSheet(
       title: hubName.map { "Join \($0)’s Network?" } ?? "Join This Hub’s Network?",
-      meta: hubName.map { "Someone in \($0) invited this \(KitDevice.name)" } ?? "Someone invited this \(KitDevice.name) to their hub",
+      meta: hubName.map { "Someone in \($0) invited this \(KitDevice.nameInSentence)" } ?? "Someone invited this \(KitDevice.nameInSentence) to their hub",
       systemImage: "person.badge.plus", hue: .teal, width: 520
     ) {
       FormCard {
@@ -98,7 +98,7 @@ struct JoinNetworkSheet: View {
       }
       VStack(alignment: .leading, spacing: 12) {
         point("arrow.left.arrow.right", hubName.map { "Reach \($0)’s devices from anywhere" } ?? "Reach the hub’s devices from anywhere",
-              "And they can reach this \(KitDevice.name), at home or away.")
+              "And they can reach this \(KitDevice.nameInSentence), at home or away.")
         point("lock", "Private", "Only devices in \(hubName ?? "the hub") can connect. Nothing passes through anyone else.")
         point("power", "Yours to switch off", "Turn it off any time in Hub Network.")
       }
@@ -116,7 +116,7 @@ struct JoinNetworkSheet: View {
   private var useConfirm: some View {
     KitSheet(
       title: inviter.map { "Use \($0)’s Internet?" } ?? "Use This Device’s Internet?",
-      meta: "\(inviter ?? "The device that showed the code") invited this \(KitDevice.name)",
+      meta: "\(inviter ?? "The device that showed the code") invited this \(KitDevice.nameInSentence)",
       systemImage: "globe", hue: .indigo, width: 520
     ) {
       if let inviter {
@@ -125,7 +125,7 @@ struct JoinNetworkSheet: View {
         }
       }
       VStack(alignment: .leading, spacing: 12) {
-        point("globe", "Browse through \(inviter ?? "it")", "Starts as soon as this \(KitDevice.name) joins.")
+        point("globe", "Browse through \(inviter ?? "it")", "Starts as soon as this \(KitDevice.nameInSentence) joins.")
         point("switch.2", "Switch it from the Hub screen", "Use and Stop on the Hub Network card.")
       }
       .padding(.horizontal, 4)
@@ -149,13 +149,13 @@ struct JoinNetworkSheet: View {
 
   private var allowVPN: some View {
     KitSheet(title: "One More Step", meta: "Allow the VPN", systemImage: "lock.shield", hue: .teal, width: 520) {
-      Text("Next, your \(KitDevice.name) asks to add a VPN. Hub uses it to connect your devices privately; the rest of your internet works as before. Choose **Allow**.")
+      Text("Next, your \(KitDevice.nameInSentence) asks to add a VPN. Hub uses it to connect your devices privately; the rest of your internet works as before. Choose **Allow**.")
         .kitFont(.body).fixedSize(horizontal: false, vertical: true)
       // The system alert, drawn with Allow marked
       VStack(spacing: 10) {
         Image(systemName: "network.badge.shield.half.filled").font(.system(size: 28)).foregroundStyle(Hue.teal.text)
         Text("“Hub” Would Like to Add VPN Configurations").kitFont(.headline).multilineTextAlignment(.center)
-        Text("All network activity on this \(KitDevice.name) may be filtered or monitored when using VPN.")
+        Text("All network activity on this \(KitDevice.nameInSentence) may be filtered or monitored when using VPN.")
           .kitFont(.caption).multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
         HStack(spacing: 8) {
           Text("Allow").kitFont(.headline).foregroundStyle(.white).frame(maxWidth: .infinity).padding(.vertical, 6)

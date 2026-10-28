@@ -195,7 +195,7 @@ struct AddDeviceSheet: View {
       link = try await hub.net.createInviteCode()
       known = Set(facts.devices.map(\.id))
     } catch is CancellationError {
-      error = "The connection helper didn’t confirm this \(KitDevice.name) in time. Try again in a moment."
+      error = "The connection helper didn’t confirm this \(KitDevice.nameInSentence) in time. Try again in a moment."
     } catch {
       self.error = error.networkLine
     }

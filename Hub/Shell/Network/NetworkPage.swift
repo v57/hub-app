@@ -204,12 +204,12 @@ struct HubNetworkPage: View {
   // MARK: Apps you share
 
   private var appsSection: some View {
-    KitSection("Apps you share", meta: ["From this \(KitDevice.name)"], systemImage: "square.and.arrow.up", hue: .purple) {
+    KitSection("Apps you share", meta: ["From this \(KitDevice.nameInSentence)"], systemImage: "square.and.arrow.up", hue: .purple) {
       ForEach(facts.sharedApps) { app in
         SharedAppRow(app: app)
       }
       if facts.sharedApps.isEmpty {
-        Text("Share an app running on this \(KitDevice.name), and your devices open it from anywhere.")
+        Text("Share an app running on this \(KitDevice.nameInSentence), and your devices open it from anywhere.")
           .kitFont(.caption).fixedSize(horizontal: false, vertical: true).padding(6)
       }
       Button("Share an App…", systemImage: "plus") { sharingApp = true }
@@ -224,10 +224,10 @@ struct HubNetworkPage: View {
     KitSection("Internet", systemImage: "globe", hue: .indigo) {
       if hub.api.contains("network/gateway/advertise") {
         SidebarRow(
-          "Let your devices use this \(KitDevice.name)’s internet",
+          "Let your devices use this \(KitDevice.nameInSentence)’s internet",
           subtitle: "Handy when they’re away: they browse as if they were here.", systemImage: "arrow.up.forward.app", hue: .orange
         ) {
-          Toggle("Let your devices use this \(KitDevice.name)’s internet", isOn: Binding {
+          Toggle("Let your devices use this \(KitDevice.nameInSentence)’s internet", isOn: Binding {
             hub.net.isSharing
           } set: { enabled in
             Task {
@@ -369,7 +369,7 @@ struct NetworkHero: View {
   private var title: String {
     switch state {
     case .on, .turningOff: "Your devices are connected"
-    case .off: isPhone ? "Hub Network is off" : "Hub Network is off on this \(KitDevice.name)"
+    case .off: isPhone ? "Hub Network is off" : "Hub Network is off on this \(KitDevice.nameInSentence)"
     case .connecting: "Connecting to \(name)…"
     case .hubOff: "\(name)’s network is off"
     }
@@ -380,12 +380,12 @@ struct NetworkHero: View {
     let reach = others.count == 1 ? "1 device" : "\(others.count) devices"
     switch state {
     case .on, .turningOff:
-      if isPhone { return "Reach \(name) and \(reach) from this \(KitDevice.name), wherever you are." }
-      var text = "From this \(KitDevice.name) you can reach \(name) and \(reach), wherever you are."
+      if isPhone { return "Reach \(name) and \(reach) from this \(KitDevice.nameInSentence), wherever you are." }
+      var text = "From this \(KitDevice.nameInSentence) you can reach \(name) and \(reach), wherever you are."
       if others.count > NetworkMap.namedLimit {
         text += " \(others.filter { $0.status == .online }.count) are online now."
       } else {
-        text += " They can reach this \(KitDevice.name) too."
+        text += " They can reach this \(KitDevice.nameInSentence) too."
       }
       return text
     case .off:

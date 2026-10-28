@@ -18,7 +18,7 @@ struct DevicePageView: View {
     case .localHub:
 #if canImport(HubServer)
       NavigationStack { LocalHubView() }.kitPane(.content)
-        .pageToolbar("Run a Hub", meta: ["on this \(KitDevice.name)"], systemImage: "server.rack", hue: .gray) { }
+        .pageToolbar("Run a Hub", meta: ["on this \(KitDevice.nameInSentence)"], systemImage: "server.rack", hue: .gray) { }
 #else
       EmptyState(systemImage: "server.rack", title: "Not on This Device")
 #endif
@@ -52,7 +52,7 @@ struct DeviceSettingsPage: View {
           }.padding(8)
         }
         KitSection("Reset Data", meta: ["everything but the keys"], systemImage: "trash", hue: .red) {
-          Text("Removes your hubs, settings and caches, Hub Network membership and its VPN profile, and the hub this \(KitDevice.name) runs with its data. Your keys stay, so hubs that know this \(KitDevice.name) still recognize it.")
+          Text("Removes your hubs, settings and caches, Hub Network membership and its VPN profile, and the hub this \(KitDevice.nameInSentence) runs with its data. Your keys stay, so hubs that know this \(KitDevice.nameInSentence) still recognize it.")
             .kitFont(.caption).fixedSize(horizontal: false, vertical: true).padding(8)
         } accessory: {
           Button(isResetting ? "Resetting…" : "Reset Data", role: .destructive) { isConfirming = true }
@@ -65,14 +65,14 @@ struct DeviceSettingsPage: View {
       .padding(.bottom, 24)
     }
     .kitPane(.content)
-    .pageToolbar("Settings", meta: ["this \(KitDevice.name)"], systemImage: "gearshape", hue: .gray) { }
+    .pageToolbar("Settings", meta: ["this \(KitDevice.nameInSentence)"], systemImage: "gearshape", hue: .gray) { }
 #if DEBUG
     // For checks that Reset Data kept them: compare with its `[HubReset] KEPT` lines after a relaunch
     .onAppear { print("[HubSettings] keys \(KeyChain.main.publicKey()) \(DeviceIdentity.app?.key.publicKey ?? "-")") }
 #endif
     .kitDialog(
       "Reset Data?", isPresented: $isConfirming,
-      message: "Hub forgets every hub, its settings, Hub Network and the hub this \(KitDevice.name) runs, and starts over. Your keys stay. This can't be undone.",
+      message: "Hub forgets every hub, its settings, Hub Network and the hub this \(KitDevice.nameInSentence) runs, and starts over. Your keys stay. This can't be undone.",
       systemImage: "trash", hue: .red, confirm: "Reset Data", role: .destructive
     ) {
       Task { await reset() }
@@ -129,14 +129,14 @@ struct SharedServicesPage: View {
       .padding(.bottom, 24)
     }
     .kitPane(.content)
-    .pageToolbar("Shared Services", meta: ["what this \(KitDevice.name) runs for its hubs", "\(AppServices.Service.sharedCount) shared"], systemImage: "square.and.arrow.up", hue: .purple) { }
+    .pageToolbar("Shared Services", meta: ["what this \(KitDevice.nameInSentence) runs for its hubs", "\(AppServices.Service.sharedCount) shared"], systemImage: "square.and.arrow.up", hue: .purple) { }
     .navigationDestination(item: idiom == .phone ? $trying : .constant(nil)) { service in
       AppServices.Page(service: service)
         .kitPane(.content)
-        .pageToolbar(service.name, meta: ["on this \(KitDevice.name)"], systemImage: service.image, hue: .purple) { }
+        .pageToolbar(service.name, meta: ["on this \(KitDevice.nameInSentence)"], systemImage: service.image, hue: .purple) { }
     }
     .kitSheet(item: idiom == .phone ? .constant(nil) : $trying) { service in
-      KitSheet(title: service.name, meta: "On this \(KitDevice.name)", systemImage: service.image, hue: .purple, width: 720) {
+      KitSheet(title: service.name, meta: "On this \(KitDevice.nameInSentence)", systemImage: service.image, hue: .purple, width: 720) {
         AppServices.Page(service: service).frame(minHeight: 460)
       } footer: {
         Button("Done") { trying = nil }.buttonStyle(.kitPrimary).keyboardShortcut(.defaultAction)

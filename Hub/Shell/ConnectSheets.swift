@@ -79,7 +79,7 @@ struct ConnectSheet: View {
       FormCard(footer: isInvitation ? "Invitations work once, for seven days." : nil) {
         FormRow(
           isInvitation ? "Invitation" : "Address",
-          help: isInvitation ? "Puts this \(KitDevice.name) on the hub's private network" : "mac.local, 192.168.1.5:1997 or an invitation",
+          help: isInvitation ? "Puts this \(KitDevice.nameInSentence) on the hub's private network" : "mac.local, 192.168.1.5:1997 or an invitation",
           systemImage: isInvitation ? "person.badge.plus" : "network", hue: isInvitation ? .teal : .accent, error: inputError,
           field: TextField("Address or invitation", text: $input)
             .kitFont(.mono).autocorrectionDisabled()
@@ -87,7 +87,7 @@ struct ConnectSheet: View {
         )
         if !isInvitation {
           FormRow(
-            "Pairing code", help: "New hubs only: makes this \(KitDevice.name) an owner", systemImage: "number",
+            "Pairing code", help: "New hubs only: makes this \(KitDevice.nameInSentence) an owner", systemImage: "number",
             field: TextField("ABC-123", text: $code)
               .kitFont(.mono).autocorrectionDisabled()
               .onChange(of: code) { if case .failed = pairing.state { pairing.reset() } }

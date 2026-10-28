@@ -49,7 +49,7 @@ struct DevicesPage: View {
         } else if approved.isEmpty {
           EmptyState(
             systemImage: "laptopcomputer", title: "No Devices Yet",
-            message: "Devices join with an invite link or a pairing code from this \(KitDevice.name)."
+            message: "Devices join with an invite link or a pairing code from this \(KitDevice.nameInSentence)."
           ) {
             if hub.canViewNetwork {
               Button("Invite…") { Navigator.main.open(hub, .network) }.buttonStyle(.kitPrimary)
@@ -333,7 +333,7 @@ struct DeviceInspector: View {
   var body: some View {
     let isThisDevice = device.key == hub.client.device?.key.publicKey
     VStack(alignment: .leading, spacing: KitMetrics.gutter) {
-      KitSection(device.name, meta: [device.statusText, isThisDevice ? "this \(KitDevice.name)" : ""], systemImage: Device.symbol(platform: device.platform), hue: .blue) {
+      KitSection(device.name, meta: [device.statusText, isThisDevice ? "this \(KitDevice.nameInSentence)" : ""], systemImage: Device.symbol(platform: device.platform), hue: .blue) {
         if let os = device.os {
           InspectorRow("System", value: [device.platform.map(Device.systemName), os, device.arch].compactMap { $0 }.joined(separator: " "), copyable: false)
         }
@@ -433,7 +433,7 @@ extension Device {
   @MainActor func cardLine(isThisDevice: Bool, compact: Bool) -> [String] {
     var parts = [String]()
     if !compact, let platform { parts.append(Device.systemName(platform)) }
-    if isThisDevice { parts.append("this \(KitDevice.name)") }
+    if isThisDevice { parts.append("this \(KitDevice.nameInSentence)") }
     if online || compact {
       parts.append(services.count == 1 ? "1 service" : "\(services.count) services")
     }
