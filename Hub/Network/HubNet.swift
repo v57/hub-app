@@ -315,11 +315,7 @@ final class HubNet {
       try await Task.sleep(for: .milliseconds(25))
     }
     try await waitForInvitationAgent(identity!)
-    guard let agent = hub.state.hubNetAgents.value.first(where: {
-      $0.localIp == "127.0.0.1"
-    }) else {
-      throw HubNetError.localAgentUnavailable
-    }
+    let agent = try await localInviter()
     guard let node = await Self.currentNodeEndpoint(hub: hub) else {
       throw HubNetError.nodeNotSet
     }
@@ -654,6 +650,21 @@ final class HubNet {
     ISO8601DateFormatter.js.date(from: string)
   }
 
+  /// The agent on the hub's machine that signs invitations (`hub/net/list`, from 127.0.0.1). Subscribes itself: the
+  /// page that opens Add a Device doesn't keep the list
+  private func localInviter() async throws -> HubNetInfo {
+    let subscription = hub.state.hubNetAgents.subscribe(hub: hub)
+    defer { withExtendedLifetime(subscription) {} }
+    let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+    while true {
+      if let inviter = hub.state.hubNetAgents.value.first(where: { $0.localIp == "127.0.0.1" }) {
+        return inviter
+      }
+      guard ContinuousClock.now < deadline else { throw HubNetError.localAgentUnavailable }
+      try await Task.sleep(for: .milliseconds(100))
+    }
+  }
+
   private func waitForInvitationAgent(
     _ identity: PacketTunnelBootstrapIdentity
   ) async throws {
@@ -669,7 +680,8 @@ final class HubNet {
 
   /// The node `hub/net/node` names (v57.dev's by default), `nil` from a hub older than that default with none set
   private static func currentNodeEndpoint(hub: Hub, timeout: Duration = .seconds(5)) async -> String? {
-    hub.state.hubNetNode.subscribe(hub: hub)
+    let subscription = hub.state.hubNetNode.subscribe(hub: hub)
+    defer { withExtendedLifetime(subscription) {} }
     let deadline = ContinuousClock.now.advanced(by: timeout)
     while ContinuousClock.now < deadline {
       if let node = hub.state.hubNetNode.value, !node.isEmpty {
@@ -739,7 +751,8 @@ final class HubNet {
     inviterAgentWatcherTask = Task { [weak self] in
       guard let self else { return }
       let hub = self.hub
-      hub.state.networkAgents.subscribe(hub: hub)
+      let subscription = hub.state.networkAgents.subscribe(hub: hub)
+      defer { withExtendedLifetime(subscription) {} }
       var sent: [HubNetworkPeer]?
       while !Task.isCancelled {
         let peers = hub.state.networkAgents.value
