@@ -7,22 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		132DD8B82F4CDDE300282A30 /* HubService in Frameworks */ = {isa = PBXBuildFile; productRef = 132DD8B72F4CDDE300282A30 /* HubService */; };
-		132DD8BA2F4CDDEB00282A30 /* HubService in Frameworks */ = {isa = PBXBuildFile; productRef = 132DD8B92F4CDDEB00282A30 /* HubService */; };
-		13B4EC572F817DF50060DAE1 /* HubUI in Frameworks */ = {isa = PBXBuildFile; productRef = 13B4EC562F817DF50060DAE1 /* HubUI */; };
-		13B4EC592F817DF80060DAE1 /* HubUI in Frameworks */ = {isa = PBXBuildFile; productRef = 13B4EC582F817DF80060DAE1 /* HubUI */; };
 		262C58D530179A8200CA8880 /* NetworkExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 262C58D430179A8200CA8880 /* NetworkExtension.framework */; };
 		262C58DD30179A8200CA8880 /* PacketTunnelExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 262C58D330179A8200CA8880 /* PacketTunnelExtension.appex */; platformFilters = (ios, macos, ); settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		48A604013018000100604001 /* WireGuardKit in Frameworks */ = {isa = PBXBuildFile; productRef = 48A604003018000100604000 /* WireGuardKit */; };
 		48A6040B301800010060400B /* HubService in Frameworks */ = {isa = PBXBuildFile; productRef = 48A6040A301800010060400A /* HubService */; };
-		4D5B0A042F90000100A0B004 /* HubServer in Frameworks */ = {isa = PBXBuildFile; productRef = 4D5B0A022F90000100A0B002 /* HubServer */; };
-		4D5B0A052F90000100A0B005 /* HubServer in Frameworks */ = {isa = PBXBuildFile; productRef = 4D5B0A032F90000100A0B003 /* HubServer */; };
-		C0C0A0042F9A000100C0A004 /* ComponentKit in Frameworks */ = {isa = PBXBuildFile; productRef = C0C0A0022F9A000100C0A002 /* ComponentKit */; };
-		C0C0A0052F9A000100C0A005 /* ComponentKit in Frameworks */ = {isa = PBXBuildFile; productRef = C0C0A0032F9A000100C0A003 /* ComponentKit */; };
-		D0D0A0042F9B000100D0A004 /* VaultKit in Frameworks */ = {isa = PBXBuildFile; platformFilters = (ios, macos, ); productRef = D0D0A0022F9B000100D0A002 /* VaultKit */; };
-		D0D0A0052F9B000100D0A005 /* VaultHub in Frameworks */ = {isa = PBXBuildFile; platformFilters = (ios, macos, ); productRef = D0D0A0032F9B000100D0A003 /* VaultHub */; };
-		E0E0A0042F9C000100E0A004 /* PlatformPower in Frameworks */ = {isa = PBXBuildFile; productRef = E0E0A0022F9C000100E0A002 /* PlatformPower */; };
-		E0E0A0052F9C000100E0A005 /* PlatformSystem in Frameworks */ = {isa = PBXBuildFile; productRef = E0E0A0032F9C000100E0A003 /* PlatformSystem */; };
+		A0A0A0042FA0000100A0A004 /* HubApp in Frameworks */ = {isa = PBXBuildFile; productRef = A0A0A0022FA0000100A0A002 /* HubApp */; };
+		A0A0A0052FA0000100A0A005 /* HubApp in Frameworks */ = {isa = PBXBuildFile; productRef = A0A0A0032FA0000100A0A003 /* HubApp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -66,23 +56,24 @@
 /* Begin PBXFileReference section */
 		1323D91D2FD07C0C00E9B818 /* Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		13C54C712D638AA1000C4CA5 /* Hub.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Hub.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		13DF13502F5158BF00BF8AA5 /* Hub-Pro-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "Hub-Pro-Info.plist"; sourceTree = "<group>"; };
 		13F5738E2D68EDB4008546EB /* Hub Pro.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Hub Pro.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		262C58D330179A8200CA8880 /* PacketTunnelExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PacketTunnelExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		262C58D430179A8200CA8880 /* NetworkExtension.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = NetworkExtension.framework; path = System/Library/Frameworks/NetworkExtension.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		13DF134E2F5156DB00BF8AA5 /* Exceptions for "Hub" folder in "Hub" target */ = {
+		13DF134E2F5156DB00BF8AA5 /* Exceptions for "Resources" folder in "Hub" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				"Hub-Pro-Info.plist",
 				Info.plist,
 			);
 			target = 13C54C702D638AA1000C4CA5 /* Hub */;
 		};
-		13DF134F2F5156DB00BF8AA5 /* Exceptions for "Hub" folder in "Hub Pro" target */ = {
+		13DF134F2F5156DB00BF8AA5 /* Exceptions for "Resources" folder in "Hub Pro" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				"Hub-Pro-Info.plist",
 				Info.plist,
 			);
 			target = 13F5738D2D68EDB4008546EB /* Hub Pro */;
@@ -104,11 +95,18 @@
 		};
 		13C54C732D638AA1000C4CA5 /* Hub */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			name = Hub;
+			path = App/Sources/Hub;
+			sourceTree = "<group>";
+		};
+		13C54C742D638AA1000C4CA5 /* Resources */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				13DF134E2F5156DB00BF8AA5 /* Exceptions for "Hub" folder in "Hub" target */,
-				13DF134F2F5156DB00BF8AA5 /* Exceptions for "Hub" folder in "Hub Pro" target */,
+				13DF134E2F5156DB00BF8AA5 /* Exceptions for "Resources" folder in "Hub" target */,
+				13DF134F2F5156DB00BF8AA5 /* Exceptions for "Resources" folder in "Hub Pro" target */,
 			);
-			path = Hub;
+			name = Resources;
+			path = App/Resources;
 			sourceTree = "<group>";
 		};
 		262C58D630179A8200CA8880 /* PacketTunnelExtension */ = {
@@ -133,14 +131,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				13B4EC572F817DF50060DAE1 /* HubUI in Frameworks */,
-				C0C0A0042F9A000100C0A004 /* ComponentKit in Frameworks */,
-				D0D0A0042F9B000100D0A004 /* VaultKit in Frameworks */,
-				D0D0A0052F9B000100D0A005 /* VaultHub in Frameworks */,
-				E0E0A0042F9C000100E0A004 /* PlatformPower in Frameworks */,
-				E0E0A0052F9C000100E0A005 /* PlatformSystem in Frameworks */,
-				132DD8B82F4CDDE300282A30 /* HubService in Frameworks */,
-				4D5B0A042F90000100A0B004 /* HubServer in Frameworks */,
+				A0A0A0042FA0000100A0A004 /* HubApp in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -148,10 +139,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				13B4EC592F817DF80060DAE1 /* HubUI in Frameworks */,
-				C0C0A0052F9A000100C0A005 /* ComponentKit in Frameworks */,
-				132DD8BA2F4CDDEB00282A30 /* HubService in Frameworks */,
-				4D5B0A052F90000100A0B005 /* HubServer in Frameworks */,
+				A0A0A0052FA0000100A0A005 /* HubApp in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -171,8 +159,8 @@
 		13C54C682D638AA1000C4CA5 = {
 			isa = PBXGroup;
 			children = (
-				13DF13502F5158BF00BF8AA5 /* Hub-Pro-Info.plist */,
 				13C54C732D638AA1000C4CA5 /* Hub */,
+				13C54C742D638AA1000C4CA5 /* Resources */,
 				1323D91E2FD07C0C00E9B818 /* Tests */,
 				262C58D630179A8200CA8880 /* PacketTunnelExtension */,
 				13F573AA2D68EE24008546EB /* Frameworks */,
@@ -258,17 +246,11 @@
 			);
 			fileSystemSynchronizedGroups = (
 				13C54C732D638AA1000C4CA5 /* Hub */,
+				13C54C742D638AA1000C4CA5 /* Resources */,
 			);
 			name = Hub;
 			packageProductDependencies = (
-				132DD8B72F4CDDE300282A30 /* HubService */,
-				13B4EC562F817DF50060DAE1 /* HubUI */,
-				4D5B0A022F90000100A0B002 /* HubServer */,
-				C0C0A0022F9A000100C0A002 /* ComponentKit */,
-				D0D0A0022F9B000100D0A002 /* VaultKit */,
-				D0D0A0032F9B000100D0A003 /* VaultHub */,
-				E0E0A0022F9C000100E0A002 /* PlatformPower */,
-				E0E0A0032F9C000100E0A003 /* PlatformSystem */,
+				A0A0A0022FA0000100A0A002 /* HubApp */,
 			);
 			productName = Hub;
 			productReference = 13C54C712D638AA1000C4CA5 /* Hub.app */;
@@ -288,13 +270,11 @@
 			);
 			fileSystemSynchronizedGroups = (
 				13C54C732D638AA1000C4CA5 /* Hub */,
+				13C54C742D638AA1000C4CA5 /* Resources */,
 			);
 			name = "Hub Pro";
 			packageProductDependencies = (
-				132DD8B92F4CDDEB00282A30 /* HubService */,
-				13B4EC582F817DF80060DAE1 /* HubUI */,
-				4D5B0A032F90000100A0B003 /* HubServer */,
-				C0C0A0032F9A000100C0A003 /* ComponentKit */,
+				A0A0A0032FA0000100A0A003 /* HubApp */,
 			);
 			productName = HubAdmin;
 			productReference = 13F5738E2D68EDB4008546EB /* Hub Pro.app */;
@@ -360,12 +340,9 @@
 			mainGroup = 13C54C682D638AA1000C4CA5;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				A0A0A0012FA0000100A0A001 /* XCLocalSwiftPackageReference "App" */,
 				132DD8B62F4CDDE300282A30 /* XCRemoteSwiftPackageReference "HubService" */,
-				4D5B0A012F90000100A0B001 /* XCRemoteSwiftPackageReference "HubServer" */,
 				48A604073018000100604007 /* XCLocalSwiftPackageReference "Vendor/wireguard-apple" */,
-				C0C0A0012F9A000100C0A001 /* XCRemoteSwiftPackageReference "Component" */,
-				D0D0A0012F9B000100D0A001 /* XCRemoteSwiftPackageReference "Vault" */,
-				E0E0A0012F9C000100E0A001 /* XCRemoteSwiftPackageReference "Platform" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 13C54C722D638AA1000C4CA5 /* Products */;
@@ -679,15 +656,15 @@
 				"ASSETCATALOG_COMPILER_APPICON_NAME[sdk=appletvsimulator*]" = "App Icon & Top Shelf Image";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
-				CODE_SIGN_ENTITLEMENTS = Hub/Resources/Hub.entitlements;
-				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = "Hub/Resources/Hub-iOS.entitlements";
-				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = "Hub/Resources/Hub-iOS.entitlements";
-				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "Hub/Resources/Hub-macOS.entitlements";
+				CODE_SIGN_ENTITLEMENTS = App/Resources/Hub.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = "App/Resources/Hub-iOS.entitlements";
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = "App/Resources/Hub-iOS.entitlements";
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "App/Resources/Hub-macOS.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_ASSET_PATHS = "\"Hub/Resources/Preview Content\"";
+				DEVELOPMENT_ASSET_PATHS = "\"App/Resources/Preview Content\"";
 				DEVELOPMENT_TEAM = AUCR797TMH;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -703,7 +680,7 @@
 				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
 				ENABLE_RESOURCE_ACCESS_USB = NO;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = Hub/Info.plist;
+				INFOPLIST_FILE = App/Resources/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Hub reads the QR code another device shows to pair with a hub or join its network.";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Hub connects to hubs on your network and, when this device runs a hub, lets your other devices connect to it.";
@@ -744,15 +721,15 @@
 				"ASSETCATALOG_COMPILER_APPICON_NAME[sdk=appletvsimulator*]" = "App Icon & Top Shelf Image";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
-				CODE_SIGN_ENTITLEMENTS = Hub/Resources/Hub.entitlements;
-				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = "Hub/Resources/Hub-iOS.entitlements";
-				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = "Hub/Resources/Hub-iOS.entitlements";
-				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "Hub/Resources/Hub-macOS.entitlements";
+				CODE_SIGN_ENTITLEMENTS = App/Resources/Hub.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = "App/Resources/Hub-iOS.entitlements";
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = "App/Resources/Hub-iOS.entitlements";
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "App/Resources/Hub-macOS.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_ASSET_PATHS = "\"Hub/Resources/Preview Content\"";
+				DEVELOPMENT_ASSET_PATHS = "\"App/Resources/Preview Content\"";
 				DEVELOPMENT_TEAM = AUCR797TMH;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -768,7 +745,7 @@
 				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
 				ENABLE_RESOURCE_ACCESS_USB = NO;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = Hub/Info.plist;
+				INFOPLIST_FILE = App/Resources/Info.plist;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Hub reads the QR code another device shows to pair with a hub or join its network.";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Hub connects to hubs on your network and, when this device runs a hub, lets your other devices connect to it.";
@@ -806,16 +783,16 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = Hub/Resources/HubAdmin.entitlements;
+				CODE_SIGN_ENTITLEMENTS = App/Resources/HubAdmin.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_ASSET_PATHS = "\"Hub/Resources/Preview Content\"";
+				DEVELOPMENT_ASSET_PATHS = "\"App/Resources/Preview Content\"";
 				DEVELOPMENT_TEAM = AUCR797TMH;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "Hub-Pro-Info.plist";
+				INFOPLIST_FILE = "App/Resources/Hub-Pro-Info.plist";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -838,16 +815,16 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = Hub/Resources/HubAdmin.entitlements;
+				CODE_SIGN_ENTITLEMENTS = App/Resources/HubAdmin.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_ASSET_PATHS = "\"Hub/Resources/Preview Content\"";
+				DEVELOPMENT_ASSET_PATHS = "\"App/Resources/Preview Content\"";
 				DEVELOPMENT_TEAM = AUCR797TMH;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "Hub-Pro-Info.plist";
+				INFOPLIST_FILE = "App/Resources/Hub-Pro-Info.plist";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1028,6 +1005,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = "Vendor/wireguard-apple";
 		};
+		A0A0A0012FA0000100A0A001 /* XCLocalSwiftPackageReference "App" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = App;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
@@ -1039,60 +1020,18 @@
 				kind = branch;
 			};
 		};
-		4D5B0A012F90000100A0B001 /* XCRemoteSwiftPackageReference "HubServer" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/v57/HubServer.git";
-			requirement = {
-				branch = main;
-				kind = branch;
-			};
-		};
-		C0C0A0012F9A000100C0A001 /* XCRemoteSwiftPackageReference "Component" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/v57/Component.git";
-			requirement = {
-				branch = main;
-				kind = branch;
-			};
-		};
-		D0D0A0012F9B000100D0A001 /* XCRemoteSwiftPackageReference "Vault" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/v57/Vault.git";
-			requirement = {
-				branch = main;
-				kind = branch;
-			};
-		};
-		E0E0A0012F9C000100E0A001 /* XCRemoteSwiftPackageReference "Platform" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/v57/Platform.git";
-			requirement = {
-				branch = main;
-				kind = branch;
-			};
-		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		132DD8B72F4CDDE300282A30 /* HubService */ = {
+		A0A0A0022FA0000100A0A002 /* HubApp */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 132DD8B62F4CDDE300282A30 /* XCRemoteSwiftPackageReference "HubService" */;
-			productName = HubService;
+			package = A0A0A0012FA0000100A0A001 /* XCLocalSwiftPackageReference "App" */;
+			productName = HubApp;
 		};
-		132DD8B92F4CDDEB00282A30 /* HubService */ = {
+		A0A0A0032FA0000100A0A003 /* HubApp */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 132DD8B62F4CDDE300282A30 /* XCRemoteSwiftPackageReference "HubService" */;
-			productName = HubService;
-		};
-		13B4EC562F817DF50060DAE1 /* HubUI */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 132DD8B62F4CDDE300282A30 /* XCRemoteSwiftPackageReference "HubService" */;
-			productName = HubUI;
-		};
-		13B4EC582F817DF80060DAE1 /* HubUI */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 132DD8B62F4CDDE300282A30 /* XCRemoteSwiftPackageReference "HubService" */;
-			productName = HubUI;
+			package = A0A0A0012FA0000100A0A001 /* XCLocalSwiftPackageReference "App" */;
+			productName = HubApp;
 		};
 		48A604003018000100604000 /* WireGuardKit */ = {
 			isa = XCSwiftPackageProductDependency;
@@ -1103,46 +1042,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 132DD8B62F4CDDE300282A30 /* XCRemoteSwiftPackageReference "HubService" */;
 			productName = HubService;
-		};
-		4D5B0A022F90000100A0B002 /* HubServer */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 4D5B0A012F90000100A0B001 /* XCRemoteSwiftPackageReference "HubServer" */;
-			productName = HubServer;
-		};
-		4D5B0A032F90000100A0B003 /* HubServer */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 4D5B0A012F90000100A0B001 /* XCRemoteSwiftPackageReference "HubServer" */;
-			productName = HubServer;
-		};
-		C0C0A0022F9A000100C0A002 /* ComponentKit */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = C0C0A0012F9A000100C0A001 /* XCRemoteSwiftPackageReference "Component" */;
-			productName = ComponentKit;
-		};
-		C0C0A0032F9A000100C0A003 /* ComponentKit */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = C0C0A0012F9A000100C0A001 /* XCRemoteSwiftPackageReference "Component" */;
-			productName = ComponentKit;
-		};
-		D0D0A0022F9B000100D0A002 /* VaultKit */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = D0D0A0012F9B000100D0A001 /* XCRemoteSwiftPackageReference "Vault" */;
-			productName = VaultKit;
-		};
-		D0D0A0032F9B000100D0A003 /* VaultHub */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = D0D0A0012F9B000100D0A001 /* XCRemoteSwiftPackageReference "Vault" */;
-			productName = VaultHub;
-		};
-		E0E0A0022F9C000100E0A002 /* PlatformPower */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = E0E0A0012F9C000100E0A001 /* XCRemoteSwiftPackageReference "Platform" */;
-			productName = PlatformPower;
-		};
-		E0E0A0032F9C000100E0A003 /* PlatformSystem */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = E0E0A0012F9C000100E0A001 /* XCRemoteSwiftPackageReference "Platform" */;
-			productName = PlatformSystem;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

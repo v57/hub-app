@@ -13,19 +13,19 @@ import AppKit
 import Combine
 #endif
 
-@main
-struct HubApp: App {
+/// The app (Hub and Hub Pro, on every platform); its entry point is App/Sources/Hub/HubMain.swift.
+public struct HubApp: App {
 #if os(macOS)
   @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 #endif
   @Environment(\.scenePhase) private var scenePhase
+  public init() {
 #if DEBUG
-  init() {
     // Line by line, also into a file or `devicectl --console`, so a run's log reads as it goes
     setvbuf(stdout, nil, _IOLBF, 0)
-  }
 #endif
-  var body: some Scene {
+  }
+  public var body: some Scene {
     WindowGroup {
       if !ProcessInfo.isPreviews {
 #if DEBUG

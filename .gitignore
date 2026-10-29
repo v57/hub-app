@@ -33,3 +33,6 @@ KANBAN*.md
 /[0-9][0-9].[0-9]-*/
 # Agents
 graphify-out/
+
+# The app package's pins: Xcode keeps the app's in Hub.xcodeproj's Package.resolved
+/App/Package.resolved

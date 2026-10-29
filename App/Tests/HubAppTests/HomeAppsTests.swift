@@ -5,7 +5,7 @@
 
 import XCTest
 import HubService
-@testable import Hub
+@testable import HubApp
 
 @MainActor
 final class HomeAppsTests: XCTestCase {
