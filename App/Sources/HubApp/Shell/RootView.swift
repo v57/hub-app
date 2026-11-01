@@ -100,6 +100,10 @@ struct RootView: View {
       if NetTest.isRequested { await NetTest.run() }
 #endif
     }
+    // `--camera-on`, `--camera-watch`: drives the security camera across devices (CameraDriver)
+    .task {
+      if CameraDriver.isRequested { await CameraDriver.run() }
+    }
     // `--connect ws://127.0.0.1:2097 --code ABC-123`: pairs with a hub at launch, for checks against a real hub
     .task {
       let arguments = CommandLine.arguments

@@ -51,6 +51,8 @@ final class CameraViewer {
   private(set) var events: [CameraEvent] = []
   private(set) var thumbnails: [String: Data] = [:]
   private(set) var lastFrame: Date?
+  /// Frames received since the viewer started
+  private(set) var frameCount = 0
 
   private let hub: Hub
   private var base: URL?
@@ -154,8 +156,9 @@ final class CameraViewer {
 
   private func received(_ message: LiveConnection.Event) {
     switch message {
-    case .frame:
+    case .frames(let count):
       lastFrame = Date()
+      frameCount += count
       if state != .live { state = .live }
     case .motion(let motion):
       self.motion = motion
@@ -255,7 +258,8 @@ enum CameraViewerError: LocalizedError {
 /// renderer, the rest to `received`
 final class LiveConnection: NSObject, URLSessionDataDelegate, @unchecked Sendable {
   enum Event: Sendable {
-    case frame
+    /// Frames shown since the last of these
+    case frames(Int)
     case motion(CameraMotion)
   }
 
@@ -266,6 +270,7 @@ final class LiveConnection: NSObject, URLSessionDataDelegate, @unchecked Sendabl
   private var parser = CameraWire.Parser()
   private var session: URLSession?
   private var lastFrameEvent = Date.distantPast
+  private var framesSinceEvent = 0
 
   init(
     request: URLRequest, renderer: CameraVideoRenderer, received: @escaping @Sendable (Event) -> Void,
@@ -312,11 +317,13 @@ final class LiveConnection: NSObject, URLSessionDataDelegate, @unchecked Sendabl
       switch message {
       case .video(let frame):
         renderer.enqueue(frame)
+        framesSinceEvent += 1
         // The viewer's clock of the last frame, a few times a second at most
         let now = Date()
         if now.timeIntervalSince(lastFrameEvent) > 0.5 {
           lastFrameEvent = now
-          received(.frame)
+          received(.frames(framesSinceEvent))
+          framesSinceEvent = 0
         }
       case .motion(let motion):
         received(.motion(motion))
