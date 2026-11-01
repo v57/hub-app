@@ -376,10 +376,11 @@ struct CameraLive: View {
           }
         }
         Spacer()
-        if isMotion {
-          VideoChip(title: style == .tile ? "Motion" : "Motion now", systemImage: "figure.walk.motion", tone: .motion)
-        } else if style == .tile, viewer.state == .live, viewer.info?.clipsPaused != nil {
+        // On a tile, paused clips win over motion: motion records nothing then
+        if style == .tile, viewer.state == .live, viewer.info?.clipsPaused != nil {
           VideoChip(title: "Clips paused", systemImage: "pause.fill")
+        } else if isMotion {
+          VideoChip(title: style == .tile ? "Motion" : "Motion now", systemImage: "figure.walk.motion", tone: .motion)
         } else if style == .tile, viewer.state == .live {
           VideoChip(title: "LIVE", tone: .live)
         }
