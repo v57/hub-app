@@ -6,7 +6,8 @@
 //  `--camera-on`: this device's camera on, for the hub it's on Hub Network with (`--camera-hub <name>` picks one); it
 //  prints the password and what changes; `--camera-device Front` picks the camera whose name has that in it (and keeps it
 //  in the settings). `--camera-watch --camera-password <password>`: watches the hub's cameras and
-//  prints their state, frame rate and events; the password is saved, so the Cameras page then shows them live.
+//  prints their state, frame rate, how far frames are behind and events; the password is saved, so the Cameras page
+//  then shows them live. Both flags run both.
 //  On an iPhone: `xcrun devicectl device process launch --console --terminate-existing --device <id> dev.v57.Hub
 //  --camera-on`.
 //
@@ -64,8 +65,15 @@ enum CameraDriver {
       return log("result fail: no connected hub on Hub Network")
     }
     log("hub \(hub.settings.name) \(hub.settings.address.absoluteString)")
-    if isOn { await turnOn(hub) }
-    if isWatching { await watch(hub) }
+    // Both: this device's camera runs beside the watch (two members each watching the other's camera)
+    if isOn, isWatching {
+      Task { await turnOn(hub) }
+      await watch(hub)
+    } else if isOn {
+      await turnOn(hub)
+    } else if isWatching {
+      await watch(hub)
+    }
   }
 
   private static func turnOn(_ hub: Hub) async {
@@ -126,7 +134,7 @@ enum CameraDriver {
           + "thumbnails=\(viewer.thumbnails.count) info=\(viewer.info.map { "\($0.width)x\($0.height)@\($0.fps) \($0.storage)" } ?? "-")"
         if last.count <= index { last.append("") }
         if line != last[index] || tick % 5 == 0 {
-          log("\(line) fps=\(fps) frames=\(viewer.frameCount)")
+          log("\(line) fps=\(fps) frames=\(viewer.frameCount) behind=\(String(format: "%.2f", viewer.behind))s restarts=\(viewer.restarts)")
           last[index] = line
         }
       }

@@ -53,6 +53,10 @@ final class CameraViewer {
   private(set) var lastFrame: Date?
   /// Frames received since the viewer started
   private(set) var frameCount = 0
+  /// How far the latest frames arrived behind the fastest one on the connection, in seconds: the live view's lag beyond
+  /// the best trip it had (which a slow link raises), and how often the stream was requested again for being behind
+  private(set) var behind: Double = 0
+  private(set) var restarts = 0
 
   private let hub: Hub
   private var base: URL?
@@ -156,9 +160,11 @@ final class CameraViewer {
 
   private func received(_ message: LiveConnection.Event) {
     switch message {
-    case .frames(let count):
+    case .frames(let count, let behind, let restarts):
       lastFrame = Date()
       frameCount += count
+      self.behind = behind
+      self.restarts = restarts
       if state != .live { state = .live }
     case .motion(let motion):
       self.motion = motion
@@ -260,8 +266,8 @@ enum CameraViewerError: LocalizedError {
 /// socket buffers or the tunnel)
 final class LiveConnection: NSObject, URLSessionDataDelegate, @unchecked Sendable {
   enum Event: Sendable {
-    /// Frames shown since the last of these
-    case frames(Int)
+    /// Frames shown since the last of these, the most one of them was behind the fastest, and the restarts so far
+    case frames(Int, behind: Double, restarts: Int)
     case motion(CameraMotion)
   }
 
@@ -273,6 +279,7 @@ final class LiveConnection: NSObject, URLSessionDataDelegate, @unchecked Sendabl
   private var session: URLSession?
   private var lastFrameEvent = Date.distantPast
   private var framesSinceEvent = 0
+  private var behindSinceEvent: Double = 0
   private var task: URLSessionDataTask?
   /// The shortest time from capture to arrival on this request, clock offset included: a frame later than this is behind
   private var fastest: Double?
@@ -345,6 +352,7 @@ final class LiveConnection: NSObject, URLSessionDataDelegate, @unchecked Sendabl
           return
         }
         renderer.enqueue(frame)
+        behindSinceEvent = max(behindSinceEvent, trip - (fastest ?? trip))
 #if DEBUG
         if stall > 0 {
           Thread.sleep(forTimeInterval: stall)
@@ -356,8 +364,9 @@ final class LiveConnection: NSObject, URLSessionDataDelegate, @unchecked Sendabl
         let now = Date()
         if now.timeIntervalSince(lastFrameEvent) > 0.5 {
           lastFrameEvent = now
-          received(.frames(framesSinceEvent))
+          received(.frames(framesSinceEvent, behind: behindSinceEvent, restarts: restarts))
           framesSinceEvent = 0
+          behindSinceEvent = 0
         }
       case .motion(let motion):
         received(.motion(motion))
