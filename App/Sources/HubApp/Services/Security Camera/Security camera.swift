@@ -55,6 +55,10 @@ final class SecurityCamera {
     fileprivate(set) var motion = CameraMotion(isActive: false, level: 0)
     fileprivate(set) var viewers = 0
     fileprivate(set) var storageProblem: String?
+    /// No clips now: someone is using the Mac (When I'm Away)
+    fileprivate(set) var clipsPaused = false
+    /// No live view either, while clips are paused (live view while paused off)
+    fileprivate(set) var liveOff = false
     fileprivate var password: String
 
     fileprivate init(id: String, engine: CameraEngine, recorder: CameraRecorder, server: CameraServer, port: UInt16, info: CameraInfoBox, shareName: String, password: String) {
@@ -83,8 +87,16 @@ final class SecurityCamera {
   private(set) var units: [String: Unit] = [:]
   /// Why the cameras aren't capturing, while they aren't
   private(set) var interruption: String? {
-    didSet { units.values.forEach { $0.info.value.paused = interruption } }
+    didSet { units.values.forEach { $0.info.value.paused = pausedReason($0) } }
   }
+  /// Whether someone is using this Mac, while a camera records only when they're away
+  private(set) var presence: UserPresence?
+  /// Record for 1 Hour: cameras that record until then even while someone is using the Mac
+  private(set) var recordsUntil: [String: Date] = [:]
+  private var presenceObservation: UserPresenceObservation?
+
+  static let clipsPausedReason = "Clips paused · you’re using this \(deviceKind)"
+  static let liveOffReason = "Live view is off while you’re using this \(deviceKind)."
   /// Why a camera couldn't start, while it can't
   private(set) var problem: String?
   /// What the cameras cost now, and before the last change (the budget's ticks)
@@ -350,7 +362,10 @@ final class SecurityCamera {
       }
     }
     router.set(Dictionary(units.values.map { ($0.engine.device.id, $0.engine) }, uniquingKeysWith: { a, _ in a }))
-    let configurations = wanted.filter { units[$0.id] != nil }.map(\.configuration)
+    observePresence()
+    updateClipsPaused()
+    // A camera whose live view is off while clips are paused doesn't capture at all
+    let configurations = wanted.filter { units[$0.id].map { !$0.liveOff } ?? false }.map(\.configuration)
     let rig = rig
     let before = budget
     do {
@@ -401,6 +416,8 @@ final class SecurityCamera {
   private func change(_ unit: Unit, to setup: CameraSetup) async throws {
     try unit.engine.update(engineSettings(setup))
     unit.info.value = info(setup, engine: unit.engine)
+    unit.info.value.paused = pausedReason(unit)
+    unit.info.value.clipsPaused = unit.clipsPaused ? Self.clipsPausedReason : nil
     if let hub {
       await unit.recorder.configure(policy: settings.storage, hubStorage: hubStorage(hub)) { events in
         Task { @MainActor in SecurityCamera.main.units[setup.id]?.events = events }
@@ -424,6 +441,64 @@ final class SecurityCamera {
     unit.server.stop()
     await unit.recorder.stop()
     unit.engine.stop()
+  }
+
+  // MARK: When I'm Away
+
+  /// Follows whether someone uses the Mac while a running camera records only when they're away
+  private func observePresence() {
+    let needed = phase == .on && UserPresence.isSupported && settings.cameras.contains { $0.isOn && $0.recording.when == .whenAway }
+    if needed, presenceObservation == nil {
+      presenceObservation = UserPresence.observe { presence in
+        SecurityCamera.main.presence = presence
+        SecurityCamera.main.updateClipsPaused()
+      }
+    } else if !needed, presenceObservation != nil {
+      presenceObservation?.cancel()
+      presenceObservation = nil
+      presence = nil
+    }
+  }
+
+  /// Whether this camera records no clips now: When I'm Away, someone is using the Mac, and no Record for 1 Hour
+  func clipsPaused(_ setup: CameraSetup) -> Bool {
+    guard setup.recording.when == .whenAway, let presence else { return false }
+    if let until = recordsUntil[setup.id], until > Date() { return false }
+    return !presence.isAway(after: Double(setup.recording.awayMinutes) * 60)
+  }
+
+  /// Records for an hour even while someone is using the Mac; nil ends it
+  func recordForAnHour(_ id: String, _ on: Bool = true) {
+    recordsUntil[id] = on ? Date().addingTimeInterval(3600) : nil
+    updateClipsPaused()
+  }
+
+  /// Pauses and resumes the running cameras' clips as presence changes; restarts the rig when a live view goes off or
+  /// comes back
+  private func updateClipsPaused() {
+    if recordsUntil.values.contains(where: { $0 <= Date() }) { recordsUntil = recordsUntil.filter { $0.value > Date() } }
+    var liveChanged = false
+    for setup in settings.cameras {
+      guard let unit = units[setup.id] else { continue }
+      let paused = clipsPaused(setup)
+      let liveOff = paused && !setup.recording.liveWhilePaused
+      if unit.clipsPaused != paused {
+        unit.clipsPaused = paused
+        unit.info.value.clipsPaused = paused ? Self.clipsPausedReason : nil
+        let recorder = unit.recorder
+        Task { await recorder.setPaused(paused) }
+      }
+      if unit.liveOff != liveOff {
+        unit.liveOff = liveOff
+        unit.info.value.paused = pausedReason(unit)
+        liveChanged = true
+      }
+    }
+    if liveChanged { Task { await apply() } }
+  }
+
+  private func pausedReason(_ unit: Unit) -> String? {
+    interruption ?? (unit.liveOff ? Self.liveOffReason : nil)
   }
 
   private func engineSettings(_ setup: CameraSetup) -> CameraEngine.Settings {

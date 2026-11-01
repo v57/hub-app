@@ -378,6 +378,8 @@ struct CameraLive: View {
         Spacer()
         if isMotion {
           VideoChip(title: style == .tile ? "Motion" : "Motion now", systemImage: "figure.walk.motion", tone: .motion)
+        } else if style == .tile, viewer.state == .live, viewer.info?.clipsPaused != nil {
+          VideoChip(title: "Clips paused", systemImage: "pause.fill")
         } else if style == .tile, viewer.state == .live {
           VideoChip(title: "LIVE", tone: .live)
         }
@@ -385,6 +387,9 @@ struct CameraLive: View {
       Spacer()
       if style == .large, viewer.state == .live, let info = viewer.info {
         HStack {
+          if let clipsPaused = info.clipsPaused {
+            VideoChip(title: clipsPaused, systemImage: "pause.fill")
+          }
           if let zone = info.zone, zone != CameraBox(x: 0, y: 0, width: 1, height: 1) {
             VideoChip(title: "Zone", systemImage: "rectangle.dashed")
           }
@@ -439,6 +444,7 @@ extension CameraViewer {
     switch state {
     case .live:
       if info?.paused != nil { parts.append("paused") }
+      else if info?.clipsPaused != nil { parts.append("clips paused") }
       else if motion?.isActive == true { parts.append("motion now") }
       else if let last = events.first { parts.append("last motion \(CameraTime.short(last.start))") }
       else { parts.append("no motion yet") }
@@ -452,7 +458,7 @@ extension CameraViewer {
 
   var hue: Hue {
     switch state {
-    case .live: info?.paused != nil ? .yellow : motion?.isActive == true ? .orange : .green
+    case .live: info?.paused != nil ? .yellow : info?.clipsPaused != nil ? .gray : motion?.isActive == true ? .orange : .green
     case .offline: .gray
     case .failed, .wrongPassword: .red
     default: .gray

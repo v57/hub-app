@@ -57,6 +57,8 @@ actor CameraRecorder {
   private var watching: Task<Void, Never>?
   private var onChange: (@Sendable ([CameraEvent]) -> Void)?
   private(set) var lastError: String?
+  /// No clips while paused (someone is using the Mac): motion is still detected, for the live view
+  private(set) var isPaused = false
 
   private struct Recording {
     var id: String
@@ -112,6 +114,16 @@ actor CameraRecorder {
     await finish()
   }
 
+  /// Pausing ends the clip being recorded now; the next motion after resuming starts a new one
+  func setPaused(_ paused: Bool) async {
+    guard paused != isPaused else { return }
+    isPaused = paused
+    guard paused else { return }
+    stopping?.cancel()
+    stopping = nil
+    await finish()
+  }
+
   func thumbnail(_ id: String) -> URL? {
     let url = folder.appending(path: "Thumbnails/\(id).jpg")
     return FileManager.default.fileExists(atPath: url.path) ? url : nil
@@ -143,6 +155,7 @@ actor CameraRecorder {
 
   private func motion(_ event: MotionEvent, engine: CameraEngine) async {
     if event.isActive {
+      guard !isPaused else { return }
       stopping?.cancel()
       stopping = nil
       if recording == nil { await begin(engine: engine, peak: event.level) }

@@ -101,6 +101,15 @@ enum CameraDriver {
         camera.update(setup)
       }
     }
+    // --camera-record always | away[:minutes][:nolive] for every lens on
+    if let record = argument("--camera-record")?.split(separator: ":").map(String.init), let when = record.first {
+      for var setup in camera.settings.cameras where setup.isOn {
+        setup.recording.when = when == "always" ? .always : .whenAway
+        if record.count > 1, let minutes = Int(record[1]) { setup.recording.awayMinutes = minutes }
+        setup.recording.liveWhilePaused = !record.contains("nolive")
+        camera.update(setup)
+      }
+    }
     await camera.turnOn(hub: hub)
     for setup in camera.settings.cameras where setup.isOn {
       log("\(setup.place) password \(camera.password(setup.id)) \(setup.video.title)")
@@ -115,6 +124,11 @@ enum CameraDriver {
       for unit in camera.orderedUnits {
         line += " | \(unit.shareName) published=\(unit.isPublished) problem=\(unit.shareProblem ?? "-") motion=\(unit.motion.isActive) "
           + "events=\(unit.events.count) viewers=\(unit.viewers) storage=\(unit.storageProblem ?? "-")"
+          + " clips=\(unit.clipsPaused ? "paused" : "on")\(unit.liveOff ? " live=off" : "")"
+      }
+      if let presence = camera.presence {
+        // Whole minutes, so the line changes only when something does
+        line += " | presence locked=\(presence.isLocked) asleep=\(presence.isAsleep) idle=\(Int((presence.idle ?? 0) / 60))m"
       }
       if line != last || tick % 20 == 0 {
         log("\(line) cpu=\(camera.cpuShare.map { String(format: "%.3f", $0) } ?? "-")")

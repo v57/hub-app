@@ -10,6 +10,7 @@
 #if canImport(PlatformCamera)
 import Foundation
 import PlatformCamera
+import PlatformPower
 
 struct CameraSetup: Codable, Hashable, Identifiable, Sendable {
   var id: String
@@ -25,12 +26,29 @@ struct CameraSetup: Codable, Hashable, Identifiable, Sendable {
   var picture = CameraProfile.balanced.picture(stabilizes: false)
   /// What Lock Now froze, while focus, exposure or white balance stay locked there
   var locked: CameraLockedValues?
+  /// When it records clips (a Mac's camera; iPhone and iPad always record)
+  var recording = CameraRecording()
 
   init(id: String = UUID().uuidString.lowercased(), device: String, place: String, isOn: Bool) {
     self.id = id
     self.device = device
     self.place = place
     self.isOn = isOn
+  }
+
+  // Settings saved before a field existed keep its default
+  init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    id = try container.decode(String.self, forKey: .id)
+    device = try container.decode(String.self, forKey: .device)
+    place = try container.decode(String.self, forKey: .place)
+    isOn = try container.decode(Bool.self, forKey: .isOn)
+    video = try container.decodeIfPresent(CameraVideo.self, forKey: .video) ?? CameraVideo()
+    sensitivity = try container.decodeIfPresent(Double.self, forKey: .sensitivity) ?? 0.5
+    zone = try container.decodeIfPresent(MotionDetector.Zone.self, forKey: .zone)
+    picture = try container.decodeIfPresent(CameraPicture.self, forKey: .picture) ?? CameraProfile.balanced.picture(stabilizes: false)
+    locked = try container.decodeIfPresent(CameraLockedValues.self, forKey: .locked)
+    recording = try container.decodeIfPresent(CameraRecording.self, forKey: .recording) ?? CameraRecording()
   }
 
   /// The profile the picture and video match, if any
@@ -63,6 +81,24 @@ struct CameraVideo: Codable, Hashable, Sendable {
   }
 
   var title: String { "\(height)p · \(fps) fps · \(codec.title)" }
+}
+
+/// When a camera records clips. On a Mac someone works at, motion is mostly them: When I'm Away keeps clips (and
+/// motion notifications) for when the Mac is locked, asleep or has had no keyboard or mouse for `awayMinutes`. Live
+/// view goes on either way, unless `liveWhilePaused` is off.
+struct CameraRecording: Codable, Hashable, Sendable {
+  enum When: String, Codable, CaseIterable, Sendable {
+    case always
+    case whenAway
+
+    var title: String { self == .always ? "Always" : "When I’m Away" }
+  }
+
+  var when: When = UserPresence.isSupported ? .whenAway : .always
+  var awayMinutes = 5
+  var liveWhilePaused = true
+
+  static let minuteChoices = [1, 2, 5, 10, 15, 30]
 }
 
 /// Presets for picture and power: how much the camera adjusts its picture, against heat and battery

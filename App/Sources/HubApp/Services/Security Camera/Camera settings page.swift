@@ -5,7 +5,8 @@
 //  This device as the hub's camera: on or off for the hub, each of its cameras (lenses) on or off as its own camera
 //  named by its place, and for the one selected its preview with the motion zone, the live motion level against the
 //  sensitivity, its video (sizes, frame rates and codecs it can't do now greyed, with why), what that costs in data and
-//  storage, how much it adjusts its picture against the system's own budget, where clips go, and its password.
+//  storage, how much it adjusts its picture against the system's own budget, when it records (a Mac: only while
+//  nobody is using it), where clips go, and its password.
 //  On a Mac two columns; on iPhone one, with Picture and Power and Expected Usage pushed.
 //
 
@@ -13,6 +14,7 @@
 import SwiftUI
 import ComponentKit
 import PlatformCamera
+import PlatformPower
 
 struct CameraSettingsPage: View {
   /// Back to the grid, where the page opens in place
@@ -71,6 +73,9 @@ struct CameraSettingsPage: View {
                 VStack(spacing: KitMetrics.gutter) {
                   master
                   CamerasCard(setups: setups, selected: selected.id) { selection = $0 }
+                  if UserPresence.isSupported {
+                    WhenToRecordCard(setup: selected)
+                  }
                   VideoCard(setup: selected)
                   ClipsCard()
                   AccessCard(setup: selected)
@@ -661,6 +666,71 @@ private struct PictureCard: View {
     if let lens = locked.lensPosition { parts.append(String(format: "focus %.2f", lens)) }
     parts.append("taken \(CameraTime.short(locked.date))")
     return parts.joined(separator: " · ")
+  }
+
+  private func binding<Value>(_ path: WritableKeyPath<CameraSetup, Value>) -> Binding<Value> {
+    Binding { setup[keyPath: path] } set: { value in
+      var setup = setup
+      setup[keyPath: path] = value
+      camera.update(setup)
+    }
+  }
+}
+
+// MARK: - When to record
+
+/// A Mac's camera: clips always, or only while nobody is using the Mac (locked, asleep, or no keyboard or mouse for a
+/// while). Live view goes on while clips wait, unless it's turned off; Record for 1 Hour records anyway.
+private struct WhenToRecordCard: View {
+  let setup: CameraSetup
+  @State private var camera = SecurityCamera.main
+
+  var body: some View {
+    let recording = setup.recording
+    let unit = camera.units[setup.id]
+    let until = camera.recordsUntil[setup.id]
+    KitSection("When to Record", meta: [setup.place, statusLine], systemImage: "clock", hue: .purple) {
+      FormCard(footer: "Hub checks only whether the \(KitDevice.nameInSentence) is in use; nothing about it leaves this \(KitDevice.nameInSentence). Viewers see that clips are paused.") {
+        FormRow("Record Clips", systemImage: "record.circle") {
+          KitSegmented(selection: binding(\.recording.when), segments: CameraRecording.When.allCases.map { KitSegment($0.title, value: $0) })
+            .fixedSize()
+        }
+        if recording.when == .whenAway {
+          FormRow("Away After", help: "No keyboard or mouse for this long. Locked or asleep counts at once.", systemImage: "hourglass") {
+            KitPicker("Away After", selection: binding(\.recording.awayMinutes), options: CameraRecording.minuteChoices.map { ($0 == 1 ? "1 minute" : "\($0) minutes", $0) })
+              .fixedSize()
+          }
+          FormRow("Live View While Paused", help: recording.liveWhilePaused ? "Viewers still see the picture; nothing is recorded" : "The camera stops while you use the \(KitDevice.nameInSentence)", systemImage: "eye") {
+            Toggle("Live View While Paused", isOn: binding(\.recording.liveWhilePaused))
+              .toggleStyle(.kitSwitch).labelsHidden().controlSize(.small)
+          }
+          FormRow("Record for 1 Hour", help: until.map { "Recording until \($0.formatted(date: .omitted, time: .shortened)), even while you use it" } ?? "Records even while you use the \(KitDevice.nameInSentence)", systemImage: "record.circle.fill") {
+            if until != nil {
+              Button("Stop") { camera.recordForAnHour(setup.id, false) }.buttonStyle(.kit).controlSize(.small)
+            } else {
+              Button("Record for 1 Hour") { camera.recordForAnHour(setup.id) }.buttonStyle(.kit).controlSize(.small)
+                .disabled(unit == nil)
+            }
+          }
+        }
+      }
+    } accessory: {
+      if unit?.clipsPaused == true {
+        KitStatusPill("Paused", systemImage: "pause.fill", hue: .gray)
+      } else if until != nil {
+        KitStatusPill("Recording", systemImage: "record.circle", hue: .red)
+      }
+    }
+  }
+
+  /// What the Mac's use looks like now: "you typed 4 s ago", "locked"
+  private var statusLine: String {
+    guard setup.recording.when == .whenAway else { return "every motion" }
+    guard let presence = camera.presence else { return "while you’re away" }
+    if presence.isLocked { return "locked" }
+    if presence.isAsleep { return "asleep" }
+    guard let idle = presence.idle else { return "while you’re away" }
+    return idle < 60 ? "you typed \(Int(idle)) s ago" : "no input for \(Int(idle / 60)) min"
   }
 
   private func binding<Value>(_ path: WritableKeyPath<CameraSetup, Value>) -> Binding<Value> {

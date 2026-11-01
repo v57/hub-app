@@ -204,6 +204,8 @@ struct CameraInfo: Codable, Hashable, Sendable {
   /// The device's model and system, and its power (Old iPhone 11 · iOS 18, Charging · 100%)
   var device: String?
   var power: String?
+  /// Why it records no clips now, while it doesn't (Clips paused · you’re using this Mac)
+  var clipsPaused: String?
 }
 
 /// A motion event and its clip
