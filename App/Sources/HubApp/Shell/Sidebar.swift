@@ -354,6 +354,8 @@ struct HubPageRow: View {
       if !groups.groups.isEmpty { Text(groups.groups.count == 1 ? "1 group" : "\(groups.groups.count) groups").kitFont(.caption) }
     case .lockdown:
       Text(whitelist.enabled ? "On" : "Off").kitFont(.caption)
+    case .cameras:
+      CamerasRowTrailing()
     case .overview, .files, .network:
       EmptyView()
     }
@@ -455,6 +457,7 @@ extension Hub {
     case .services: true
     case .apps: true
     case .files: hasStorage || canInstall
+    case .cameras: CamerasPage.isAvailable && HubNets.isAvailable && canViewNetwork
     case .launcher: require(permissions: "launcher/status")
     case .devices: require(permissions: "hub/devices")
     case .requests: require(permissions: "hub/host/pending")

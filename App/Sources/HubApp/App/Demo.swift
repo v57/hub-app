@@ -122,18 +122,18 @@ enum HubDemo {
   static let thisAgentKey = "agent-studio-mac"
 
   /// Home's network as the hub-net boards draw it: this Mac, home-nas sharing its internet and two apps, a phone, a PC
-  /// this Mac can't reach, an asleep laptop, and two more devices that share their internet. `--demo-net 100`: that
-  /// many devices, for the map's rings and the list. `--demo-net-off`: this Mac's network is off. `--demo-net-sharing`: this
-  /// Mac shares its internet.
+  /// this Mac can’t reach, an asleep laptop (the phone and the laptop are cameras), and two more devices that share
+  /// their internet. `--demo-net 100`: that many devices, for the map's rings and the list. `--demo-net-off`: this
+  /// Mac's network is off. `--demo-net-sharing`: this Mac shares its internet.
   static func network(_ hub: Hub) {
     let arguments = ProcessInfo.processInfo.arguments
     let count = arguments.firstIndex(of: "--demo-net").flatMap { $0 + 1 < arguments.count ? Int(arguments[$0 + 1]) : nil } ?? 0
     var devices: [(name: String, platform: String, state: String, gateway: Bool, apps: [(String, Int, String?)])] = [
       ("studio-mac", "macos", "online", false, []),
       ("home-nas", "linux", "online", true, [("photos", 2342, nil), ("jellyfin", 8096, "family")]),
-      ("maya-iphone", "ios", "online", false, []),
+      ("maya-iphone", "ios", "online", false, [("Camera: maya-iphone", 49152, nil)]),
       ("gaming-pc", "windows", "unreachable", false, [("steam-link", 27036, nil)]),
-      ("old-macbook", "macos", "asleep", false, []),
+      ("old-macbook", "macos", "asleep", false, [("Camera: old-macbook", 49153, nil)]),
       ("fra-vps", "linux", "online", true, []),
       ("office-mini", "macos", "online", true, [("files", 8384, nil), ("notes", 3000, nil), ("print", 631, nil)]),
       ("parents-pi", "linux", "asleep", true, []),
@@ -170,7 +170,8 @@ enum HubDemo {
       for app in device.apps {
         let id = "res-\(device.name)-\(app.0)"
         resources.append([
-          "version": 1, "resourceId": id, "ownerKey": key, "shareName": app.0, "authority": "\(app.0).\(device.name).hub.invalid:\(app.1)",
+          "version": 1, "resourceId": id, "ownerKey": key, "shareName": app.0,
+          "authority": "\(app.0.lowercased().replacingOccurrences(of: ": ", with: "-")).\(device.name).hub.invalid:\(app.1)",
           "policy": ["mode": app.2 == nil ? "hub" : "group", "group": app.2 as Any], "generation": 1,
         ])
         providers[id] = [HubNetworkProvider(version: 1, providerId: "p-\(id)", resourceId: id, serviceKey: key, key: key, protocol: .tcp,

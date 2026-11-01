@@ -12,7 +12,7 @@ import ComponentKit
 
 /// A page of one hub, in the sidebar's order: the hub's own card, then Access, then Hub Network.
 enum HubPage: String, Hashable, CaseIterable, Sendable {
-  case overview, services, apps, files, launcher
+  case overview, services, apps, files, cameras, launcher
   case devices, requests, connections, permissions, lockdown
   case network
 
@@ -22,6 +22,7 @@ enum HubPage: String, Hashable, CaseIterable, Sendable {
     case .services: "Services"
     case .apps: "Apps"
     case .files: "Files"
+    case .cameras: "Cameras"
     case .launcher: "Launcher"
     case .devices: "Devices"
     case .requests: "Requests"
@@ -37,6 +38,7 @@ enum HubPage: String, Hashable, CaseIterable, Sendable {
     case .services: "hexagon"
     case .apps: "square.grid.3x3"
     case .files: "folder"
+    case .cameras: "video"
     case .launcher: "apple.terminal"
     case .devices: "macbook.and.iphone"
     case .requests: "clock"
@@ -49,7 +51,7 @@ enum HubPage: String, Hashable, CaseIterable, Sendable {
   /// The sidebar card the page is in
   var group: Group {
     switch self {
-    case .overview, .services, .apps, .files, .launcher: .hub
+    case .overview, .services, .apps, .files, .cameras, .launcher: .hub
     case .devices, .requests, .connections, .permissions, .lockdown: .access
     case .network: .network
     }

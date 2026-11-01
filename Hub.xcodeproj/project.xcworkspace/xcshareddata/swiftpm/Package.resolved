@@ -25,7 +25,7 @@
       "location" : "https://github.com/v57/HubServer.git",
       "state" : {
         "branch" : "main",
-        "revision" : "9887e22e56f0c28f5df27f71ddeced5ffde9edea"
+        "revision" : "2cb71481bb8ec201f70d2b4202fbb2c7a572e534"
       }
     },
     {
@@ -43,7 +43,7 @@
       "location" : "https://github.com/v57/Platform.git",
       "state" : {
         "branch" : "main",
-        "revision" : "0d9af9dd51dec3e28505d3e3777548ceaa6fddbe"
+        "revision" : "cf393092cc29198ef6a35adbdce7dbfd97f07c02"
       }
     },
     {

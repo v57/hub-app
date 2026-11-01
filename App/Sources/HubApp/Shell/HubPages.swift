@@ -22,6 +22,7 @@ struct HubPageView: View {
       case .services: ServicesPage()
       case .apps: AppsPage()
       case .files: FilesPage()
+      case .cameras: CamerasPage()
       case .launcher: LauncherPage()
       case .devices: DevicesPage()
       case .requests: RequestsPage()

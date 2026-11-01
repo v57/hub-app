@@ -453,6 +453,7 @@ extension HubPage {
     case .services: .blue
     case .apps: .purple
     case .files: .blue
+    case .cameras: .indigo
     case .launcher: .gray
     case .devices: .gray
     case .requests: .orange

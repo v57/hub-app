@@ -31,6 +31,10 @@ public struct HubApp: App {
 #if DEBUG
         if HubReset.isRequested {
           Text("Resetting Hub…").task { await HubReset.run() }
+        } else if CameraSelfTest.isRequested {
+          Text("Camera self-test…").task { await CameraSelfTest.run() }
+        } else if CameraPublishTest.isRequested {
+          Text("Camera publish test…").task { await CameraPublishTest.run() }
         } else if ProcessInfo.processInfo.environment["HUB_HN9XX_OWNER_ACCEPTANCE"] != nil
             || ProcessInfo.processInfo.environment["HUB_HN9XX_JOINER_ACCEPTANCE"] != nil {
           HN9xxAcceptanceView()
@@ -63,6 +67,10 @@ public struct HubApp: App {
           NetworkInvitationRouter.main.open(url)
         }
       }
+#if canImport(PlatformCamera)
+      // The security camera comes back on where the user left it on
+      .task { SecurityCamera.main.restore() }
+#endif
 #if canImport(HubServer)
       // The hub this device runs: started at launch when it's on, again after iOS suspended it
       .task { await LocalHub.main.resume() }

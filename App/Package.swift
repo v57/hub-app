@@ -23,6 +23,8 @@ func v57(_ name: String) -> Package.Dependency {
 
 /// The vault isn't built for tvOS and visionOS (the code checks `canImport(VaultHub)`).
 let vault = TargetDependencyCondition.when(platforms: [.macOS, .iOS, .linux, .windows])
+/// The security camera, on the devices that have cameras (the code checks `canImport(PlatformCamera)`).
+let camera = TargetDependencyCondition.when(platforms: [.macOS, .iOS])
 
 let package = Package(
   name: "HubApp",
@@ -45,6 +47,9 @@ let package = Package(
         .product(name: "VaultHub", package: "Vault", condition: vault),
         .product(name: "PlatformPower", package: "Platform"),
         .product(name: "PlatformSystem", package: "Platform"),
+        .product(name: "PlatformCamera", package: "Platform", condition: camera),
+        .product(name: "PlatformMedia", package: "Platform", condition: camera),
+        .product(name: "ChannelServer", package: "HubServer"),
       ],
       // As the Xcode target had it: Swift 6 with the project's upcoming features that Swift 6 doesn't turn on itself.
       swiftSettings: [
