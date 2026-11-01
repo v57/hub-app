@@ -10,10 +10,11 @@
 //      GET /snapshot.jpg?width=640  the newest picture
 //      GET /events                  [CameraEvent] (JSON), newest first
 //      GET /events/<id>/thumbnail.jpg, GET /events/<id>/clip.mp4
+//      DELETE /events/<id>          deletes the event and its clip, wherever it's kept
 //
 //  Every request carries `Authorization: Bearer <password>`.
 //
-//  Why a framed H.264 stream over one HTTP response, not HLS or fragmented MP4: HLS waits for whole segments (seconds
+//  Why a framed H.264 (or HEVC) stream over one HTTP response, not HLS or fragmented MP4: HLS waits for whole segments (seconds
 //  of latency even with 1 s segments, more with the player's buffer), while these records are the encoder's access
 //  units as they come out, shown at once with AVSampleBufferDisplayLayer: the latency is the network's. It's one TCP
 //  connection through the WireGuard overlay (no UDP or multicast to forward), the server drops frames for a viewer that
@@ -32,8 +33,8 @@ enum CameraWire {
   static let maximumRecord = 8 << 20
 
   enum Kind: UInt8 {
-    /// flags (bit 0: keyframe), time (Float64), duration (Float32), width, height (UInt16), parameter set count
-    /// (UInt8), each parameter set (UInt16 length + bytes), then the frame's AVCC data
+    /// flags (bit 0: keyframe, bit 1: HEVC), time (Float64), duration (Float32), width, height (UInt16), parameter
+    /// set count (UInt8), each parameter set (UInt16 length + bytes), then the frame's AVCC (HVCC) data
     case video = 1
     /// CameraMotion as JSON
     case motion = 2
@@ -46,7 +47,7 @@ enum CameraWire {
 
   static func record(_ frame: EncodedVideoFrame) -> Data {
     var payload = Data(capacity: frame.data.count + 64)
-    payload.append(frame.isKeyframe ? 1 : 0)
+    payload.append((frame.isKeyframe ? 1 : 0) | (frame.codec == .hevc ? 2 : 0))
     payload.append(bigEndian: frame.time.bitPattern)
     payload.append(bigEndian: Float32(frame.duration).bitPattern)
     payload.append(bigEndian: UInt16(clamping: frame.width))
@@ -114,7 +115,7 @@ enum CameraWire {
         sets.append(Data(reader.take(Int(length))))
       }
       return EncodedVideoFrame(
-        data: Data(reader.rest), isKeyframe: flags & 1 == 1, time: Double(bitPattern: time),
+        codec: flags & 2 == 2 ? .hevc : .h264, data: Data(reader.rest), isKeyframe: flags & 1 == 1, time: Double(bitPattern: time),
         duration: Double(Float32(bitPattern: duration)), parameterSets: sets, width: Int(width), height: Int(height))
     }
   }
@@ -157,19 +158,29 @@ private extension Data {
 }
 #endif
 
+/// A part of the picture, in parts of its width and height (0…1, origin top left)
+struct CameraBox: Codable, Hashable, Sendable {
+  var x: Double
+  var y: Double
+  var width: Double
+  var height: Double
+}
+
 /// The camera's state on the live stream and in `CameraInfo`
 struct CameraMotion: Codable, Hashable, Sendable {
   /// Motion is going on, and a clip is being recorded
   var isActive: Bool
-  /// How much of the picture moves, 0…1
+  /// How much of the picture (of the motion zone, with one) moves, 0…1
   var level: Double
+  /// Where it moves, while it does
+  var box: CameraBox?
 }
 
 /// What `GET /` answers
 struct CameraInfo: Codable, Hashable, Sendable {
   /// The camera device's name
   var name: String
-  /// Which of its cameras
+  /// Which of its cameras (the lens: Back Camera, FaceTime HD Camera)
   var camera: String
   var width: Int
   var height: Int
@@ -178,6 +189,21 @@ struct CameraInfo: Codable, Hashable, Sendable {
   var sensitivity: Double
   /// Where clips go: `device` or `hub`
   var storage: String
+  /// The place it watches (Front Door); what the hub's share is named after
+  var place: String?
+  /// `h264` or `hevc`
+  var codec: String?
+  /// Bits per second of the live stream
+  var bitrate: Int?
+  /// Devices watching it live now
+  var viewers: Int?
+  /// Why it isn't capturing, while it isn't (another app took the camera, the device is too hot)
+  var paused: String?
+  /// Where motion counts; nil for the whole picture
+  var zone: CameraBox?
+  /// The device's model and system, and its power (Old iPhone 11 · iOS 18, Charging · 100%)
+  var device: String?
+  var power: String?
 }
 
 /// A motion event and its clip

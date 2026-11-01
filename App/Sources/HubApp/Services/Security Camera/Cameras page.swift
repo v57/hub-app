@@ -2,8 +2,10 @@
 //  Cameras page.swift
 //  Hub
 //
-//  A hub's cameras: this device as one (on, off, password, motion sensitivity, where clips go and how long they stay),
-//  and every camera on the hub's network with its live view; a camera opens with its motion events and clips.
+//  A hub's cameras: every camera on the hub's network live in a grid, named by the place it watches with its device
+//  under it, motion on the tile (an orange chip and box); the motion events of all of them in the inspector (Today or
+//  the Week); Add Camera; where the clips are kept. A camera opens on its own page (`CameraPage`), this device's
+//  cameras on their settings (`CameraSettingsPage`).
 //
 
 #if canImport(ComponentKit)
@@ -12,7 +14,6 @@ import ComponentKit
 import HubService
 #if canImport(PlatformCamera)
 import PlatformCamera
-import PlatformMedia
 #endif
 
 struct CamerasPage: View {
@@ -29,7 +30,10 @@ struct CamerasPage: View {
 #if canImport(PlatformCamera)
   @HubState(\.networkResources) private var resources
   @Environment(\.kitIdiom) private var idiom
-  @State private var opened: HubCamera?
+  @State private var pushed: CamerasRoute?
+  @State private var span = EventSpan.today
+  @State private var addsCamera = false
+  @State private var camera = SecurityCamera.main
 
   private var cameras: [HubCamera] {
     resources.compactMap(HubCamera.init).sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
@@ -37,40 +41,115 @@ struct CamerasPage: View {
 
   var body: some View {
     let cameras = cameras
-    ScrollView {
-      VStack(alignment: .leading, spacing: KitMetrics.gutter) {
-        if SecurityCamera.isSupported {
-          ThisDeviceCamera()
-        }
-        if cameras.isEmpty {
-          EmptyState(
-            systemImage: "video", title: "No Cameras on \(hub.settings.name)",
-            message: "Turn an old iPhone, iPad or Mac into a camera: open this page on it and turn on its camera. Your devices on Hub Network see it here."
-          )
-          .padding(.top, 40)
-        } else {
-          KitSection("Cameras", meta: [cameras.count == 1 ? "1 camera" : "\(cameras.count) cameras"], systemImage: "video", hue: .indigo) {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: idiom == .phone ? 280 : 340), spacing: KitMetrics.gutter, alignment: .top)], spacing: KitMetrics.gutter) {
-              ForEach(cameras) { camera in
-                CameraTile(camera: camera) { opened = camera }
-              }
-            }
-            .padding(4)
+    let viewers = CameraViewers.of(hub)
+    Group {
+      // Mac and iPad have no stack to push on: a camera's page opens in place, with a back button
+      if idiom != .phone, let route = pushed {
+        routed(route, viewers: viewers, back: { pushed = nil }).id(route)
+      } else {
+        grid(cameras, viewers: viewers)
+          .navigationDestination(item: idiom == .phone ? $pushed : .constant(nil)) { route in
+            routed(route, viewers: viewers, back: nil).hub(hub)
           }
-          .kitSectionStyle(.plain)
-        }
-        if !hub.net.isJoined {
-          Text("This \(KitDevice.nameInSentence) reaches cameras through Hub Network: turn it on on the Network page.")
-            .kitFont(.caption)
+      }
+    }
+#if DEBUG
+    .task(id: cameras.map(\.id)) {
+      // --camera-open settings | camera | clip: a camera page at launch, for captures
+      guard !Self.openedAtLaunch, let open = CommandLine.arguments.firstIndex(of: "--camera-open").map({ CommandLine.arguments[$0 + 1] }) else { return }
+      if open == "settings" {
+        Self.openedAtLaunch = true
+        pushed = .settings
+      } else if let first = cameras.first(where: { viewers.viewer($0).isOwn }) ?? cameras.first {
+        Self.openedAtLaunch = true
+        if open == "clip" {
+          viewers.use(first)
+          let viewer = viewers.viewer(first)
+          for _ in 0..<40 where viewer.events.first(where: { $0.end != nil }) == nil { try? await Task.sleep(for: .milliseconds(500)) }
+          viewers.release(first)
+          if let event = viewer.events.first(where: { $0.end != nil }) { pushed = .clip(first, event.id) }
+        } else {
+          pushed = .camera(first)
         }
       }
-      .padding(KitMetrics.gutter)
     }
-    .kitPane(.content)
-    .pageToolbar("Cameras", meta: PageMeta.parts(hub, [cameras.count == 1 ? "1 camera" : "\(cameras.count) cameras"]), systemImage: HubPage.cameras.systemImage, hue: .indigo) { }
-    .navigationDestination(item: $opened) { camera in
-      CameraDetail(camera: camera).hub(hub)
+#endif
+  }
+
+  @ViewBuilder private func routed(_ route: CamerasRoute, viewers: CameraViewers, back: (() -> Void)?) -> some View {
+    switch route {
+    case .camera(let camera): CameraPage(camera: camera, viewers: viewers, back: back) { pushed = .settings }
+    case .clip(let camera, let event): CameraPage(camera: camera, viewers: viewers, playing: event, back: back) { pushed = .settings }
+    case .settings: CameraSettingsPage(back: back)
     }
+  }
+
+  private func grid(_ cameras: [HubCamera], viewers: CameraViewers) -> some View {
+    PageWithInspector(name: "cameras", showsInspector: !cameras.isEmpty) {
+      ScrollView {
+        VStack(alignment: .leading, spacing: KitMetrics.gutter) {
+          CameraBanners()
+          if cameras.isEmpty {
+            EmptyState(
+              systemImage: "video", title: "No Cameras on \(hub.settings.name)",
+              message: "Use this \(KitDevice.nameInSentence), or an old iPhone or iPad that stays at home: open Hub on it, go to \(hub.settings.name) › Cameras and turn its camera on."
+            ) {
+              if SecurityCamera.isSupported, !camera.isOn {
+                Button("Use This \(KitDevice.name) as a Camera") { pushed = .settings }.buttonStyle(.kitPrimary)
+              }
+            }
+            .padding(.top, 40)
+          } else {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: idiom == .phone ? 280 : 360), spacing: KitMetrics.gutter * 1.5, alignment: .top)], spacing: KitMetrics.gutter * 1.5) {
+              ForEach(cameras) { camera in
+                CameraTile(camera: camera, viewers: viewers) { pushed = .camera(camera) }
+              }
+              if idiom != .phone, SecurityCamera.isSupported {
+                AddCameraTile { pushed = .settings }
+              }
+            }
+            if idiom == .phone {
+              CameraEventsSection(cameras: cameras, viewers: viewers, span: $span) { camera, event in
+                pushed = .clip(camera, event)
+              }
+            }
+            CameraStorageLine(cameras: cameras, viewers: viewers)
+          }
+        }
+        .padding(KitMetrics.gutter)
+        .padding(.bottom, 24)
+      }
+    } inspector: {
+      ScrollView {
+        CameraEventsSection(cameras: cameras, viewers: viewers, span: $span) { camera, event in
+          pushed = .clip(camera, event)
+        }
+        .padding(KitMetrics.gutter)
+      }
+    }
+    .pageToolbar("Cameras", meta: PageMeta.parts(hub, meta(cameras, viewers)), systemImage: HubPage.cameras.systemImage, hue: .indigo) {
+      if SecurityCamera.isSupported {
+        ToolGroup {
+          Button(idiom == .phone ? "Camera" : "Add Camera", systemImage: idiom == .phone ? "web.camera" : "plus") {
+            if idiom == .phone { pushed = .settings } else { addsCamera = true }
+          }
+          .kitPopover(isPresented: $addsCamera) {
+            AddCameraPopover { addsCamera = false; pushed = .settings }
+          }
+        }
+      }
+    }
+  }
+
+#if DEBUG
+  private static var openedAtLaunch = false
+#endif
+
+  private func meta(_ cameras: [HubCamera], _ viewers: CameraViewers) -> [String] {
+    var parts = [cameras.count == 1 ? "1 camera" : "\(cameras.count) cameras"]
+    let moving = cameras.filter { viewers.viewer($0).motion?.isActive == true }.count
+    if moving > 0 { parts.append("\(moving) with motion now") }
+    return parts
   }
 #else
   var body: some View {
@@ -81,378 +160,425 @@ struct CamerasPage: View {
 #endif
 }
 
-/// The sidebar row's count: this device's camera while it's on
+/// The sidebar row's mark: this device's cameras while they're on, orange while one sees motion
 struct CamerasRowTrailing: View {
   var body: some View {
 #if canImport(PlatformCamera)
-    if SecurityCamera.main.phase == .on {
-      Chip("On", systemImage: "record.circle", hue: SecurityCamera.main.motion.isActive ? .red : .green).controlSize(.small)
+    let camera = SecurityCamera.main
+    if camera.phase == .on {
+      Chip("On", systemImage: "record.circle", hue: camera.units.values.contains { $0.motion.isActive } ? .orange : .green).controlSize(.small)
     }
 #endif
   }
 }
 
 #if canImport(PlatformCamera)
-// MARK: - This device
+enum CamerasRoute: Hashable {
+  case camera(HubCamera)
+  /// A camera's page playing one of its clips
+  case clip(HubCamera, String)
+  /// This device as a camera
+  case settings
+}
 
-private struct ThisDeviceCamera: View {
+enum EventSpan: String, Hashable {
+  case today, week
+}
+
+extension View {
+  /// A camera page's title bar: with a back button to the grid where the page opens in place (Mac, iPad)
+  func cameraToolbar(
+    _ title: String, meta: [String], systemImage: String, hue: Hue, back: (() -> Void)?,
+    @ToolbarSlotBuilder tools: () -> [ToolbarSlot]
+  ) -> some View {
+    pageToolbar(title, title: {
+      HStack(spacing: 10) {
+        if let back {
+          Button("Cameras", systemImage: "chevron.backward", action: back)
+            .labelStyle(.iconOnly).buttonStyle(.kitRound).controlSize(.small)
+            .keyboardShortcut("[", modifiers: .command)
+        }
+        KitTitle(title, meta: meta, systemImage: systemImage, hue: hue)
+      }
+    }, tools: tools)
+  }
+}
+
+extension CameraViewers {
+  private static var stores: [Hub.ID: CameraViewers] = [:]
+
+  /// The hub's viewers, one store per hub for the app's life
+  static func of(_ hub: Hub) -> CameraViewers {
+    if let store = stores[hub.id] { return store }
+    let store = CameraViewers(hub: hub)
+    stores[hub.id] = store
+    return store
+  }
+}
+
+// MARK: - Banners
+
+/// What keeps the cameras from working: Hub Network off, this device's cameras failing or their clips not stored
+struct CameraBanners: View {
   @Environment(Hub.self) private var hub
   @State private var camera = SecurityCamera.main
-  @State private var showsPassword = false
-  @State private var editsPassword = false
-  @State private var newPassword = ""
 
   var body: some View {
-    KitSection("This \(KitDevice.name)", meta: meta, systemImage: "web.camera", hue: .indigo) {
-      SidebarRow("Use as a Security Camera", subtitle: subtitle, systemImage: "video", hue: camera.phase == .on ? .green : .gray) {
-        Toggle("Use as a Security Camera", isOn: Binding { camera.isOn && camera.hubID == hub.id } set: { on in
-          Task { on ? await camera.turnOn(hub: hub) : await camera.turnOff() }
-        })
-        .toggleStyle(.kitSwitch).labelsHidden().controlSize(.small)
-        .disabled(camera.phase == .starting)
+    if !hub.net.isJoined {
+      Banner(
+        "Cameras need Hub Network",
+        message: "This \(KitDevice.nameInSentence) reaches \(hub.settings.name)’s cameras through it, and it’s off here.",
+        systemImage: "network", hue: .orange
+      ) {
+        Button("Open Network") { Navigator.main.open(hub, .network) }.buttonStyle(.kit)
       }
+    }
+    if camera.hubID == hub.id {
       if case .failed(let message) = camera.phase {
-        Text(message).kitFont(.caption).foregroundStyle(Hue.red.text).padding(6)
+        Banner("This \(KitDevice.name)’s camera didn’t start", message: message, systemImage: "video.slash", hue: .red) {}
+      } else if camera.isOn, let problem = camera.problem {
+        Banner("A camera didn’t start", message: problem, systemImage: "video.slash", hue: .red) {}
       }
-      if camera.isOn, camera.hubID == hub.id {
-        ForEach([camera.shareProblem, camera.interruption, camera.storageProblem].compactMap { $0 }, id: \.self) { problem in
-          Label(problem, systemImage: "exclamationmark.triangle").kitFont(.caption).foregroundStyle(Hue.orange.text).padding(6)
-        }
-      }
-      if camera.isOn, camera.hubID != hub.id, let other = camera.hub {
-        Text("The camera is on for \(other.settings.name). Turning it on here moves it.").kitFont(.caption).padding(6)
-      }
-      FormCard {
-        FormRow("Password", help: "Your devices ask for it once to watch.", systemImage: "key") {
-          let password = Text(showsPassword ? camera.password : "••••-••••-••••").monospaced().kitFont(.body)
-          // Buttons where they fit, a menu on a phone
-          ViewThatFits(in: .horizontal) {
-            HStack(spacing: 6) {
-              password
-              Button(showsPassword ? "Hide" : "Show") { showsPassword.toggle() }.buttonStyle(.kit).controlSize(.small)
-              Button("Copy") { KitPasteboard.copy(camera.password) }.buttonStyle(.kit).controlSize(.small)
-              Button("Change…") { changePassword() }.buttonStyle(.kit).controlSize(.small)
-            }
-            .fixedSize()
-            Menu {
-              Button(showsPassword ? "Hide" : "Show", systemImage: showsPassword ? "eye.slash" : "eye") { showsPassword.toggle() }
-              Button("Copy", systemImage: "doc.on.doc") { KitPasteboard.copy(camera.password) }
-              Button("Change…", systemImage: "arrow.triangle.2.circlepath") { changePassword() }
-            } label: {
-              password.lineLimit(1).fixedSize()
-            }
-            .menuStyle(.button).buttonStyle(.kit).controlSize(.small).fixedSize()
-          }
-        }
-        let devices = camera.devices
-        if devices.count > 1 {
-          FormRow("Camera", systemImage: "camera") {
-            Picker("Camera", selection: $camera.settings.device) {
-              Text("Default").tag(String?.none)
-              ForEach(devices) { device in Text(device.name).tag(Optional(device.id)) }
-            }
-            .labelsHidden().fixedSize()
-          }
-        }
-        FormRow("Quality", systemImage: "sparkles.tv") {
-          Picker("Quality", selection: $camera.settings.quality) {
-            ForEach(SecurityCamera.Quality.allCases, id: \.self) { Text($0.title).tag($0) }
-          }
-          .labelsHidden().fixedSize()
-        }
-        FormRow("Motion Sensitivity", help: "Higher catches smaller movement, and more false alarms.", systemImage: "figure.walk.motion") {
-          KitSlider("Motion Sensitivity", value: $camera.settings.sensitivity, in: 0...1, step: 0.1) { "\(Int(($0 * 100).rounded()))%" }
-            .frame(maxWidth: 220)
-        }
-      }
-      FormCard(footer: storageFooter) {
-        FormRow("Keep Clips On", systemImage: "externaldrive") {
-          Picker("Keep Clips On", selection: $camera.settings.storage.target) {
-            Text("This \(KitDevice.name)").tag(CameraStoragePolicy.Target.device)
-            Text("\(hub.settings.name)’s Storage").tag(CameraStoragePolicy.Target.hub)
-          }
-          .labelsHidden().fixedSize()
-          .disabled(!hub.hasStorage && camera.settings.storage.target == .device)
-        }
-        FormRow("Delete After", systemImage: "calendar") {
-          Picker("Delete After", selection: $camera.settings.storage.days) {
-            ForEach([1, 3, 7, 14, 30, 90], id: \.self) { Text($0 == 1 ? "1 day" : "\($0) days").tag($0) }
-            Text("Never").tag(0)
-          }
-          .labelsHidden().fixedSize()
-        }
-        FormRow("Size Limit", systemImage: "internaldrive") {
-          Picker("Size Limit", selection: $camera.settings.storage.gigabytes) {
-            ForEach([1.0, 2, 5, 10, 20, 50], id: \.self) { Text("\(Int($0)) GB").tag($0) }
-            Text("None").tag(0.0)
-          }
-          .labelsHidden().fixedSize()
-        }
+      if let storage = camera.orderedUnits.compactMap(\.storageProblem).first {
+        Banner("Clips stay on this \(KitDevice.nameInSentence)", message: storage, systemImage: "externaldrive.badge.exclamationmark", hue: .red) {}
       }
     }
-    .kitSheet(isPresented: $editsPassword) {
-      KitSheet(title: "Camera Password", meta: "Devices that watch this camera sign in again with the new one.", systemImage: "key", hue: .indigo) {
-        FormCard {
-          FormRow("New Password", systemImage: "key") {
-            TextField("Password", text: $newPassword).kitField(mono: true).autocorrectionDisabled().frame(maxWidth: 220)
-          }
-        }
-      } footer: {
-        Button("Cancel") { editsPassword = false }.keyboardShortcut(.cancelAction)
-        Button("Change") {
-          camera.password = newPassword
-          editsPassword = false
-        }
-        .buttonStyle(.kitPrimary).keyboardShortcut(.defaultAction)
-        .disabled(newPassword.count < 6)
-      }
-    }
-  }
-
-  private func changePassword() {
-    newPassword = SecurityCamera.makePassword()
-    editsPassword = true
-  }
-
-  private var meta: [String] {
-    guard camera.isOn, camera.hubID == hub.id else { return ["Off"] }
-    return [camera.motion.isActive ? "Recording" : "Watching", "\(camera.events.count) events"]
-  }
-
-  private var subtitle: String {
-    switch camera.phase {
-    case .off, .failed: return "Watches for motion and records clips. Only devices on \(hub.settings.name)’s network with the password can watch."
-    case .starting: return "Starting…"
-    case .on:
-      var parts = [camera.device?.name ?? "Camera"]
-      parts.append(camera.isPublished ? "Shared on Hub Network" : "Not shared yet")
-      if KitDevice.name != "Mac" { parts.append("Keep Hub open") }
-      return parts.joined(separator: " · ")
-    }
-  }
-
-  private var storageFooter: String {
-    let base = camera.settings.storage.target == .hub
-      ? "Each clip goes to the hub’s storage when it ends; this \(KitDevice.nameInSentence) keeps a thumbnail."
-      : "Clips stay on this \(KitDevice.nameInSentence)."
-    return base + " A clip starts a few seconds before the motion and ends \(Int(camera.settings.storage.postRoll)) seconds after it."
   }
 }
 
-// MARK: - A camera of the hub
+// MARK: - Tiles
 
-/// A camera's live view in the grid, which opens its events
+/// A camera in the grid: live, with its place and motion on the picture and its device in the foot; opens its page
 private struct CameraTile: View {
   let camera: HubCamera
+  let viewers: CameraViewers
   let open: () -> Void
-  @Environment(Hub.self) private var hub
-  @State private var viewer: CameraViewer?
-  @State private var providers = [HubNetworkProvider]()
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 8) {
-      if let viewer {
-        CameraLive(viewer: viewer)
-          .aspectRatio(16 / 9, contentMode: .fit)
-          .clipShape(RoundedRectangle(cornerRadius: KitMetrics.radiusCard - 4))
-      }
+    let viewer = viewers.viewer(camera)
+    VStack(spacing: 0) {
+      CameraLive(viewer: viewer, style: .tile)
+        .aspectRatio(16 / 9, contentMode: .fit)
       HStack(spacing: 8) {
-        VStack(alignment: .leading, spacing: 2) {
-          Text(camera.name).kitFont(.headline)
-          if let viewer { Text(viewer.statusLine).kitFont(.caption) }
+        Tile(systemImage: viewer.deviceSymbol, hue: .gray, size: 24)
+        VStack(alignment: .leading, spacing: 1) {
+          Text(camera.name).kitFont(.headline).lineLimit(1)
+          Text(viewer.tileLine).kitFont(.caption).lineLimit(1)
         }
-        Spacer()
-        if let viewer, viewer.motion?.isActive == true {
-          Chip("Motion", systemImage: "figure.walk.motion", hue: .red).controlSize(.small)
-        }
-        Button("Events", systemImage: "list.bullet.rectangle") { open() }.buttonStyle(.kit).controlSize(.small)
+        Spacer(minLength: 4)
+        StatusDot(hue: viewer.hue, isHollow: viewer.state == .offline)
       }
+      .padding(.horizontal, 10)
+      .padding(.vertical, 8)
     }
-    .padding(KitMetrics.cardPadding)
     .kitSurface(.card)
-    .hubStream("network/providers/list", CameraProviderRequest(resourceId: camera.id), initial: [], to: $providers)
-    .onAppear { if viewer == nil { viewer = CameraViewer(camera: camera, hub: hub) } }
-    .onChange(of: providers, initial: true) { _, providers in viewer?.providers(providers) }
-    .onDisappear { viewer?.stop() }
+    .clipShape(RoundedRectangle(cornerRadius: KitMetrics.radiusCard))
+    .contentShape(RoundedRectangle(cornerRadius: KitMetrics.radiusCard))
+    .onTapGesture(perform: open)
+    .accessibilityElement(children: .contain)
+    .accessibilityAddTraits(.isButton)
+    .onAppear { viewers.use(camera) }
+    .onDisappear { viewers.release(camera) }
   }
 }
 
-struct CameraProviderRequest: Encodable, Hashable, Sendable {
-  let resourceId: String
+/// The grid's last tile: this device as a camera
+private struct AddCameraTile: View {
+  let open: () -> Void
+  @State private var camera = SecurityCamera.main
+
+  var body: some View {
+    Button(action: open) {
+      VStack(spacing: 8) {
+        Image(systemName: camera.isOn ? "web.camera" : "plus").font(.system(size: 20, weight: .medium)).foregroundStyle(.kitSecondary)
+        Text(camera.isOn ? "This \(KitDevice.name) as a Camera" : "Add a Camera").kitFont(.headline)
+        Text(camera.isOn
+          ? "\(camera.orderedUnits.count == 1 ? "1 camera" : "\(camera.orderedUnits.count) cameras") on · settings, zones and video"
+          : "Use this \(KitDevice.nameInSentence), or an old iPhone or iPad that stays at home.")
+          .kitFont(.caption).multilineTextAlignment(.center).frame(maxWidth: 260)
+      }
+      .frame(maxWidth: .infinity, minHeight: 140)
+      .padding(12)
+      .background {
+        RoundedRectangle(cornerRadius: KitMetrics.radiusCard)
+          .strokeBorder(.kitBorder, style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
+      }
+      .contentShape(RoundedRectangle(cornerRadius: KitMetrics.radiusCard))
+    }
+    .buttonStyle(.plain)
+  }
 }
 
-/// The live picture, or what keeps it away
-private struct CameraLive: View {
+/// Add Camera: this device, or another one of the hub's
+private struct AddCameraPopover: View {
+  let openSettings: () -> Void
+  @Environment(Hub.self) private var hub
+  @State private var camera = SecurityCamera.main
+
+  var body: some View {
+    KitSection("Add a Camera", meta: "Any Hub device with a camera", systemImage: "plus", hue: .accent) {
+      SidebarRow("This \(KitDevice.name)", subtitle: thisDevice, systemImage: KitDevice.name == "Mac" ? "laptopcomputer" : "iphone") {
+        Button(camera.isOn && camera.hubID == hub.id ? "Settings…" : "Set Up…") { openSettings() }
+          .buttonStyle(.kitPrimary).controlSize(.small)
+      }
+      SidebarRow("An iPhone or iPad", subtitle: "Open Hub on it › \(hub.settings.name) › Cameras, and turn its camera on. It has to be on \(hub.settings.name) and Hub Network first.", systemImage: "ipad.and.iphone")
+    }
+    .frame(width: 440)
+    .padding(8)
+  }
+
+  private var thisDevice: String {
+    let names = camera.devices.map(\.name)
+    let lenses = names.isEmpty ? "No camera found" : names.joined(separator: ", ")
+    return lenses + (KitDevice.name == "Mac" ? " · stays on while the Mac is awake" : " · Hub stays open")
+  }
+}
+
+// MARK: - The live picture
+
+/// A camera's picture, with what's on it (place, live, motion and its box) or what keeps it away (its password, the
+/// device offline, the camera paused)
+struct CameraLive: View {
+  enum Style {
+    case tile, large
+  }
   let viewer: CameraViewer
+  var style = Style.tile
   @State private var password = ""
 
-  // The video is a platform layer that SwiftUI can't draw over, so it's on screen only while live
   var body: some View {
-    if viewer.state == .live {
+    let info = viewer.info
+    let aspect = info.map { CGFloat($0.width) / CGFloat(max($0.height, 1)) } ?? 16 / 9
+    ZStack {
       CameraVideoView(renderer: viewer.renderer)
-    } else {
-      ZStack {
-        Color.black
-        switch viewer.state {
-        case .needsPassword, .wrongPassword:
-          VStack(spacing: 8) {
-            Text(viewer.state == .wrongPassword ? "Wrong password" : "This camera needs its password")
-              .kitFont(.headline).foregroundStyle(.white)
-            HStack {
-              SecureField("Password", text: $password).kitField(mono: true).frame(maxWidth: 200)
-                .onSubmit { viewer.setPassword(password) }
-              Button("Watch") { viewer.setPassword(password) }.buttonStyle(.kitPrimary).disabled(password.isEmpty)
-            }
+      if let box = viewer.motion?.box, viewer.motion?.isActive == true, viewer.state == .live {
+        PictureSpace(aspect: aspect) { MotionBox(box: box) }
+      }
+      if viewer.state != .live || info?.paused != nil {
+        Color.black.opacity(0.6)
+        center.padding(12)
+      }
+      chips.padding(8)
+    }
+    .background(Color.black)
+  }
+
+  @ViewBuilder private var chips: some View {
+    let isMotion = viewer.motion?.isActive == true && viewer.state == .live
+    VStack {
+      HStack(spacing: 6) {
+        if style == .tile {
+          VideoChip(title: viewer.camera.name)
+        } else if viewer.state == .live {
+          VideoChip(title: "LIVE", tone: .live)
+          TimelineView(.periodic(from: .now, by: 1)) { context in
+            VideoChip(title: context.date.formatted(date: .omitted, time: .standard))
           }
-          .padding()
-        default:
-          // What it is is in the status line beside the picture
-          Image(systemName: viewer.state == .offline ? "video.slash" : "video").font(.title).foregroundStyle(.white.opacity(0.6))
+        }
+        Spacer()
+        if isMotion {
+          VideoChip(title: style == .tile ? "Motion" : "Motion now", systemImage: "figure.walk.motion", tone: .motion)
+        } else if style == .tile, viewer.state == .live {
+          VideoChip(title: "LIVE", tone: .live)
+        }
+      }
+      Spacer()
+      if style == .large, viewer.state == .live, let info = viewer.info {
+        HStack {
+          if let zone = info.zone, zone != CameraBox(x: 0, y: 0, width: 1, height: 1) {
+            VideoChip(title: "Zone", systemImage: "rectangle.dashed")
+          }
+          Spacer()
+          VideoChip(title: "\(info.width)×\(info.height) · \(info.fps) fps · \(VideoCodec(rawValue: info.codec ?? "h264")?.title ?? "H.264")", systemImage: "network")
         }
       }
     }
+  }
+
+  @ViewBuilder private var center: some View {
+    VStack(spacing: 8) {
+      switch viewer.state {
+      case .needsPassword, .wrongPassword:
+        Image(systemName: "key").font(.title2)
+        Text(viewer.state == .wrongPassword ? "Wrong password for \(viewer.camera.name)" : "\(viewer.camera.name) asks for its password")
+          .kitFont(.headline)
+        if style == .large {
+          Text("The hub can’t hand it over yet. Copy it from the camera’s settings on its device.").kitFont(.caption).foregroundStyle(.white.opacity(0.7))
+        }
+        HStack {
+          SecureField("Password", text: $password).kitField(mono: true).frame(maxWidth: 180)
+            .onSubmit { viewer.setPassword(password) }
+          Button("Watch") { viewer.setPassword(password) }.buttonStyle(.kitPrimary).disabled(password.isEmpty)
+        }
+        .onTapGesture {}
+      case .offline:
+        Image(systemName: "video.slash").font(.title2)
+        Text("\(viewer.camera.name) is offline").kitFont(.headline)
+        if style == .large { Text("Its device isn’t on Hub Network now.").kitFont(.caption).foregroundStyle(.white.opacity(0.7)) }
+      case .finding, .connecting:
+        ProgressView().controlSize(.small).tint(.white)
+      case .failed(let message):
+        Image(systemName: "exclamationmark.triangle").font(.title2)
+        Text(message).kitFont(.caption).foregroundStyle(.white.opacity(0.8)).multilineTextAlignment(.center)
+      case .live:
+        if let paused = viewer.info?.paused {
+          Image(systemName: "pause.circle").font(.title2)
+          Text("\(viewer.camera.name) is paused").kitFont(.headline)
+          Text(paused).kitFont(.caption).foregroundStyle(.white.opacity(0.7)).multilineTextAlignment(.center)
+        }
+      }
+    }
+    .foregroundStyle(.white)
   }
 }
 
 extension CameraViewer {
-  var statusLine: String {
+  /// The camera's device under its name in the grid
+  var tileLine: String {
+    var parts = [info?.name ?? ""]
     switch state {
-    case .finding: "Looking for the camera…"
-    case .offline: "Offline: its device isn’t on Hub Network"
-    case .needsPassword: "Needs its password"
-    case .wrongPassword: "Wrong password"
-    case .connecting: "Connecting…"
     case .live:
-      if motion?.isActive == true { "Live · Motion" }
-      else if let info { "Live · \(info.width)×\(info.height) · \(info.fps) fps" } else { "Live" }
-    case .failed(let message): message
+      if info?.paused != nil { parts.append("paused") }
+      else if motion?.isActive == true { parts.append("motion now") }
+      else if let last = events.first { parts.append("last motion \(CameraTime.short(last.start))") }
+      else { parts.append("no motion yet") }
+    case .offline: parts.append("offline")
+    case .needsPassword, .wrongPassword: parts.append("needs its password")
+    case .finding, .connecting: parts.append("connecting…")
+    case .failed: parts.append("not reachable")
     }
+    return parts.filter { !$0.isEmpty }.joined(separator: " · ")
+  }
+
+  var hue: Hue {
+    switch state {
+    case .live: info?.paused != nil ? .yellow : motion?.isActive == true ? .orange : .green
+    case .offline: .gray
+    case .failed, .wrongPassword: .red
+    default: .gray
+    }
+  }
+
+  /// The camera device's kind, from its info (iPhone · iOS 18)
+  var deviceSymbol: String {
+    let device = info?.device ?? ""
+    if device.hasPrefix("iPhone") { return "iphone" }
+    if device.hasPrefix("iPad") { return "ipad" }
+    if device.hasPrefix("Mac") { return "laptopcomputer" }
+    return "video"
   }
 }
 
-// MARK: - A camera's events
+enum CameraTime {
+  /// 21:05 today, Yesterday 21:05, Oct 30 21:05
+  static func short(_ date: Date) -> String {
+    let time = date.formatted(date: .omitted, time: .shortened)
+    if Calendar.current.isDateInToday(date) { return time }
+    if Calendar.current.isDateInYesterday(date) { return "yesterday \(time)" }
+    return "\(date.formatted(.dateTime.month(.abbreviated).day())) \(time)"
+  }
+}
 
-private struct CameraDetail: View {
-  let camera: HubCamera
-  @Environment(Hub.self) private var hub
-  @State private var viewer: CameraViewer?
-  @State private var providers = [HubNetworkProvider]()
-  @State private var playing: CameraEvent?
+// MARK: - Events across cameras
+
+/// Today's (or the week's) motion events of all the cameras, newest first
+private struct CameraEventsSection: View {
+  let cameras: [HubCamera]
+  let viewers: CameraViewers
+  @Binding var span: EventSpan
+  let open: (HubCamera, String) -> Void
 
   var body: some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: KitMetrics.gutter) {
-        if let viewer {
-          CameraLive(viewer: viewer)
-            .aspectRatio(16 / 9, contentMode: .fit)
-            .clipShape(RoundedRectangle(cornerRadius: KitMetrics.radiusCard))
-            .frame(maxWidth: 960)
-          KitSection("Motion Events", meta: eventsMeta(viewer), systemImage: "figure.walk.motion", hue: .red) {
-            if viewer.events.isEmpty {
-              Text(viewer.state == .live ? "Nothing moved yet. Clips of motion show up here." : viewer.statusLine)
-                .kitFont(.caption).padding(6)
-            }
-            ForEach(viewer.events) { event in
-              CameraEventRow(event: event, thumbnail: viewer.thumbnails[event.id]) { playing = event }
-            }
-          }
+    let events = events
+    KitSection("Motion Events", meta: [span == .today ? "Today" : "Last 7 days", events.count == 1 ? "1 event" : "\(events.count) events"], systemImage: "figure.walk.motion", hue: .orange) {
+      if events.isEmpty {
+        Text(span == .today ? "Nothing moved today. Clips of motion show up here." : "Nothing moved this week.")
+          .kitFont(.caption).padding(8)
+      }
+      ForEach(events, id: \.event.id) { item in
+        CameraEventRow(event: item.event, thumbnail: item.viewer.thumbnails[item.event.id], camera: item.camera.name) {
+          open(item.camera, item.event.id)
         }
       }
-      .padding(KitMetrics.gutter)
-    }
-    .kitPane(.content)
-    .pageToolbar(camera.name, meta: [viewer?.statusLine ?? ""], systemImage: "video", hue: .indigo) { }
-    .hubStream("network/providers/list", CameraProviderRequest(resourceId: camera.id), initial: [], to: $providers)
-    .onAppear { if viewer == nil { viewer = CameraViewer(camera: camera, hub: hub) } }
-    .onChange(of: providers, initial: true) { _, providers in viewer?.providers(providers) }
-    .onDisappear { viewer?.stop() }
-    .kitSheet(item: $playing) { event in
-      if let viewer { ClipPlayer(viewer: viewer, event: event) }
+    } accessory: {
+      KitSegmented(selection: $span, options: [("Today", EventSpan.today), ("Week", EventSpan.week)])
+        .controlSize(.small)
     }
   }
 
-  private func eventsMeta(_ viewer: CameraViewer) -> [String] {
-    let today = viewer.events.filter { Calendar.current.isDateInToday($0.start) }.count
-    return ["\(viewer.events.count) kept", "\(today) today"]
+  private var events: [(camera: HubCamera, viewer: CameraViewer, event: CameraEvent)] {
+    let since = span == .today ? Calendar.current.startOfDay(for: Date()) : Date().addingTimeInterval(-7 * 86_400)
+    var events = [(camera: HubCamera, viewer: CameraViewer, event: CameraEvent)]()
+    for camera in cameras {
+      let viewer = viewers.viewer(camera)
+      for event in viewer.events where event.start >= since {
+        events.append((camera, viewer, event))
+      }
+    }
+    return events.sorted { $0.event.start > $1.event.start }
   }
 }
 
-private struct CameraEventRow: View {
+/// An event in a list: its thumbnail, the camera (or the time), its length and size, or Recording
+struct CameraEventRow: View {
   let event: CameraEvent
   let thumbnail: Data?
-  let play: () -> Void
+  /// The camera's name, in a list across cameras
+  var camera: String?
+  var isSelected = false
+  let open: () -> Void
 
   var body: some View {
-    SidebarRow(event.start.formatted(date: .abbreviated, time: .standard), subtitle: subtitle, icon: {
-      Group {
-        if let thumbnail, let image = Image(data: thumbnail) {
-          image.resizable().aspectRatio(16 / 9, contentMode: .fill)
-        } else {
-          Color.black.opacity(0.6)
-        }
-      }
-      .frame(width: 64, height: 36)
-      .clipShape(RoundedRectangle(cornerRadius: 4))
-    }) {
+    SidebarRow(camera ?? CameraTime.short(event.start), subtitle: subtitle) {
+      CameraThumbnail(data: thumbnail, width: 64)
+    } trailing: {
       if event.end == nil {
         Chip("Recording", systemImage: "record.circle", hue: .red).controlSize(.small)
       } else {
-        Button("Play", systemImage: "play.fill") { play() }.buttonStyle(.kit).controlSize(.small).disabled(event.clip == nil)
+        Image(systemName: "play.fill").font(.system(size: 11)).foregroundStyle(.kitSecondary)
       }
     }
+    .isCurrent(isSelected)
+    .action(open)
   }
 
   private var subtitle: String {
-    var parts = [Duration.seconds(event.duration.rounded()).formatted(.units(allowed: [.minutes, .seconds], width: .abbreviated))]
-    parts.append("\(Int((event.peak * 100).rounded()))% moved")
-    if event.size > 0 { parts.append(ByteCountFormatter.string(fromByteCount: Int64(event.size), countStyle: .file)) }
-    parts.append(event.storage == "hub" ? "On the hub" : "On the camera")
+    var parts = [String]()
+    if camera != nil { parts.append(CameraTime.short(event.start)) }
+    if event.end != nil {
+      parts.append(CameraFormat.duration(event.duration))
+      if event.size > 0 { parts.append(CameraFormat.bytes(Double(event.size))) }
+    } else {
+      parts.append("now")
+    }
     return parts.joined(separator: " · ")
   }
 }
 
-/// Downloads a clip, then plays it
-private struct ClipPlayer: View {
-  let viewer: CameraViewer
-  let event: CameraEvent
-  @Environment(\.kitDismiss) private var dismiss
-  @State private var player = PlatformPlayer()
-  @State private var file: URL?
-  @State private var error: String?
+// MARK: - Storage
+
+/// Where the cameras' clips are and how much of them there is
+private struct CameraStorageLine: View {
+  let cameras: [HubCamera]
+  let viewers: CameraViewers
+  @Environment(Hub.self) private var hub
 
   var body: some View {
-    KitSheet(title: event.start.formatted(date: .abbreviated, time: .standard), meta: viewer.camera.name, systemImage: "play.rectangle", hue: .indigo, status: file == nil && error == nil ? .working : .idle) {
-      ZStack {
-        PlatformVideoView(player: player)
-        if let error {
-          Text(error).kitFont(.caption).foregroundStyle(.white).padding()
-        } else if file == nil {
-          Text("Downloading the clip…").kitFont(.caption).foregroundStyle(.white.opacity(0.8))
-        }
-      }
-      .aspectRatio(16 / 9, contentMode: .fit)
-      .frame(minWidth: 320, idealWidth: 720)
-      .clipShape(RoundedRectangle(cornerRadius: 8))
-    } footer: {
-      if let file {
-        ShareLink(item: file).buttonStyle(.kit)
-      }
-      Button("Done") { dismiss() }.keyboardShortcut(.defaultAction)
+    let viewers = cameras.map { self.viewers.viewer($0) }
+    let events = viewers.flatMap(\.events)
+    let onHub = viewers.filter { $0.info?.storage == CameraStoragePolicy.Target.hub.rawValue }.count
+    let known = viewers.filter { $0.info != nil }.count
+    HStack(spacing: 8) {
+      Image(systemName: "externaldrive").foregroundStyle(Hue.orange.fill)
+      Text(known == 0 ? "Clips" : onHub == known ? "Clips go to \(hub.settings.name)’s storage" : onHub == 0 ? "Clips stay on each camera" : "Clips on \(hub.settings.name)’s storage and on cameras")
+        .kitFont(.callout)
+      Spacer()
+      Text("\(events.count == 1 ? "1 clip" : "\(events.count) clips") · \(CameraFormat.bytes(Double(events.reduce(0) { $0 + $1.size })))")
+        .kitFont(.caption).monospacedDigit()
     }
-    .task {
-      do {
-        let file = try await viewer.downloadClip(event)
-        self.file = file
-        try await player.open(file)
-        player.play()
-      } catch {
-        self.error = error.localizedDescription
-      }
-    }
-    .onDisappear {
-      player.stop()
-      if let file { try? FileManager.default.removeItem(at: file) }
-    }
+    .padding(.horizontal, 12)
+    .padding(.vertical, 8)
+    .kitSurface(.card)
   }
 }
 #endif

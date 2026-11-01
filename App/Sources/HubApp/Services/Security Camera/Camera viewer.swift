@@ -68,8 +68,11 @@ final class CameraViewer {
   init(camera: HubCamera, hub: Hub) {
     self.camera = camera
     self.hub = hub
-    password = Self.savedPassword(camera)
+    password = Self.savedPassword(camera) ?? SecurityCamera.main.password(for: camera)
   }
+
+  /// Whether the camera is one of this device's own
+  var isOwn: Bool { SecurityCamera.main.password(for: camera) != nil }
 
   /// The providers of the camera's share as the hub streams them (`network/providers/list`)
   func providers(_ providers: [HubNetworkProvider]) {
@@ -102,6 +105,7 @@ final class CameraViewer {
       state = .offline
       return
     }
+    if password?.isEmpty != false { password = SecurityCamera.main.password(for: camera) }
     guard password?.isEmpty == false else {
       state = .needsPassword
       return
@@ -124,17 +128,19 @@ final class CameraViewer {
     do {
       info = try await get("", as: CameraInfo.self)
     } catch CameraViewerError.unauthorized {
-      state = .wrongPassword
+      wrongPassword()
       return
     } catch {
       fail(error)
       return
     }
     startLive()
+    // Events, and the info for a pause, a new format or viewer count
     refresh = Task { [weak self] in
       while !Task.isCancelled {
         await self?.loadEvents()
-        try? await Task.sleep(for: .seconds(10))
+        try? await Task.sleep(for: .seconds(5))
+        if let info = try? await self?.get("", as: CameraInfo.self) { self?.info = info }
       }
     }
   }
@@ -175,7 +181,7 @@ final class CameraViewer {
     guard connection != nil else { return }
     connection = nil
     if case CameraViewerError.unauthorized? = error {
-      state = .wrongPassword
+      wrongPassword()
       return
     }
     fail(error ?? CameraViewerError.closed)
@@ -191,15 +197,35 @@ final class CameraViewer {
     state = .failed(error.localizedDescription)
   }
 
+  /// A camera of this device knows its password: one changed there is taken here without asking
+  private func wrongPassword() {
+    if let own = SecurityCamera.main.password(for: camera), own != password {
+      password = own
+      connect()
+    } else {
+      state = .wrongPassword
+    }
+  }
+
   /// The event's clip in a temporary file, for the player; the caller deletes it
   func downloadClip(_ event: CameraEvent) async throws -> URL {
     guard let request = request("events/\(event.id)/clip.mp4") else { throw CameraViewerError.closed }
     let (download, response) = try await URLSession.shared.download(for: request)
     try Self.check(response)
-    let file = URL.temporaryDirectory.appending(path: "\(event.id).mp4")
+    let file = URL.temporaryDirectory.appending(path: "\(camera.name) \(event.id).mp4")
     try? FileManager.default.removeItem(at: file)
     try FileManager.default.moveItem(at: download, to: file)
     return file
+  }
+
+  /// Deletes the event and its clip on the camera, wherever the clip is kept
+  func delete(_ event: CameraEvent) async throws {
+    guard var request = request("events/\(event.id)") else { throw CameraViewerError.closed }
+    request.httpMethod = "DELETE"
+    let (_, response) = try await URLSession.shared.data(for: request)
+    try Self.check(response)
+    events.removeAll { $0.id == event.id }
+    thumbnails[event.id] = nil
   }
 
   // MARK: Requests
@@ -242,6 +268,71 @@ final class CameraViewer {
   static func save(_ password: String, for camera: HubCamera) {
     try? KeyChain.replaceData(Data(password.utf8), keychain: keychain(camera))
   }
+}
+
+/// The viewers of a hub's cameras the pages show, shared by the grid and a camera's own page so opening one doesn't
+/// connect again: a viewer runs while a view uses it (`use` and `release`), with its share's providers followed from
+/// the hub, and stops a moment after the last one goes
+@MainActor @Observable
+final class CameraViewers {
+  private let hub: Hub
+  private var viewers: [String: CameraViewer] = [:]
+  private var uses: [String: Int] = [:]
+  private var providers: [String: Task<Void, Never>] = [:]
+  private var stops: [String: Task<Void, Never>] = [:]
+
+  init(hub: Hub) {
+    self.hub = hub
+  }
+
+  func viewer(_ camera: HubCamera) -> CameraViewer {
+    if let viewer = viewers[camera.id] { return viewer }
+    let viewer = CameraViewer(camera: camera, hub: hub)
+    viewers[camera.id] = viewer
+    return viewer
+  }
+
+  /// The viewers made so far, for the events across cameras
+  var all: [CameraViewer] { Array(viewers.values) }
+
+  func use(_ camera: HubCamera) {
+    uses[camera.id, default: 0] += 1
+    stops[camera.id]?.cancel()
+    stops[camera.id] = nil
+    guard providers[camera.id] == nil else { return }
+    let viewer = viewer(camera)
+    let hub = hub
+    providers[camera.id] = Task {
+      do {
+        for try await list: [HubNetworkProvider] in hub.client.values("network/providers/list", CameraProviderRequest(resourceId: camera.id)) {
+          viewer.providers(list)
+        }
+      } catch {}
+    }
+  }
+
+  func release(_ camera: HubCamera) {
+    uses[camera.id, default: 1] -= 1
+    guard uses[camera.id] ?? 0 <= 0 else { return }
+    // A view going as another comes (the grid pushing a camera's page) keeps it running
+    stops[camera.id] = Task { [weak self] in
+      try? await Task.sleep(for: .seconds(2))
+      guard !Task.isCancelled, let self, self.uses[camera.id] ?? 0 <= 0 else { return }
+      self.providers[camera.id]?.cancel()
+      self.providers[camera.id] = nil
+      self.viewers[camera.id]?.stop()
+    }
+  }
+
+  func stopAll() {
+    for task in providers.values { task.cancel() }
+    providers = [:]
+    for viewer in viewers.values { viewer.stop() }
+  }
+}
+
+struct CameraProviderRequest: Encodable, Hashable, Sendable {
+  let resourceId: String
 }
 
 enum CameraViewerError: LocalizedError {

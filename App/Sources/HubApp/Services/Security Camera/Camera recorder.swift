@@ -73,12 +73,13 @@ actor CameraRecorder {
     if let data = try? Data(contentsOf: folder.appending(path: "events.json")),
       let saved = try? JSONDecoder.camera.decode([CameraEvent].self, from: data)
     {
-      // A clip that was recording when the app quit ends where its file ends
+      // A clip that was recording when the app quit ends where its file ends, when it was last written
       events = saved.map { event in
         guard event.end == nil else { return event }
         var event = event
-        event.end = event.start
-        event.size = (event.clip.flatMap { try? FileManager.default.attributesOfItem(atPath: folder.appending(path: "Clips/\($0)").path)[.size] as? Int }) ?? 0
+        let attributes = event.clip.flatMap { try? FileManager.default.attributesOfItem(atPath: folder.appending(path: "Clips/\($0)").path) }
+        event.end = max(event.start, attributes?[.modificationDate] as? Date ?? event.start)
+        event.size = attributes?[.size] as? Int ?? 0
         return event
       }
     }
@@ -127,6 +128,15 @@ actor CameraRecorder {
     let url = try await hubStorage.read(clip)
     let (download, _) = try await URLSession.shared.download(from: url)
     return (download, true)
+  }
+
+  /// Deletes a finished event's clip and thumbnail, wherever the clip is; false for an unknown or recording event
+  func delete(_ id: String) async -> Bool {
+    guard let index = events.firstIndex(where: { $0.id == id }), events[index].end != nil else { return false }
+    let event = events.remove(at: index)
+    await remove([event])
+    changed()
+    return true
   }
 
   // MARK: Recording
@@ -251,6 +261,11 @@ actor CameraRecorder {
       }
     }
     guard !removed.isEmpty else { return }
+    await remove(removed)
+    changed()
+  }
+
+  private func remove(_ removed: [CameraEvent]) async {
     for event in removed {
       try? FileManager.default.removeItem(at: folder.appending(path: "Thumbnails/\(event.id).jpg"))
       guard let clip = event.clip else { continue }
@@ -260,7 +275,6 @@ actor CameraRecorder {
         try? FileManager.default.removeItem(at: folder.appending(path: "Clips/\(clip)"))
       }
     }
-    changed()
   }
 
   private func changed() {

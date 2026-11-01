@@ -61,6 +61,9 @@ final class CameraServer: @unchecked Sendable {
     }
   }
 
+  /// Devices watching live now
+  var viewers: Int { queue.sync { live.count } }
+
   /// Whether the share is live: without it, requests get 503 and live viewers are dropped (fail closed)
   func setPublished(_ published: Bool) {
     queue.async { [self] in
@@ -106,7 +109,7 @@ final class CameraServer: @unchecked Sendable {
 
   private func handle(_ request: Request, address: String, on stream: ByteStream) {
     guard isPublished else { return respond(stream, status: 503, text: "The camera isn’t shared on Hub Network") }
-    guard request.method == "GET" || request.method == "HEAD" else { return respond(stream, status: 405, text: "Use GET") }
+    guard ["GET", "HEAD", "DELETE"].contains(request.method) else { return respond(stream, status: 405, text: "Use GET") }
     let now = Date()
     let recent = (failures[address] ?? []).filter { now.timeIntervalSince($0) < 60 }
     failures[address] = recent.isEmpty ? nil : recent
@@ -116,9 +119,18 @@ final class CameraServer: @unchecked Sendable {
       return respond(stream, status: 401, text: "Wrong password", headers: ["WWW-Authenticate": "Bearer realm=\"Hub camera\""])
     }
     let parts = request.path.split(separator: "/").map(String.init)
+    if request.method == "DELETE" {
+      guard parts.count == 2, parts[0] == "events" else { return respond(stream, status: 405, text: "Only events can be deleted") }
+      let id = parts[1]
+      return answer(stream) { [recorder] in
+        await recorder.delete(id) ? .text(200, "Deleted") : .text(404, "No such event")
+      }
+    }
     switch parts.first {
     case nil:
-      respond(stream, json: info())
+      var info = info()
+      info.viewers = live.count
+      respond(stream, json: info)
     case "live" where parts.count == 1:
       startLive(on: stream)
     case "snapshot.jpg" where parts.count == 1:

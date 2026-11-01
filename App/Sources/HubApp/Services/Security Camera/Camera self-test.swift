@@ -36,9 +36,14 @@ enum CameraSelfTest {
     let folder = URL.temporaryDirectory.appending(path: "camera-selftest-\(UUID().uuidString.prefix(6))")
     defer { try? FileManager.default.removeItem(at: folder) }
     do {
-      let engine = try CameraEngine(settings: .init(device: nil, format: .hd, sensitivity: 0.5))
-      try engine.start()
-      log("capturing from \(engine.device?.name ?? "?")")
+      guard let device = CameraCapture.devices().first else { throw CameraError.noDevice }
+      let engine = try CameraEngine(device: device, settings: .init(format: .hd, sensitivity: 0.5))
+      engine.start()
+      let rig = CameraRig()
+      rig.onFrame = { _, frame in engine.take(frame) }
+      try rig.run([CameraConfiguration(device: device.id, width: 1280, height: 720, fps: 15)])
+      defer { rig.stop() }
+      log("capturing from \(engine.device.name)")
       var policy = CameraStoragePolicy()
       policy.postRoll = 2
       let recorder = CameraRecorder(folder: folder, policy: policy, hubFolder: "Cameras/test")
@@ -132,6 +137,28 @@ enum CameraSelfTest {
         thumbRequest.setValue("Bearer \(password)", forHTTPHeaderField: "Authorization")
         let (thumbnail, _) = try await URLSession.shared.data(for: thumbRequest)
         check(thumbnail.prefix(2) == Data([0xFF, 0xD8]), "event thumbnail is a JPEG")
+        var deleteRequest = URLRequest(url: base.appending(path: "events/\(event.id)"))
+        deleteRequest.httpMethod = "DELETE"
+        deleteRequest.setValue("Bearer \(password)", forHTTPHeaderField: "Authorization")
+        let (_, deleted) = try await URLSession.shared.data(for: deleteRequest)
+        let left = try JSONDecoder.camera.decode([CameraEvent].self, from: try await URLSession.shared.data(for: eventsRequest).0)
+        check((deleted as? HTTPURLResponse)?.statusCode == 200 && left.isEmpty, "DELETE removes the event and its clip")
+      }
+
+      // Another format while live: HEVC at 1080p reaches a viewer from a keyframe with its three parameter sets
+      if CameraEncoder.supports(.hevc) {
+        let hevc = LiveStats()
+        let probe = LiveProbe(request: request, stats: hevc)
+        probe.start()
+        try await Task.sleep(for: .seconds(1))
+        let format = VideoFormat(width: 1920, height: 1080, fps: 15, bitrate: 2_000_000, codec: .hevc)
+        try engine.update(.init(format: format, sensitivity: 0.5))
+        try await Task.sleep(for: .seconds(3))
+        probe.cancel()
+        let codecs = hevc.codecs
+        log("after the switch: \(codecs)")
+        check(codecs.last == "hevc 1920×1080 3 sets", "switches to HEVC 1080p while live")
+        try engine.update(.init(format: .hd, sensitivity: 0.5))
       }
 
       // HomeKit's seam: a second stream at another format, and the fMP4 prebuffer
@@ -196,8 +223,15 @@ private final class LiveStats: @unchecked Sendable {
       bytes += frame.data.count
       size = (frame.width, frame.height)
       latencies.append(latency)
+      if frame.isKeyframe {
+        let kind = "\(frame.codec.rawValue) \(frame.width)×\(frame.height) \(frame.parameterSets.count) sets"
+        if kinds.last != kind { kinds.append(kind) }
+      }
     }
   }
+  /// What the keyframes were, each change once
+  private var kinds: [String] = []
+  var codecs: [String] { lock.withLock { kinds } }
   func motion(_ motion: CameraMotion) { lock.withLock { motions += 1 } }
   func ended(_ error: Error?) {}
 

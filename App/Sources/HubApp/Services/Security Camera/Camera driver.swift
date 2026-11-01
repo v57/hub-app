@@ -14,6 +14,7 @@
 
 #if DEBUG && canImport(PlatformCamera)
 import Foundation
+import PlatformCamera
 
 @MainActor
 enum CameraDriver {
@@ -78,19 +79,45 @@ enum CameraDriver {
 
   private static func turnOn(_ hub: Hub) async {
     let camera = SecurityCamera.main
-    if let name = argument("--camera-device"), let device = camera.devices.first(where: { $0.name.contains(name) }) {
-      camera.settings.device = device.id
+    log("lenses \(camera.devices.map(\.name)) at most \(CameraRig.maximumCameras) at once")
+    // --camera-device <name part>[,<name part>…]: only these lenses on
+    if let names = argument("--camera-device")?.split(separator: ",").map(String.init) {
+      for var setup in camera.settings.cameras {
+        setup.isOn = false
+        camera.update(setup)
+      }
+      for name in names {
+        guard let device = camera.devices.first(where: { $0.name.contains(name) }) else { continue }
+        var setup = camera.setup(for: device)
+        setup.isOn = true
+        camera.update(setup)
+      }
+    }
+    // --camera-video 1080:30:hevc for every lens on
+    if let video = argument("--camera-video")?.split(separator: ":").map(String.init), video.count == 3,
+      let height = Int(video[0]), let fps = Int(video[1]), let codec = VideoCodec(rawValue: video[2]) {
+      for var setup in camera.settings.cameras where setup.isOn {
+        setup.video = CameraVideo(height: height, fps: fps, codec: codec)
+        camera.update(setup)
+      }
     }
     await camera.turnOn(hub: hub)
-    log("password \(camera.password)")
+    for setup in camera.settings.cameras where setup.isOn {
+      log("\(setup.place) password \(camera.password(setup.id)) \(setup.video.title)")
+    }
     var last = ""
     var tick = 0
     while true {
-      let line = "phase=\(camera.phase) published=\(camera.isPublished) problem=\(camera.shareProblem ?? "-") "
-        + "device=\(camera.device?.name ?? "-") motion=\(camera.motion.isActive) events=\(camera.events.count) "
-        + "interruption=\(camera.interruption ?? "-") storage=\(camera.storageProblem ?? "-")"
+      let budget = camera.budget
+      var line = "phase=\(camera.phase) interruption=\(camera.interruption ?? "-") problem=\(camera.problem ?? "-") "
+        + "budget=\(budget.hardwareCost.map { String(format: "%.2f", $0) } ?? "-")/\(budget.systemPressureCost.map { String(format: "%.2f", $0) } ?? "-") "
+        + "pressure=\(budget.pressure.title)"
+      for unit in camera.orderedUnits {
+        line += " | \(unit.shareName) published=\(unit.isPublished) problem=\(unit.shareProblem ?? "-") motion=\(unit.motion.isActive) "
+          + "events=\(unit.events.count) viewers=\(unit.viewers) storage=\(unit.storageProblem ?? "-")"
+      }
       if line != last || tick % 20 == 0 {
-        log("\(line) level=\(String(format: "%.3f", camera.motion.level))")
+        log("\(line) cpu=\(camera.cpuShare.map { String(format: "%.3f", $0) } ?? "-")")
         last = line
       }
       tick += 1

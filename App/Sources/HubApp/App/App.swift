@@ -89,6 +89,14 @@ public struct HubApp: App {
       .componentKit(accent: .hubAccent)
 #else
     RootView()
+#if os(iOS) && canImport(PlatformCamera)
+      // The iPhone or iPad that is a camera: its black screen over the app
+      .overlay {
+        if SecurityCamera.main.showsScreen, SecurityCamera.main.phase == .on {
+          CameraScreen()
+        }
+      }
+#endif
       .kitToasts()
       .componentKit(accent: .hubAccent)
 #endif

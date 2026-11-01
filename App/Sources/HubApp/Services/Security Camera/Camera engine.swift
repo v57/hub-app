@@ -2,20 +2,24 @@
 //  Camera engine.swift
 //  Hub
 //
-//  One running camera: capture, the live H.264 encoder, motion detection and the fragmented MP4 prebuffer. It is the
-//  `CameraFeed` a HomeKit bridge (HAPKit) takes later; the camera's own server and recorder use the same calls.
+//  One running camera: the live encoder (H.264 or HEVC), motion detection and the fragmented MP4 prebuffer, fed the
+//  frames of one lens by the device's `CameraRig`. It is the `CameraFeed` a HomeKit bridge (HAPKit) takes later; the
+//  camera's own server and recorder use the same calls. Its format, sensitivity and zone change while it runs.
 //
 
 #if canImport(PlatformCamera)
 import Foundation
 import PlatformCamera
 
+/// Platform's encoder: the app has a `VideoEncoder` of its own (the Video Encoder service)
+typealias CameraEncoder = PlatformCamera.VideoEncoder
+
 final class CameraEngine: CameraFeed, @unchecked Sendable {
   struct Settings: Hashable, Sendable {
-    /// A `CameraDevice.id`, or nil for the default camera
-    var device: String?
     var format: VideoFormat
     var sensitivity: Double
+    /// Where motion counts; nil for the whole picture
+    var zone: MotionDetector.Zone?
   }
 
   /// Seconds of recording kept before now, for clips that start before the motion did (HomeKit asks for 4 or more)
@@ -23,49 +27,74 @@ final class CameraEngine: CameraFeed, @unchecked Sendable {
   /// Motion is looked for this many times a second
   static let analysisRate: Double = 5
 
-  let settings: Settings
-  /// Called on the capture queue when the camera stops or comes back by itself; empty when it came back
-  var onInterruption: (@Sendable (String) -> Void)?
+  /// Which lens it is
+  let device: CameraDevice
 
-  private let capture: CameraCapture
-  private let encoder: H264Encoder
+  private var encoder: CameraEncoder
   private let writer = FragmentedMP4Writer(segmentDuration: 1)
   private let lock = NSLock()
+  private var current: Settings
   private var detector: MotionDetector
   private var lastAnalysis = -Double.infinity
   private var latest: CameraFrame?
   private var liveSinks: [UUID: @Sendable (EncodedVideoFrame) -> Void] = [:]
-  private var streams: [UUID: H264Encoder] = [:]
+  private var streams: [UUID: CameraEncoder] = [:]
   private var motionSinks: [UUID: AsyncStream<MotionEvent>.Continuation] = [:]
   private var recordingSinks: [UUID: AsyncStream<MP4Fragment>.Continuation] = [:]
   private var initialization: MP4Fragment?
   private var segments: [MP4Fragment] = []
   private var currentMotion = CameraMotion(isActive: false, level: 0)
+  private var isStopped = false
 
-  init(settings: Settings) throws {
-    self.settings = settings
-    capture = CameraCapture(device: settings.device, width: settings.format.width, height: settings.format.height, fps: settings.format.fps)
-    encoder = try H264Encoder(format: settings.format)
-    detector = MotionDetector(sensitivity: settings.sensitivity)
+  init(device: CameraDevice, settings: Settings) throws {
+    self.device = device
+    current = settings
+    encoder = try CameraEncoder(format: settings.format)
+    detector = MotionDetector(sensitivity: settings.sensitivity, zone: settings.zone)
   }
 
-  /// Which camera is capturing, once started
-  var device: CameraDevice? { capture.device }
+  var settings: Settings { lock.withLock { current } }
 
   /// Motion now, as viewers see it
   var motion: CameraMotion { lock.withLock { currentMotion } }
 
-  func start() throws {
+  /// The newest picture, for a preview that isn't the live stream
+  var latestFrame: CameraFrame? { lock.withLock { latest } }
+
+  func start() {
     encoder.onFrame = { [weak self] frame in self?.encoded(frame) }
     writer.onFragment = { [weak self] fragment in self?.written(fragment) }
-    capture.onFrame = { [weak self] frame in self?.captured(frame) }
-    capture.onInterruption = { [weak self] reason in self?.onInterruption?(reason) }
-    try capture.start()
+  }
+
+  /// Another format starts a new encoder (viewers get a keyframe with the new parameter sets, and the recording a new
+  /// initialization fragment, which ends a clip); sensitivity and zone apply from the next frame
+  func update(_ settings: Settings) throws {
+    let old = lock.withLock { current }
+    guard settings != old else { return }
+    if settings.format != old.format {
+      let encoder = try CameraEncoder(format: settings.format)
+      encoder.onFrame = { [weak self] frame in self?.encoded(frame) }
+      let previous = lock.withLock {
+        defer { self.encoder = encoder }
+        return self.encoder
+      }
+      previous.invalidate()
+    }
+    lock.withLock {
+      current = settings
+      detector.sensitivity = settings.sensitivity
+      if detector.zone != settings.zone {
+        detector.zone = settings.zone
+        detector.reset()
+      }
+    }
   }
 
   func stop() {
-    capture.stop()
-    capture.onFrame = nil
+    let encoder = lock.withLock {
+      isStopped = true
+      return self.encoder
+    }
     encoder.invalidate()
     writer.finish()
     let (streams, motionSinks, recordingSinks) = lock.withLock {
@@ -84,13 +113,16 @@ final class CameraEngine: CameraFeed, @unchecked Sendable {
 
   // MARK: Pipeline
 
-  private func captured(_ frame: CameraFrame) {
-    let (streams, analyze) = lock.withLock {
+  /// The lens's next frame, on its capture queue
+  func take(_ frame: CameraFrame) {
+    let (encoder, streams, analyze): (CameraEncoder?, [CameraEncoder], Bool) = lock.withLock {
+      guard !isStopped else { return (nil, [], false) }
       latest = frame
       let analyze = frame.time - lastAnalysis >= 1 / Self.analysisRate
       if analyze { lastAnalysis = frame.time }
-      return (Array(self.streams.values), analyze)
+      return (self.encoder, Array(self.streams.values), analyze)
     }
+    guard let encoder else { return }
     encoder.encode(frame)
     streams.forEach { $0.encode(frame) }
     if analyze { detectMotion(frame) }
@@ -99,8 +131,9 @@ final class CameraEngine: CameraFeed, @unchecked Sendable {
   private func detectMotion(_ frame: CameraFrame) {
     let luma = frame.lumaGrid(columns: 64, rows: 36)
     let (event, sinks) = lock.withLock {
-      let event = detector.process(luma: luma, time: frame.time)
-      currentMotion = CameraMotion(isActive: detector.isActive, level: detector.level)
+      let event = detector.process(luma: luma, columns: 64, time: frame.time)
+      let box = detector.box.map { CameraBox(x: $0.x, y: $0.y, width: $0.width, height: $0.height) }
+      currentMotion = CameraMotion(isActive: detector.isActive, level: detector.level, box: detector.isActive ? box : nil)
       return (event, Array(motionSinks.values))
     }
     guard let event else { return }
@@ -134,7 +167,10 @@ final class CameraEngine: CameraFeed, @unchecked Sendable {
   /// closure to stop
   func watch(_ sink: @escaping @Sendable (EncodedVideoFrame) -> Void) -> @Sendable () -> Void {
     let id = UUID()
-    lock.withLock { liveSinks[id] = sink }
+    let encoder = lock.withLock {
+      liveSinks[id] = sink
+      return self.encoder
+    }
     encoder.requestKeyframe()
     return { [weak self] in
       _ = self?.lock.withLock { self?.liveSinks.removeValue(forKey: id) }
@@ -155,13 +191,15 @@ final class CameraEngine: CameraFeed, @unchecked Sendable {
   // MARK: CameraFeed
 
   var supportedFormats: [VideoFormat] {
-    [settings.format, .low, VideoFormat(width: 320, height: 240, fps: 15, bitrate: 200_000)]
+    var format = settings.format
+    format.codec = .h264
+    return [format, .low, VideoFormat(width: 320, height: 240, fps: 15, bitrate: 200_000)]
   }
 
   func video(_ format: VideoFormat) -> CameraVideoStream {
     let id = UUID()
     let (frames, continuation) = AsyncStream.makeStream(of: EncodedVideoFrame.self, bufferingPolicy: .bufferingNewest(30))
-    guard let encoder = try? H264Encoder(format: format) else {
+    guard let encoder = try? CameraEncoder(format: format) else {
       continuation.finish()
       return CameraVideoStream(format: format, frames: frames) { _ in }
     }
