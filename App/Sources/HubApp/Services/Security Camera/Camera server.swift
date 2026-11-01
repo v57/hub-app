@@ -219,10 +219,18 @@ final class CameraServer: @unchecked Sendable {
   /// Writes a frame unless the viewer is behind; one that fell behind starts again at a keyframe
   private func send(_ frame: EncodedVideoFrame, to viewer: LiveViewer) {
     guard live[ObjectIdentifier(viewer.stream)] === viewer else { return }
-    if viewer.stream.bufferedAmount > Self.liveBacklog { viewer.skips = true }
+    if !viewer.skips, viewer.stream.bufferedAmount > Self.liveBacklog {
+      viewer.skips = true
+#if DEBUG
+      print("[CAMERA] viewer behind, \(viewer.stream.bufferedAmount) bytes queued: skipping to a keyframe")
+#endif
+    }
     if viewer.skips {
       guard frame.isKeyframe, viewer.stream.bufferedAmount < Self.liveBacklog / 4 else { return }
       viewer.skips = false
+#if DEBUG
+      print("[CAMERA] viewer caught up, \(viewer.stream.bufferedAmount) bytes queued")
+#endif
     }
     viewer.stream.write(CameraWire.record(frame))
   }
