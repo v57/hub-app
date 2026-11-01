@@ -354,7 +354,7 @@ enum NetTest {
   }
 
   /// Waits up to `--net-wait` seconds (40) for a link with a fresh handshake, printing the extension's links as they
-  /// go, then opens the hub's port on each linked device's overlay address
+  /// go, then opens the hub's port on the hub's machine through its link
   private static func links(_ hub: Hub) async {
     let arguments = CommandLine.arguments
     let seconds = arguments.firstIndex(of: "--net-wait").flatMap { $0 + 1 < arguments.count ? Double(arguments[$0 + 1]) : nil } ?? 40
@@ -371,8 +371,9 @@ enum NetTest {
       return fail("no link came up")
     }
     var reachedAll = true
-    // A member reaches the hub on the machine it links to
-    for peer in status.up where peer.opens {
+    // A member reaches the hub on the machine it links to; a share link to another member opens only its shares
+    let hubHost = hub.settings.address.host() ?? ""
+    for peer in status.up where peer.opens && peer.routes.contains(where: { $0.hasPrefix("\(hubHost)/") }) {
       guard let address = peer.routes.first(where: { !$0.contains(":") })?.split(separator: "/").first else { continue }
       let reached = await reach("\(address):1997")
       log("reach \(address):1997 through the link: \(reached)")

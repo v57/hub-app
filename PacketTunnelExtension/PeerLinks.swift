@@ -12,7 +12,8 @@ struct LinkEndpoint: Codable, Hashable, Sendable {
 }
 
 /// A hub-signed link between two devices of one hub (hub-net-node's PROTOCOL.md, "Peer links"). `hub` links a member
-/// (`a`) and the hub's machine (`b`): the member routes `aViaB` through the machine and may open `aToB` on it.
+/// (`a`) and the hub's machine (`b`): the member routes `aViaB` through the machine and may open `aToB` on it. `share`
+/// links a member (`a`) and another member fronting shares it may open (`b`): a camera on an iPhone, watched from an iPad.
 struct PeerLinkGrant: Codable, Equatable, Sendable {
   struct Side: Codable, Equatable, Sendable {
     let key: String
@@ -42,6 +43,8 @@ struct PeerLinkGrant: Codable, Equatable, Sendable {
   let signature: String
 
   static let domain = "hub-network/peer-link/v1"
+  /// The purposes this device links for; `gateway` grants come another way
+  static let purposes: Set<String> = ["hub", "share"]
   static let maximumLifetime: TimeInterval = 31 * 24 * 3600
   static let maximumClockSkew: TimeInterval = 30
 }
@@ -85,7 +88,7 @@ extension PeerLinkGrant {
   /// signature over the canonical JSON, and that the routes are the other side's own addresses. The coordinator's say
   /// counts for nothing here.
   func verified(trustedHubKey: String, ownKey: String, now: Date = Date()) throws -> VerifiedLink {
-    guard version == 1, !grantId.isEmpty, purpose == "hub", a.key != b.key, a.wireGuardKey != b.wireGuardKey,
+    guard version == 1, !grantId.isEmpty, Self.purposes.contains(purpose), a.key != b.key, a.wireGuardKey != b.wireGuardKey,
       !a.addresses.isEmpty, !b.addresses.isEmpty,
       aToB.allSatisfy({ ["tcp", "udp"].contains($0.protocol) }), bToA.allSatisfy({ ["tcp", "udp"].contains($0.protocol) })
     else { throw PeerLinkGrantError.malformed }
@@ -105,7 +108,7 @@ extension PeerLinkGrant {
     let own = opens ? a : b
     let other = opens ? b : a
     let routes = opens ? aViaB : bViaA
-    // A hub link carries the other device's own addresses and nothing more
+    // A link carries the other device's own addresses and nothing more
     guard Set(routes) == Set(other.addresses.map(Self.hostRoute)), routes.count == other.addresses.count else {
       throw PeerLinkGrantError.invalidRoutes
     }
@@ -189,6 +192,9 @@ actor LinkManager {
 
   /// A path counts as live while handshakes keep coming (WireGuard renews its session every two minutes)
   static let liveHandshakeAge: TimeInterval = 150
+  /// Linked devices at once (hub-net-node's PROTOCOL.md): grants past it, hub links first, are left out and links
+  /// other devices bring past it are rejected
+  static let maximumLinks = 16
   /// How long one endpoint gets to complete a handshake before the next is tried
   var endpointTrial: TimeInterval = 5
   /// How long a link has to come up once ready
@@ -204,9 +210,9 @@ actor LinkManager {
   private var peers: [String: Peer] = [:]
   private var attempts: [String: Attempt] = [:]
   private var opening: Set<String> = []
-  /// The grant each linked device last took, by its key: a new grant (other ports) opens the link again even while
-  /// the path is live, since the other side learns ports only from the grant a link brings
-  private var delivered: [String: String] = [:]
+  /// The grants whose link came up: a new grant (other ports) opens the link again even while the path is live, since
+  /// the other side learns ports only from the grant a link brings
+  private var delivered: Set<String> = []
   private var present = false
   private(set) var linkUps = 0
 
@@ -226,12 +232,15 @@ actor LinkManager {
         dependencies.log("link grant \(grant.grantId.prefix(8)) rejected: \(error)")
       }
     }
-    own = verified
-    for link in verified {
-      let current = peers[link.other.key]
-      let endpoint = current?.wireGuardKey == link.other.wireGuardKey ? current?.endpoint : nil
-      let peer = Self.peer(for: link, endpoint: endpoint)
-      if current != peer { peers[link.other.key] = peer }
+    // Hub links first, then one device after another until the limit, counting those already admitted
+    var keys = Set(admitted.keys)
+    own = verified.sorted { ($0.grant.purpose == "hub" ? 0 : 1) < ($1.grant.purpose == "hub" ? 0 : 1) }.filter { link in
+      guard keys.contains(link.other.key) || keys.count < Self.maximumLinks else {
+        dependencies.log("link grant \(link.grant.grantId.prefix(8)) left out: \(Self.maximumLinks) links")
+        return false
+      }
+      keys.insert(link.other.key)
+      return true
     }
     await removeStale()
     await openWhereNeeded()
@@ -260,7 +269,7 @@ actor LinkManager {
 
   var status: [(peer: Peer, opens: Bool, attempting: Bool)] {
     peers.values.sorted { $0.key < $1.key }.map { peer in
-      (peer, own.contains { $0.other.key == peer.key }, attempts.values.contains { $0.link.other.key == peer.key })
+      (peer, own.contains { $0.opens && $0.other.key == peer.key }, attempts.values.contains { $0.link.other.key == peer.key })
     }
   }
 
@@ -307,13 +316,13 @@ actor LinkManager {
       try? await dependencies.send("link.reject", linkId, nil)
       return
     }
-    admitted[peerKey] = link
-    let current = peers[peerKey]
-    let peer = Self.peer(for: link, endpoint: current?.wireGuardKey == link.other.wireGuardKey ? current?.endpoint : nil)
-    if current != peer {
-      peers[peerKey] = peer
-      await apply()
+    guard peers[peerKey] != nil || peers.count < Self.maximumLinks else {
+      dependencies.log("link.incoming \(linkId.prefix(8)) from \(peerKey.suffix(8)) rejected: \(Self.maximumLinks) links")
+      try? await dependencies.send("link.reject", linkId, nil)
+      return
     }
+    admitted[peerKey] = link
+    if refreshPeer(peerKey) { await apply() }
     dependencies.log("link.incoming \(linkId.prefix(8)) from \(peerKey.suffix(8)) accepted")
     do {
       try await dependencies.send("link.accept", linkId, nil)
@@ -330,7 +339,7 @@ actor LinkManager {
     guard present else { return }
     for link in own where link.opens && !opening.contains(link.grant.grantId) {
       guard !attempts.values.contains(where: { $0.link.grant.grantId == link.grant.grantId }) else { continue }
-      if delivered[link.other.key] == link.grant.grantId, await isLive(link) {
+      if delivered.contains(link.grant.grantId), await isLive(link) {
         continue
       }
       opening.insert(link.grant.grantId)
@@ -383,7 +392,7 @@ actor LinkManager {
     if let current = peers[link.other.key]?.endpoint, endpoints.contains(where: { $0.endpoint == current }),
       await isLive(link)
     {
-      delivered[link.other.key] = link.grant.grantId
+      delivered.insert(link.grant.grantId)
       let reached = await pinLiveEndpoint(of: link, tried: current)
       dependencies.log("link \(linkId.prefix(8)) renewed with \(link.other.key.suffix(8)) at \(reached)")
       finish(linkId)
@@ -407,7 +416,7 @@ actor LinkManager {
       while dependencies.now() < trialEnd, !Task.isCancelled {
         if let last = await dependencies.lastHandshake(link.other.wireGuardKey), last >= started.addingTimeInterval(-1) {
           linkUps += 1
-          delivered[link.other.key] = link.grant.grantId
+          delivered.insert(link.grant.grantId)
           let reached = await pinLiveEndpoint(of: link, tried: endpoint.endpoint)
           dependencies.log("link \(linkId.prefix(8)) up with \(link.other.key.suffix(8)) at \(reached)")
           finish(linkId)
@@ -449,10 +458,12 @@ actor LinkManager {
     let now = dependencies.now()
     own.removeAll { $0.expiresAt <= now }
     admitted = admitted.filter { $0.value.expiresAt > now }
-    let keep = Set(own.map(\.other.key)).union(admitted.keys)
-    delivered = delivered.filter { keep.contains($0.key) }
+    let grants = Set(own.map(\.grant.grantId)).union(admitted.values.map(\.grant.grantId))
+    delivered = delivered.filter { grants.contains($0) }
     let before = peers.count
+    let keep = Set(own.map(\.other.key)).union(admitted.keys)
     peers = peers.filter { keep.contains($0.key) }
+    for key in keep { refreshPeer(key) }
     await apply(force: peers.count != before)
   }
 
@@ -469,11 +480,26 @@ actor LinkManager {
     }
   }
 
-  private static func peer(for link: VerifiedLink, endpoint: String?) -> Peer {
-    Peer(
-      key: link.other.key, wireGuardKey: link.other.wireGuardKey, routes: link.routes,
-      sources: link.other.addresses.map(PeerLinkGrant.hostRoute), ports: link.exposed, endpoint: endpoint
+  /// Sets the peer of a linked device from every grant naming it: two members that both front shares the other may
+  /// open each bring a `share` grant, and the device lets the other reach the ports of both. The newest grant's
+  /// WireGuard key counts (the device joined again with new keys). Returns whether the peer changed
+  @discardableResult
+  private func refreshPeer(_ key: String) -> Bool {
+    let links = own.filter { $0.other.key == key } + (admitted[key].map { [$0] } ?? [])
+    let current = peers[key]
+    guard let newest = links.max(by: { $0.expiresAt < $1.expiresAt }) else {
+      return peers.removeValue(forKey: key) != nil
+    }
+    let same = links.filter { $0.other.wireGuardKey == newest.other.wireGuardKey }
+    let peer = Peer(
+      key: key, wireGuardKey: newest.other.wireGuardKey, routes: Self.unique(same.flatMap(\.routes)),
+      sources: Self.unique(same.flatMap { $0.other.addresses.map(PeerLinkGrant.hostRoute) }),
+      ports: Self.unique(same.flatMap(\.exposed)).sorted { ($0.port, $0.protocol) < ($1.port, $1.protocol) },
+      endpoint: current?.wireGuardKey == newest.other.wireGuardKey ? current?.endpoint : nil
     )
+    guard current != peer else { return false }
+    peers[key] = peer
+    return true
   }
 
   /// A private address of another network (the Mac's LAN seen from a phone on cellular) can't answer, and trying it
@@ -502,9 +528,9 @@ actor LinkManager {
     a.rawValue.prefix(3) == b.rawValue.prefix(3)
   }
 
-  private static func unique(_ endpoints: [LinkEndpoint]) -> [LinkEndpoint] {
-    var seen = Set<LinkEndpoint>()
-    return endpoints.filter { seen.insert($0).inserted }
+  private static func unique<Element: Hashable>(_ elements: [Element]) -> [Element] {
+    var seen = Set<Element>()
+    return elements.filter { seen.insert($0).inserted }
   }
 }
 

@@ -102,6 +102,83 @@ final class LinkTests: XCTestCase {
     XCTAssertEqual(member.count("opened to"), opened)
   }
 
+  /// An iPad watching an iPhone's camera: the tablet opens a share link to the phone, which lets it reach only the
+  /// camera's port, and the tablet lets nothing of the phone in
+  func testAMemberLinksToAnotherMembersShare() async throws {
+    let hub = Curve25519.Signing.PrivateKey()
+    let tablet = LinkDevice(port: port, trusting: hub, name: "tablet")
+    let phone = LinkDevice(port: port, trusting: hub, name: "phone")
+    phone.start()
+    tablet.start()
+    defer {
+      tablet.client.stop()
+      phone.client.stop()
+    }
+    try await tablet.waitPresent()
+    try await phone.waitPresent()
+    let camera = [PeerLinkGrant.Port(protocol: "tcp", port: 50000)]
+    await tablet.manager.update(grants: [signedGrant(hub: hub, purpose: "share", member: tablet, machine: phone, ports: camera)])
+
+    let onPhone = try await phone.waitLinked(to: tablet)
+    let onTablet = try await tablet.waitLinked(to: phone)
+    XCTAssertEqual(onPhone.routes, ["100.96.0.4/32", "fd48:5542:4e45::4/128"])
+    XCTAssertEqual(onPhone.ports, camera)
+    XCTAssertEqual(onTablet.routes, ["100.96.0.3/32", "fd48:5542:4e45::3/128"])
+    XCTAssertEqual(onTablet.ports, [])
+    // A gateway grant isn't a link this way
+    let gateway = LinkDevice(port: port, trusting: hub, name: "member")
+    await gateway.manager.update(grants: [signedGrant(hub: hub, purpose: "gateway", member: gateway, machine: phone)])
+    XCTAssertTrue(gateway.logged("rejected: malformed"))
+  }
+
+  /// Both members front a camera the other may open: each opens its own share link, both come up over one WireGuard
+  /// peer, each lets the other reach its own camera, and neither opens again once both are delivered
+  func testTwoMembersSharingWithEachOtherLinkOnce() async throws {
+    let hub = Curve25519.Signing.PrivateKey()
+    let tablet = LinkDevice(port: port, trusting: hub, name: "tablet")
+    let phone = LinkDevice(port: port, trusting: hub, name: "phone")
+    phone.start()
+    tablet.start()
+    defer {
+      tablet.client.stop()
+      phone.client.stop()
+    }
+    try await tablet.waitPresent()
+    try await phone.waitPresent()
+    let phoneCamera = [PeerLinkGrant.Port(protocol: "tcp", port: 50000)]
+    let tabletCamera = [PeerLinkGrant.Port(protocol: "tcp", port: 50001)]
+    await tablet.manager.update(grants: [signedGrant(hub: hub, purpose: "share", member: tablet, machine: phone, ports: phoneCamera)])
+    _ = try await phone.waitLinked(to: tablet)
+    await phone.manager.update(grants: [signedGrant(hub: hub, purpose: "share", member: phone, machine: tablet, ports: tabletCamera)])
+    try await tablet.waitLog("link.incoming")
+    try await phone.waitLog("renewed with")
+
+    XCTAssertEqual(phone.appliedPeers.map(\.ports), [phoneCamera])
+    XCTAssertEqual(tablet.appliedPeers.map(\.ports), [tabletCamera])
+    XCTAssertEqual(phone.appliedPeers.map(\.routes), [tablet.addresses.map(PeerLinkGrant.hostRoute)])
+    let opened = (tablet.count("opened to"), phone.count("opened to"))
+    await tablet.manager.tick()
+    await phone.manager.tick()
+    await tablet.manager.tick()
+    XCTAssertEqual(tablet.count("opened to"), opened.0)
+    XCTAssertEqual(phone.count("opened to"), opened.1)
+  }
+
+  /// At most 16 linked devices: grants past it are left out, hub links first
+  func testGrantsPastSixteenLinksAreLeftOut() async throws {
+    let hub = Curve25519.Signing.PrivateKey()
+    let viewer = LinkDevice(port: port, trusting: hub, name: "tablet")
+    let others = (0..<18).map { LinkDevice(port: port, trusting: hub, name: "camera-\($0)") }
+    let machine = LinkDevice(port: port, trusting: hub, name: "machine")
+    let grants = others.map { signedGrant(hub: hub, purpose: "share", member: viewer, machine: $0, ports: []) }
+      + [signedGrant(hub: hub, member: viewer, machine: machine)]
+    await viewer.manager.update(grants: grants)
+    let linked = await viewer.manager.status.map(\.peer.key)
+    XCTAssertEqual(linked.count, 16)
+    XCTAssertTrue(linked.contains(machine.serviceKey))
+    XCTAssertEqual(viewer.count("left out: 16 links"), 3)
+  }
+
   /// The member moved to another network and opens the link again: the machine's handshake with the old mapping still
   /// looks live, but the member isn't there any more, so the machine punches to where it is now
   func testAMemberOnANewNetworkIsPunchedToAgain() async throws {
@@ -210,16 +287,16 @@ final class LinkTests: XCTestCase {
   }
 
   private func signedGrant(
-    hub: Curve25519.Signing.PrivateKey, member: LinkDevice, machine: LinkDevice,
+    hub: Curve25519.Signing.PrivateKey, purpose: String = "hub", member: LinkDevice, machine: LinkDevice,
     ports: [PeerLinkGrant.Port] = [.init(protocol: "tcp", port: 1997)]
   ) -> PeerLinkGrant {
     let formatter = ISO8601DateFormatter()
     formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
     let unsigned = PeerLinkGrant(
-      version: 1, grantId: UUID().uuidString, hubKey: spki(hub.publicKey), hubNetworkId: "network-1", purpose: "hub",
-      a: .init(key: member.serviceKey, wireGuardKey: member.wireGuardKey, member: "device:a", addresses: ["100.96.0.2", "fd48:5542:4e45::2"]),
-      b: .init(key: machine.serviceKey, wireGuardKey: machine.wireGuardKey, member: "device:b", addresses: ["100.96.0.1", "fd48:5542:4e45::1"]),
-      aViaB: ["100.96.0.1/32", "fd48:5542:4e45::1/128"], bViaA: ["100.96.0.2/32", "fd48:5542:4e45::2/128"],
+      version: 1, grantId: UUID().uuidString, hubKey: spki(hub.publicKey), hubNetworkId: "network-1", purpose: purpose,
+      a: .init(key: member.serviceKey, wireGuardKey: member.wireGuardKey, member: "device:a", addresses: member.addresses),
+      b: .init(key: machine.serviceKey, wireGuardKey: machine.wireGuardKey, member: "device:b", addresses: machine.addresses),
+      aViaB: machine.addresses.map(PeerLinkGrant.hostRoute), bViaA: member.addresses.map(PeerLinkGrant.hostRoute),
       aToB: ports, bToA: [],
       issuedAt: formatter.string(from: Date().addingTimeInterval(-1)),
       expiresAt: formatter.string(from: Date().addingTimeInterval(3600)), signature: ""
@@ -262,6 +339,10 @@ final class LinkDevice: @unchecked Sendable {
     set { lock.withLock { candidateAddress = newValue } }
   }
 
+  /// The last byte of its overlay and candidate addresses
+  var host: Int { ["machine": 1, "member": 2, "phone": 3, "tablet": 4][name] ?? 9 }
+  var addresses: [String] { ["100.96.0.\(host)", "fd48:5542:4e45::\(host)"] }
+
   init(port: UInt16, trusting hub: Curve25519.Signing.PrivateKey, name: String) {
     self.name = name
     let key = self.key
@@ -286,7 +367,7 @@ final class LinkDevice: @unchecked Sendable {
       log: { [weak self] in self?.log($0) }
     )
     let client = client!
-    candidateAddress = name == "member" ? "198.51.100.2" : "198.51.100.1"
+    candidateAddress = "198.51.100.\(host)"
     manager = LinkManager(ownKey: serviceKey, trustedHubKey: spki(hub.publicKey), dependencies: .init(
       open: { try await client.openLink($0) },
       send: { try await client.sendLink($0, linkId: $1, endpoints: $2) },
