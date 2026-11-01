@@ -2,7 +2,7 @@
 //  NetTest.swift
 //  Hub
 //
-//  `--net-test [use-internet|stop|join|share-internet|leave|status|links|node|hub|ip|reach|get|grant|diag|fallback]` (Debug): drives this device's Hub Network on its first hub (or
+//  `--net-test [use-internet|stop|join|share-internet|leave|status|invite|join-link|links|node|hub|ip|reach|get|grant|diag|fallback]` (Debug): drives this device's Hub Network on its first hub (or
 //  `--net-hub <ws address>`) without taps and prints each step as a `[NETTEST]` line: the hub's agent, joining, the
 //  devices that offer their internet, Use Internet, a download through it, the network path and the extension's
 //  diagnostics. On an iPhone, read the lines with
@@ -52,6 +52,22 @@ enum NetTest {
       return pass()
     }
 #endif
+    if action == "join-link" {
+      // `--net-link hub://join/…` (from `--net-test invite` on the inviting device): joins that hub's network as the
+      // Join sheet does, adding the hub
+      let arguments = CommandLine.arguments
+      guard let link = arguments.firstIndex(of: "--net-link").flatMap({ $0 + 1 < arguments.count ? arguments[$0 + 1] : nil }) else {
+        return fail("no --net-link")
+      }
+      do {
+        let hub = try await HubNets.main.join(link: link)
+        log("joined \(hub.settings.name) \(hub.settings.address.absoluteString)")
+        await statusLines(hub)
+        return pass()
+      } catch {
+        return fail("join: \(error)")
+      }
+    }
     guard let hub = await wait("hub", seconds: 20, { firstHub() }) else { return fail("no hub") }
     log("hub \(hub.settings.name) \(hub.settings.address.absoluteString) onHubMachine=\(hub.isOnHubMachine)")
     // A stopped tunnel of this hub starts first, as the hub may answer only through it (a relaunch from devicectl
@@ -149,6 +165,15 @@ enum NetTest {
       keyLines(hub)
       await diagnostics()
       return pass()
+    }
+    if action == "invite" {
+      // An invitation for another device, to open there: `devicectl device process launch --payload-url hub://join/…`
+      do {
+        log("invitation \(try await hub.net.createInviteCode())")
+        return pass()
+      } catch {
+        return fail("invite: \(error)")
+      }
     }
     if action == "node" {
       // `--net-node <ws address>`, or none for the default: the coordinator the hub names (owners only)
