@@ -15,8 +15,9 @@ import Foundation
 import PlatformCamera
 
 final class CameraServer: @unchecked Sendable {
-  /// Bytes queued for a live viewer before its frames are skipped: about two seconds of video
-  static let liveBacklog = 512 * 1024
+  /// How long a live frame may wait in a viewer's queue before frames are skipped. In time, not bytes: two viewers
+  /// sharing a slow link drain their queues at half the speed, and a byte limit let them fall 10 s behind
+  static let liveDelay = Duration.seconds(1)
   /// Failed passwords from one address before it waits a minute
   static let attempts = 10
 
@@ -181,11 +182,31 @@ final class CameraServer: @unchecked Sendable {
   private final class LiveViewer: @unchecked Sendable {
     let stream: ByteStream
     var stopWatching: () -> Void = {}
-    /// Skipping frames until a keyframe, after falling behind
-    var skips = false
+    /// Skipping frames until a keyframe: at the start, and after falling behind
+    var skips = true
     var motion: CameraMotion?
     var timer: DispatchSourceTimer?
+    /// Bytes written so far, and when each record still in the stream's queue was written (by its end)
+    private var written = 0
+    private var queued: [(end: Int, at: ContinuousClock.Instant)] = []
     init(stream: ByteStream) { self.stream = stream }
+
+    func write(_ data: Data) {
+      written += data.count
+      queued.append((written, .now))
+      stream.write(data)
+    }
+
+    /// How long the oldest record still queued has waited, zero with nothing queued
+    var delay: Duration {
+      let sent = written - stream.bufferedAmount
+      if let index = queued.firstIndex(where: { $0.end > sent }) {
+        queued.removeFirst(index)
+      } else {
+        queued.removeAll()
+      }
+      return queued.first.map { .now - $0.at } ?? .zero
+    }
   }
 
   private func startLive(on stream: ByteStream) {
@@ -205,7 +226,7 @@ final class CameraServer: @unchecked Sendable {
       let rounded = CameraMotion(isActive: motion.isActive, level: (motion.level * 100).rounded() / 100)
       guard rounded != viewer.motion else { return }
       viewer.motion = rounded
-      viewer.stream.write(CameraWire.record(rounded))
+      viewer.write(CameraWire.record(rounded))
     }
     timer.resume()
     viewer.timer = timer
@@ -219,20 +240,21 @@ final class CameraServer: @unchecked Sendable {
   /// Writes a frame unless the viewer is behind; one that fell behind starts again at a keyframe
   private func send(_ frame: EncodedVideoFrame, to viewer: LiveViewer) {
     guard live[ObjectIdentifier(viewer.stream)] === viewer else { return }
-    if !viewer.skips, viewer.stream.bufferedAmount > Self.liveBacklog {
+    let delay = viewer.delay
+    if !viewer.skips, delay > Self.liveDelay {
       viewer.skips = true
 #if DEBUG
-      print("[CAMERA] viewer behind, \(viewer.stream.bufferedAmount) bytes queued: skipping to a keyframe")
+      print("[CAMERA] viewer behind by \(delay), \(viewer.stream.bufferedAmount) bytes queued: skipping to a keyframe")
 #endif
     }
     if viewer.skips {
-      guard frame.isKeyframe, viewer.stream.bufferedAmount < Self.liveBacklog / 4 else { return }
+      guard frame.isKeyframe, delay < Self.liveDelay / 4 else { return }
       viewer.skips = false
 #if DEBUG
       print("[CAMERA] viewer caught up, \(viewer.stream.bufferedAmount) bytes queued")
 #endif
     }
-    viewer.stream.write(CameraWire.record(frame))
+    viewer.write(CameraWire.record(frame))
   }
 
   // MARK: Responses

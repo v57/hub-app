@@ -4,7 +4,8 @@
 //
 //  Debug: `Hub --camera-selftest` runs the camera on this device's real camera without a hub: the engine, the server
 //  on loopback, the live stream through the viewer's parser, a snapshot, wrong passwords, and a clip around a simulated
-//  motion event, downloaded back. It prints `[CAMERA]` lines and quits.
+//  motion event, downloaded back. It prints `[CAMERA]` lines and quits. `--camera-hold <seconds>` keeps the published server
+//  up that long first, for a client from outside.
 //
 
 #if DEBUG && canImport(PlatformCamera)
@@ -57,6 +58,12 @@ enum CameraSelfTest {
       try await Task.sleep(for: .milliseconds(100))
       check(try await status(base, password: "wrong") == 401, "wrong password gets 401")
       check(try await status(base, password: password) == 200, "right password gets 200")
+      // --camera-hold <seconds>: keeps the server up for a client from outside (a slow viewer, say) before going on
+      if let index = CommandLine.arguments.firstIndex(of: "--camera-hold"), index + 1 < CommandLine.arguments.count,
+        let seconds = Double(CommandLine.arguments[index + 1]) {
+        log("holding \(seconds) s on \(port), password \(password)")
+        try await Task.sleep(for: .seconds(seconds))
+      }
 
       // Live: 6 seconds through the viewer's parser
       let stats = LiveStats()
@@ -79,6 +86,14 @@ enum CameraSelfTest {
       log("live \(summary.frames) frames, \(summary.keyframes) keyframes, \(summary.bytes / 1024) KB, \(summary.width)×\(summary.height), latency median \(summary.latency) ms, motion messages \(summary.motions)")
       check(summary.frames >= 60, "live stream delivers frames (\(summary.frames) in 6 s)")
       check(summary.keyframes >= 1 && summary.firstIsKeyframe, "live stream starts at a keyframe with parameter sets")
+
+      // A viewer held up for 5 s is more than LiveConnection.maximumLag behind: it asks for the stream again
+      let stalled = LiveConnection(request: request, renderer: CameraVideoRenderer()) { _ in } ended: { _ in }
+      stalled.stall = 5
+      stalled.start()
+      try await Task.sleep(for: .seconds(8))
+      stalled.cancel()
+      check(stalled.restarts == 1, "a viewer 5 s behind starts the stream again (\(stalled.restarts) restarts)")
 
       // Snapshot
       var snapshotRequest = URLRequest(url: base.appending(path: "snapshot.jpg").appending(queryItems: [URLQueryItem(name: "width", value: "640")]))

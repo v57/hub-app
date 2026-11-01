@@ -255,7 +255,9 @@ enum CameraViewerError: LocalizedError {
 }
 
 /// The live stream's HTTP response, parsed as it arrives on URLSession's delegate queue: frames go straight to the
-/// renderer, the rest to `received`
+/// renderer, the rest to `received`. A stream that falls more than `maximumLag` behind is dropped and requested again,
+/// which throws away whatever is queued on the way (the camera skips frames for a slow viewer, but can't see the
+/// socket buffers or the tunnel)
 final class LiveConnection: NSObject, URLSessionDataDelegate, @unchecked Sendable {
   enum Event: Sendable {
     /// Frames shown since the last of these
@@ -271,6 +273,16 @@ final class LiveConnection: NSObject, URLSessionDataDelegate, @unchecked Sendabl
   private var session: URLSession?
   private var lastFrameEvent = Date.distantPast
   private var framesSinceEvent = 0
+  private var task: URLSessionDataTask?
+  /// The shortest time from capture to arrival on this request, clock offset included: a frame later than this is behind
+  private var fastest: Double?
+  static let maximumLag = 3.0
+  /// Requests started again for being behind
+  private(set) var restarts = 0
+#if DEBUG
+  /// Holds the delegate queue this long after the next frame, for the self-test
+  var stall: Double = 0
+#endif
 
   init(
     request: URLRequest, renderer: CameraVideoRenderer, received: @escaping @Sendable (Event) -> Void,
@@ -291,7 +303,14 @@ final class LiveConnection: NSObject, URLSessionDataDelegate, @unchecked Sendabl
     queue.maxConcurrentOperationCount = 1
     let session = URLSession(configuration: configuration, delegate: self, delegateQueue: queue)
     self.session = session
-    session.dataTask(with: request).resume()
+    request(on: session)
+  }
+
+  private func request(on session: URLSession) {
+    parser = CameraWire.Parser()
+    fastest = nil
+    task = session.dataTask(with: request)
+    task?.resume()
   }
 
   func cancel() {
@@ -313,10 +332,25 @@ final class LiveConnection: NSObject, URLSessionDataDelegate, @unchecked Sendabl
   }
 
   func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+    guard dataTask === task else { return }
     for message in parser.append(data) {
       switch message {
       case .video(let frame):
+        let trip = ProcessInfo.processInfo.systemUptime - frame.time
+        fastest = min(fastest ?? trip, trip)
+        if let fastest, trip - fastest > Self.maximumLag {
+          restarts += 1
+          dataTask.cancel()
+          request(on: session)
+          return
+        }
         renderer.enqueue(frame)
+#if DEBUG
+        if stall > 0 {
+          Thread.sleep(forTimeInterval: stall)
+          stall = 0
+        }
+#endif
         framesSinceEvent += 1
         // The viewer's clock of the last frame, a few times a second at most
         let now = Date()
@@ -335,6 +369,8 @@ final class LiveConnection: NSObject, URLSessionDataDelegate, @unchecked Sendabl
   }
 
   func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+    // One dropped for being behind
+    guard task === self.task else { return }
     session.finishTasksAndInvalidate()
     if (error as? URLError)?.code == .cancelled, self.session == nil { return }
     ended(error)
