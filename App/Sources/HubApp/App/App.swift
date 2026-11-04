@@ -10,7 +10,6 @@ import Foundation
 import ComponentKit
 #if os(macOS)
 import AppKit
-import Combine
 #endif
 
 /// The app (Hub and Hub Pro, on every platform); its entry point is App/Sources/Hub/HubMain.swift.
@@ -105,11 +104,11 @@ public struct HubApp: App {
 
 #if os(macOS)
 class AppDelegate: NSObject, NSApplicationDelegate {
-  private var wake: AnyCancellable?
+  private var wake: Task<Void, Never>?
 
   func applicationDidFinishLaunching(_ notification: Notification) {
-    wake = NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didWakeNotification).sink { _ in
-      Task { @MainActor in
+    wake = Task { @MainActor in
+      for await _ in NSWorkspace.shared.notificationCenter.notifications(named: NSWorkspace.didWakeNotification) {
         for hub in Hubs.main.list {
           hub.networkAppAgent.systemDidWake()
         }

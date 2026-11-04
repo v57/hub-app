@@ -8,9 +8,6 @@
 #if !os(tvOS) && !os(visionOS)
 import SwiftUI
 import PlatformPower
-#if os(iOS)
-import Combine
-#endif
 
 struct FarmView: View {
 #if os(iOS)
@@ -165,7 +162,7 @@ extension View {
 #if os(iOS)
   private var brightness: CGFloat?
   weak var screen: UIScreen?
-  private var farmTracking: AnyCancellable?
+  private var farmTracking: Task<Void, Never>?
 #endif
   
   init() {
@@ -174,8 +171,10 @@ extension View {
       withAnimation { self?.battery = battery }
     }
 #if os(iOS)
-    farmTracking = NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification).sink { [unowned self] _ in
-      isRunning = false
+    farmTracking = Task { [weak self] in
+      for await _ in NotificationCenter.default.notifications(named: UIApplication.willResignActiveNotification) {
+        self?.isRunning = false
+      }
     }
 #endif
   }

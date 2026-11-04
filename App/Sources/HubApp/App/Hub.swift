@@ -240,6 +240,6 @@ class Hubs {
 
 extension View {
   func hub(_ hub: Hub) -> some View {
-    environment(hub).environmentObject(hub.client)
+    environment(hub).environment(hub.client)
   }
 }

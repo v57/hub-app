@@ -12,7 +12,6 @@ class TranslationGroups {
 
 #if os(macOS) || os(iOS)
 import Translation
-import Combine
 
 extension HubService.Group {
   @available(macOS 15.0, iOS 18.0, *)
