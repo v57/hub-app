@@ -293,6 +293,85 @@ final class LinkTests: XCTestCase {
     XCTAssertEqual(member.appliedPeers, [])
   }
 
+  /// The same values as the node's own computation (hub-net-node's protocol.PresenceProof)
+  func testAPresenceProofMatchesTheNodes() {
+    let proof = CoordinatorClient.presenceProof(secret: Data(repeating: 7, count: 32), target: "target-key")
+    XCTAssertEqual(proof, "d4Zy1NzETDI87QND7hsxd/A9u9/68KGQ885Z0BqMFCc=")
+    XCTAssertEqual(CoordinatorClient.presenceTag(proof: proof), "t3FwWmY9vasQuH+W9if3oB+BbNP4+V3mGseU/1xYQWg=")
+  }
+
+  /// A device holding its Hub's secret looks absent to anyone without it: the node pushes nothing at it. A member with
+  /// the secret links as ever. Needs a node that takes tags, so an older node skips this one
+  func testWithoutThePresenceSecretTheNodeGivesNoAnswer() async throws {
+    let hub = Curve25519.Signing.PrivateKey()
+    let attacker = Curve25519.Signing.PrivateKey()
+    let secret = Data(repeating: 9, count: 32)
+    let machine = LinkDevice(port: port, trusting: hub, name: "machine")
+    let member = LinkDevice(port: port, trusting: hub, name: "member")
+    let intruder = LinkDevice(port: port, trusting: attacker, name: "intruder")
+    machine.client.holdPresenceSecret(secret)
+    member.client.holdPresenceSecret(secret)
+    machine.start()
+    member.start()
+    intruder.start()
+    defer {
+      machine.client.stop()
+      member.client.stop()
+      intruder.client.stop()
+    }
+    try await machine.waitPresent()
+    try await member.waitPresent()
+    try await intruder.waitPresent()
+
+    do {
+      _ = try await intruder.client.openLink(signedGrant(hub: attacker, member: intruder, machine: machine))
+      XCTFail("the node introduced a device with no secret")
+    } catch {
+      XCTAssertTrue("\(error)".contains("peer_offline"), "\(error)")
+    }
+    XCTAssertFalse(machine.logged("link.incoming"), "the machine heard from a device with no secret")
+
+    await member.manager.update(grants: [signedGrant(hub: hub, member: member, machine: machine)], devicePorts: everyPort)
+    _ = try await machine.waitLinked(to: member)
+    _ = try await member.waitLinked(to: machine)
+
+    // A secret that arrives later than the registration counts too
+    await machine.client.setPresenceSecret(nil)
+    let phone = LinkDevice(port: port, trusting: hub, name: "phone")
+    phone.start()
+    defer { phone.client.stop() }
+    try await phone.waitPresent()
+    await phone.client.setPresenceSecret(secret)
+    try await Task.sleep(nanoseconds: 100_000_000)
+    do {
+      _ = try await intruder.client.openLink(signedGrant(hub: attacker, member: intruder, machine: phone))
+      XCTFail("the node introduced a device with no secret, after presence.tags")
+    } catch {
+      XCTAssertTrue("\(error)".contains("peer_offline"), "\(error)")
+    }
+  }
+
+  /// Holding a secret changes nothing for a node that doesn't take tags, and on one that does, two holders link
+  func testTwoHoldersOfTheSecretLinkOnAnyNode() async throws {
+    let hub = Curve25519.Signing.PrivateKey()
+    let secret = Data(repeating: 9, count: 32)
+    let machine = LinkDevice(port: port, trusting: hub, name: "machine")
+    let member = LinkDevice(port: port, trusting: hub, name: "member")
+    machine.client.holdPresenceSecret(secret)
+    member.client.holdPresenceSecret(secret)
+    machine.start()
+    member.start()
+    defer {
+      machine.client.stop()
+      member.client.stop()
+    }
+    try await machine.waitPresent()
+    try await member.waitPresent()
+    await member.manager.update(grants: [signedGrant(hub: hub, member: member, machine: machine)], devicePorts: everyPort)
+    _ = try await machine.waitLinked(to: member)
+    _ = try await member.waitLinked(to: machine)
+  }
+
   /// A grant HubServer signed (Core/HubServer, `network/links`) verifies here: both sides canonicalize alike
   func testAGrantSignedByHubServerVerifies() throws {
     let json = #"{"version":1,"grantId":"01a1734b-765a-7c5b-a953-c0317cc2c0e7","hubKey":"MCowBQYDK2VwAyEAMP8jW0u1gofE2VH0F2AHtLur35DN2hrWCUSUararuQI=","hubNetworkId":"01a1734b-7657-7bb6-9627-f59ed64392f6","purpose":"hub","a":{"key":"MCowBQYDK2VwAyEAs93y5mJl2I30WqQ6ol+d+28gInimBOEMTaSS7rxhJNk=","wireGuardKey":"wg-phone","member":"MCowBQYDK2VwAyEAs93y5mJl2I30WqQ6ol+d+28gInimBOEMTaSS7rxhJNk=","addresses":["100.96.0.2","fd48:5542:4e45::2"]},"b":{"key":"MCowBQYDK2VwAyEADfjkkhvj/f7n0NWhB4Uo5Y/9pScGajXfHyv+RmRrlDw=","wireGuardKey":"wg-machine","member":"MCowBQYDK2VwAyEADfjkkhvj/f7n0NWhB4Uo5Y/9pScGajXfHyv+RmRrlDw=","addresses":["100.96.0.1","fd48:5542:4e45::1"]},"aViaB":["100.96.0.1/32","fd48:5542:4e45::1/128"],"bViaA":["100.96.0.2/32","fd48:5542:4e45::2/128"],"aToB":[{"protocol":"tcp","port":1997}],"bToA":[],"issuedAt":"2026-10-25T13:41:27.771Z","expiresAt":"2026-11-24T13:41:27.771Z","signature":"ecU3t7DBxir0e1v6qYkLew4a1Y7OoVwgDqarVjNYUdsQdVzYjypWKYIbWS1kgwjcVCMYw+mdB/n2UiYOD4X6AA=="}"#

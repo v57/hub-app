@@ -873,4 +873,6 @@ struct HubNetworkPeerLinks: Codable, Equatable, Sendable {
   let grants: [Grant]
   /// What this device lets open (`DevicePorts`), set here and never taken from the Hub
   var devicePorts: [Grant.Port]? = nil
+  /// What this device and its Hub share, so the coordinator says nothing about either to anyone else. Passed on as is
+  var presenceSecret: String? = nil
 }

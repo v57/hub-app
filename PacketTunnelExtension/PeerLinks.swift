@@ -61,6 +61,11 @@ struct PeerLinksState: Codable, Equatable, Sendable {
   /// What this device lets open, the app's `DevicePorts`: a grant's port opens only if it's also here. Missing (a file
   /// from before this list), nothing opens until the app hands the list over
   var devicePorts: [PeerLinkGrant.Port]? = nil
+  /// What this device and its Hub share, so the coordinator says nothing about either to anyone else. Base64
+  var presenceSecret: String? = nil
+
+  /// The secret to hold: none from a Hub that gives none, whose members can't hold one either
+  var presenceSecretData: Data? { presenceSecret.flatMap { Data(base64Encoded: $0) } }
 }
 
 enum PeerLinkGrantError: Error, Equatable {

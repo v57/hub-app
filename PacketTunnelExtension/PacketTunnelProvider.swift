@@ -382,6 +382,8 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         await manager.tick()
       }
     }
+    // From the file, so a restart away from the Hub stays silent to anyone without the secret
+    client.holdPresenceSecret(stored?.presenceSecretData)
     client.start()
     extensionDiagnostics("coordinator \(nodeEndpoint), \(stored?.grants.count ?? 0) stored link grants")
   }
@@ -405,6 +407,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
       startCoordinator(profile: profile)
       return
     }
+    await coordinatorClient?.setPresenceSecret(links.presenceSecretData)
     await linkManager?.update(grants: links.grants, devicePorts: links.devicePorts ?? [])
   }
 

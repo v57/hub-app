@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 /// The device's client for the coordinator (hub-net-node, PROTOCOL.md).
@@ -83,6 +84,23 @@ final class CoordinatorClient: NSObject, URLSessionWebSocketDelegate, @unchecked
     var peerKey: String? = nil
     var endpoints: [LinkEndpoint]? = nil
     var punchAt: String? = nil
+    /// What the node checks a `link.open`'s proof against, from a node that takes them (`presence.challenge` says minor 1)
+    var presenceTags: [String]? = nil
+    var presenceProof: String? = nil
+  }
+
+  /// What an opener shows the node for one target. The secret stays with the Hub and its devices; the node sees only
+  /// this value, good for this target alone
+  static func presenceProof(secret: Data, target: String) -> String {
+    var message = Data("hub-network/presence/v1".utf8)
+    message.append(0)
+    message.append(Data(target.utf8))
+    return Data(HMAC<SHA256>.authenticationCode(for: message, using: SymmetricKey(data: secret))).base64EncodedString()
+  }
+
+  /// What a device registers for a proof, so the node's memory opens nothing
+  static func presenceTag(proof: String) -> String {
+    Data(SHA256.hash(data: Data(proof.utf8))).base64EncodedString()
   }
 
   /// A `link.opened` reply: the link's id, this side's probe token and the other side
@@ -131,6 +149,11 @@ final class CoordinatorClient: NSObject, URLSessionWebSocketDelegate, @unchecked
   private var runTask: Task<Void, Never>?
   /// Registrations completed, renewals included (for tests)
   private(set) var registrations = 0
+  /// What this device and its Hub share, what this connection's node stated in `presence.challenge`, and the tags it
+  /// last got
+  private var presenceSecret: Data?
+  private var nodeMinor = 0
+  private var sentTags: [String] = []
 
   init(
     nodeEndpoint: String,
@@ -156,6 +179,35 @@ final class CoordinatorClient: NSObject, URLSessionWebSocketDelegate, @unchecked
 
   var registered: Bool { lock.withLock { isRegistered } }
 
+  private var presenceTagsLocked: [String] {
+    guard let presenceSecret, nodeMinor >= 1 else { return [] }
+    return [Self.presenceTag(proof: Self.presenceProof(secret: presenceSecret, target: serviceKey))]
+  }
+
+  /// Takes the secret this device shares with its Hub: the node then gives no answer about this device to anyone
+  /// without it, and this device can reach others who hold it. Nil goes back to answering everyone. Tags and proofs go
+  /// only to a node that said it takes them, because an older one refuses them.
+  func setPresenceSecret(_ secret: Data?) async {
+    holdPresenceSecret(secret)
+    await syncPresenceTags()
+  }
+
+  /// `setPresenceSecret` before `start`, so the first registration has its tags
+  func holdPresenceSecret(_ secret: Data?) {
+    lock.withLock { presenceSecret = secret }
+  }
+
+  /// Tells the node when this device's tags changed since it last told it
+  private func syncPresenceTags() async {
+    let change: (CoordinatorLink, [String])? = lock.withLock {
+      guard isRegistered, let link, presenceTagsLocked != sentTags else { return nil }
+      sentTags = presenceTagsLocked
+      return (link, sentTags)
+    }
+    guard let change else { return }
+    try? await change.0.send(Envelope(majorVersion: 1, minorVersion: 0, type: "presence.tags", presenceTags: change.1))
+  }
+
   /// The coordinator this client registers at, as configured
   var nodeEndpointValue: String { nodeEndpoint }
 
@@ -165,9 +217,14 @@ final class CoordinatorClient: NSObject, URLSessionWebSocketDelegate, @unchecked
   /// Asks the node to introduce this device to the other side of `grant` (`link.open`)
   func openLink(_ grant: PeerLinkGrant) async throws -> OpenedLink {
     guard let link = lock.withLock({ isRegistered ? self.link : nil }) else { throw CoordinatorError.closed }
+    let target = grant.a.key == serviceKey ? grant.b.key : grant.a.key
+    let proof = lock.withLock { () -> String? in
+      guard let presenceSecret, nodeMinor >= 1 else { return nil }
+      return Self.presenceProof(secret: presenceSecret, target: target)
+    }
     let opened = try await link.exclusive {
       try await link.request(Envelope(
-        majorVersion: 1, minorVersion: 0, type: "link.open", requestId: UUID().uuidString, grant: grant
+        majorVersion: 1, minorVersion: 0, type: "link.open", requestId: UUID().uuidString, grant: grant, presenceProof: proof
       ), timeout: self.replyTimeout)
     }
     guard opened.type == "link.opened", let linkId = opened.linkId, let probeToken = opened.probeToken,
@@ -254,6 +311,8 @@ final class CoordinatorClient: NSObject, URLSessionWebSocketDelegate, @unchecked
 
     var expiresAt = try await link.exclusive { try await self.register(link) }
     setRegistered(true)
+    // The Hub may have given a new secret while this registration was on its way
+    await syncPresenceTags()
     log("coordinator: present, lease until \(expiresAt)")
 
     let renewal = Task { [weak self] in
@@ -302,9 +361,15 @@ final class CoordinatorClient: NSObject, URLSessionWebSocketDelegate, @unchecked
     guard let nonceData = Self.base64URLDecode(nonce) ?? Data(base64Encoded: nonce), !nonceData.isEmpty else {
       throw CoordinatorError.invalidNonce
     }
+    let tags = lock.withLock { () -> [String] in
+      nodeMinor = challenge.minorVersion
+      sentTags = presenceTagsLocked
+      return sentTags
+    }
     let registered = try await link.request(Envelope(
       majorVersion: 1, minorVersion: 0, type: "presence.register", requestId: UUID().uuidString,
-      serviceKey: serviceKey, challengeNonce: nonce, challengeSignature: try sign(nonceData)
+      serviceKey: serviceKey, challengeNonce: nonce, challengeSignature: try sign(nonceData),
+      presenceTags: tags.isEmpty ? nil : tags
     ), timeout: replyTimeout)
     guard registered.type == "presence.registered", let raw = registered.registrationExpiresAt,
       let expiresAt = Self.parseRFC3339(raw)
