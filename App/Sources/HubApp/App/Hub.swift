@@ -126,6 +126,19 @@ extension KeyChain {
     /// Which keys the app uses on this hub (App credentials.swift): `sharedKeys`, or what its own are derived from
     var keys: String? = nil
   }
+  /// Whether this app connects to this hub with the keys every hub from before auth v2 shares
+  var usesSharedKeys: Bool { settings.keys == Settings.sharedKeys || settings.identityTag != nil }
+  /// A device's safety code, worked out from the key this app pinned for this hub. Nil when there's no value to work it
+  /// from: nothing is shown then, since a code without the hub's value says nothing.
+  func safetyCode(deviceKey: String, codeValue: String?) -> String? {
+    guard let codeValue, let pinned = client.hubKey else { return nil }
+    return DeviceKey.safetyCode(hubKey: pinned, deviceKey: deviceKey, codeValue: codeValue)
+  }
+  /// What the page shows for a device asking to join; a hub stating another code than the pinned key gives shows none
+  func safetyCode(of device: PendingDevice) -> String? {
+    if isDemo { return device.safetyCode }
+    return client.hubKey.flatMap { device.verifiedCode(hubKey: $0) }
+  }
   /// What the packet tunnel derives this hub's key from; `nil` for the app's shared key, which it reads as it is
   var tunnelKeyScope: String? {
     settings.identityTag == nil && settings.keys != Settings.sharedKeys ? settings.keys : nil

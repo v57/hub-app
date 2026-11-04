@@ -58,7 +58,8 @@ struct HubSidebar: View {
   }
 
   private func copyKey() {
-    KitPasteboard.copy(KeyChain.main.publicKey())
+    // Each hub knows this device by its own key; away from any hub, the shared one
+    KitPasteboard.copy(navigator.openHub?.key ?? KeyChain.main.publicKey())
     withAnimation(.kit) { copied = true }
     Task {
       try? await Task.sleep(for: .seconds(2))

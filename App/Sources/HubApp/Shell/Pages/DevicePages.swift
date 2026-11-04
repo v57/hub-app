@@ -39,14 +39,20 @@ struct DevicePageView: View {
 
 /// This device's keys, and Reset Data
 struct DeviceSettingsPage: View {
+  @State private var hubs = Hubs.main
   @State private var isConfirming = false
   @State private var isResetting = false
 
   var body: some View {
     ScrollView {
       VStack(spacing: KitMetrics.gutter) {
-        KitSection("Identity", meta: ["kept by Reset Data"], systemImage: "key", hue: .gray) {
+        ForEach(hubs.list) { hub in
+          HubKeysSection(hub: hub)
+        }
+        KitSection("Shared Keys", meta: ["kept by Reset Data"], systemImage: "key", hue: .gray) {
           VStack(spacing: 8) {
+            Text("Hubs from before each hub got keys of its own stay on these, and so does the hub this \(KitDevice.nameInSentence) runs.")
+              .kitFont(.caption).fixedSize(horizontal: false, vertical: true)
             KeyValueLine(key: "Your Key", value: KeyChain.main.publicKey(), mono: true)
             KeyValueLine(key: "Device Key", value: DeviceIdentity.app?.key.publicKey ?? "–", mono: true)
           }.padding(8)
@@ -84,6 +90,53 @@ struct DeviceSettingsPage: View {
     isResetting = true
     _ = await HubReset.resetData()
     isResetting = false
+  }
+}
+
+/// This device on one hub: the keys that hub knows it by, and the safety code an owner compares
+private struct HubKeysSection: View {
+  let hub: Hub
+  @State private var request: DeviceRequest?
+
+  var body: some View {
+    KitSection(hub.settings.name, meta: [hub.usesSharedKeys ? "shared keys" : "keys of its own"], systemImage: "key", hue: .blue) {
+      VStack(spacing: 8) {
+        KeyValueLine(key: "Your Key", value: hub.key, mono: true)
+        KeyValueLine(key: "Device Key", value: deviceKey ?? "–", mono: true)
+        KeyValueLine(key: "Safety Code", value: safetyCode ?? "–")
+        if let waiting {
+          Text(waiting).kitFont(.caption).fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+      }.padding(8)
+    }
+    .task(id: hub.isConnected) {
+      // The value the code covers comes from the hub, on its own stream: older hubs have none, and show no code
+      guard hub.isConnected, hub.client.device != nil, !hub.isDemo else { return }
+      do {
+        for try await request in hub.client.devices.request() {
+          self.request = request
+        }
+      } catch {
+        request = nil
+      }
+    }
+  }
+
+  private var deviceKey: String? { hub.client.device?.key.publicKey }
+
+  private var safetyCode: String? {
+    guard let deviceKey else { return nil }
+    return hub.safetyCode(deviceKey: deviceKey, codeValue: request?.codeValue)
+  }
+
+  private var waiting: String? {
+    switch request?.status {
+    case .waiting: "Waiting for its turn with this hub. The code comes once the hub has this \(KitDevice.nameInSentence)’s request."
+    case .pending: "An owner compares this code and approves this \(KitDevice.nameInSentence)."
+    case .approved: nil
+    case nil: hub.isConnected ? "This hub gives no safety code to compare." : nil
+    }
   }
 }
 

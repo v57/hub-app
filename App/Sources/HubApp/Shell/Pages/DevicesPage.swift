@@ -174,7 +174,7 @@ struct PendingDeviceBanner: View {
       message: MetaLine.join([
         device.platform.map(Device.systemName) ?? "",
         device.firstSeenDate.map { "asked \($0.formatted(.relative(presentation: .named)))" } ?? "",
-        "check its safety code \(device.safetyCode) on the device",
+        hub.safetyCode(of: device).map { "check its safety code \($0) on the device" } ?? "this hub gives no safety code to check",
       ]),
       systemImage: Device.symbol(platform: device.platform), hue: .orange
     ) {
@@ -343,7 +343,9 @@ struct DeviceInspector: View {
         if let overlay = device.overlay {
           InspectorRow("Hub Network", value: overlay.address)
         }
-        InspectorRow("Safety code", value: DeviceKey.safetyCode(publicKey: device.key), copyable: false)
+        if let code = hub.safetyCode(deviceKey: device.key, codeValue: device.codeValue) {
+          InspectorRow("Safety code", value: code, copyable: false)
+        }
         InspectorRow("Key", value: "…" + device.key.suffix(8))
         if let gateway {
           InternetGatewayRow(gateway: gateway, title: String(localized: "Internet"))
