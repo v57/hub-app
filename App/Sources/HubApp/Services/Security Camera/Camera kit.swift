@@ -176,11 +176,10 @@ struct CameraThumbnail: View {
   var body: some View {
     ZStack {
       Color.black.opacity(0.75)
-      if let data, let image = Image(data: data) {
-        image.resizable().aspectRatio(16 / 9, contentMode: .fill)
-      } else {
+      KitImageData(data: data) {
         Image(systemName: "video").font(.system(size: width / 5)).foregroundStyle(.white.opacity(0.45))
       }
+      .aspectRatio(16 / 9, contentMode: .fill)
     }
     .frame(width: width, height: width * 9 / 16)
     .clipShape(RoundedRectangle(cornerRadius: 4))
