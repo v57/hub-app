@@ -99,7 +99,15 @@ final class LocalHub {
     if let old = server { await old.stop() }
     error = nil
     refreshAddresses()
-    let server = HubServer(configuration())
+    let server: HubServer
+    do {
+      server = HubServer(try configuration())
+    } catch {
+      // Never a new key instead: that would change the hub's identity for every device that pinned it
+      self.server = nil
+      self.error = "Couldn't read the hub's key: \(error)"
+      return
+    }
     self.server = server
     statusTask?.cancel()
     statusTask = Task { [weak self] in
@@ -160,8 +168,11 @@ final class LocalHub {
     isPairingHidden = true
   }
 
-  private func configuration() -> HubServer.Configuration {
+  private func configuration() throws -> HubServer.Configuration {
     var configuration = HubServer.Configuration(dataDirectory: Self.dataDirectory)
+#if canImport(Security)
+    configuration.key = try Self.hubKey()
+#endif
     configuration.listen = ListenAddress(port: port)
     configuration.name = AppDevice.name
     configuration.deviceName = AppDevice.name
@@ -179,6 +190,26 @@ final class LocalHub {
 #endif
     return configuration
   }
+
+#if canImport(Security)
+  /// The hub's key, in the app's own keychain group and on this device only, moved there from the `auth` file older
+  /// builds wrote. Other devices pin it and it signs what they trust, so no other app and no file should hold it.
+  /// Settings' Reset Data removes it with the hub's data. Without a keychain (Linux) it stays the `auth` file.
+  private static func hubKey() throws -> HubKeyPair {
+    let group = Bundle.main.object(forInfoDictionaryKey: "HubKeychainAccessGroup") as? String
+    let item = KeyChain.KeychainConfiguration(
+      service: "dev.v57.Hub.local-hub.v1",
+      account: "ed25519-private-key",
+      accessGroup: group?.isEmpty == false ? group : nil,
+      useDataProtectionKeychain: true
+    )
+    return try HubKeyPair.moved(
+      from: dataDirectory.appendingPathComponent("auth"),
+      load: { try KeyChain.loadData(keychain: item) },
+      save: { try KeyChain.replaceData($0, keychain: item) }
+    )
+  }
+#endif
 
   /// Adds this hub to the app's hubs, with its key pinned so the first connection is already hub-bound
   private func connectApp() {
