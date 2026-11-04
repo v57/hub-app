@@ -58,6 +58,9 @@ struct PeerLinksState: Codable, Equatable, Sendable {
   let coordinator: String
   let hubHost: Bool
   let grants: [PeerLinkGrant]
+  /// What this device lets open, the app's `DevicePorts`: a grant's port opens only if it's also here. Missing (a file
+  /// from before this list), nothing opens until the app hands the list over
+  var devicePorts: [PeerLinkGrant.Port]? = nil
 }
 
 enum PeerLinkGrantError: Error, Equatable {
@@ -205,6 +208,8 @@ actor LinkManager {
   private let dependencies: Dependencies
   private var trustedHubKey: String
   private var own: [VerifiedLink] = []
+  /// What this device lets open: a Hub can narrow it, never widen it
+  private var devicePorts: Set<PeerLinkGrant.Port> = []
   /// Devices that brought a grant this device verified, by their key
   private var admitted: [String: VerifiedLink] = [:]
   private var peers: [String: Peer] = [:]
@@ -216,14 +221,19 @@ actor LinkManager {
   private var present = false
   private(set) var linkUps = 0
 
-  init(ownKey: String, trustedHubKey: String, dependencies: Dependencies) {
+  init(ownKey: String, trustedHubKey: String, devicePorts: [PeerLinkGrant.Port] = [], dependencies: Dependencies) {
     self.ownKey = ownKey
     self.trustedHubKey = trustedHubKey
+    self.devicePorts = Set(devicePorts)
     self.dependencies = dependencies
   }
 
-  /// The grants the hub issued this device; the ones that don't verify are dropped
-  func update(grants: [PeerLinkGrant]) async {
+  /// The grants the hub issued this device, with the device's own list of what it lets open; grants that don't verify
+  /// are dropped
+  func update(grants: [PeerLinkGrant], devicePorts: [PeerLinkGrant.Port]) async {
+    let previous = self.devicePorts
+    self.devicePorts = Set(devicePorts)
+    if previous != self.devicePorts, Set(peers.keys).map(refreshPeer).contains(true) { await apply() }
     var verified: [VerifiedLink] = []
     for grant in grants {
       do {
@@ -494,7 +504,7 @@ actor LinkManager {
     let peer = Peer(
       key: key, wireGuardKey: newest.other.wireGuardKey, routes: Self.unique(same.flatMap(\.routes)),
       sources: Self.unique(same.flatMap { $0.other.addresses.map(PeerLinkGrant.hostRoute) }),
-      ports: Self.unique(same.flatMap(\.exposed)).sorted { ($0.port, $0.protocol) < ($1.port, $1.protocol) },
+      ports: Self.unique(same.flatMap(\.exposed)).filter { devicePorts.contains($0) }.sorted { ($0.port, $0.protocol) < ($1.port, $1.protocol) },
       endpoint: current?.wireGuardKey == newest.other.wireGuardKey ? current?.endpoint : nil
     )
     guard current != peer else { return false }

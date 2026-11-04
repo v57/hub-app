@@ -719,18 +719,32 @@ final class HubNet {
     linksWatcherTask?.cancel()
     linksWatcherTask = Task { [weak self] in
       guard let hub = self?.hub else { return }
+      var latest: HubNetworkPeerLinks?
       var sent: HubNetworkPeerLinks?
+      // The device's own list decides what opens here, also when it changes between two `network/links`
+      let send = { (links: HubNetworkPeerLinks) async in
+        let links = Self.withDevicePorts(links, hub: hub)
+        // The tunnel may still be starting: retry until it takes them
+        for _ in 0..<10 where links != sent {
+          if (try? await PacketTunnelController().setLinks(links)) != nil {
+            sent = links
+            break
+          }
+          try? await Task.sleep(for: .seconds(2))
+        }
+      }
+      let listChanges = Task {
+        while !Task.isCancelled {
+          try? await Task.sleep(for: .seconds(5))
+          if let latest { await send(latest) }
+        }
+      }
+      defer { listChanges.cancel() }
       while !Task.isCancelled {
         do {
           for try await links: HubNetworkPeerLinks in hub.client.values("network/links") {
-            // The tunnel may still be starting: retry until it takes them
-            for _ in 0..<10 where links != sent {
-              if (try? await PacketTunnelController().setLinks(links)) != nil {
-                sent = links
-                break
-              }
-              try? await Task.sleep(for: .seconds(2))
-            }
+            latest = links
+            await send(links)
           }
         } catch {
           print("network/links: \(error)")
@@ -738,6 +752,19 @@ final class HubNet {
         try? await Task.sleep(for: .seconds(5))
       }
     }
+  }
+
+  /// `links` with this device's list in place of anything the Hub put there. A Hub running on this device opens what it
+  /// opened before this list existed, once
+  private static func withDevicePorts(_ links: HubNetworkPeerLinks, hub: Hub) -> HubNetworkPeerLinks {
+    let onThisDevice = hub.settings.address.host().map(DevicePorts.isThisDevice(host:)) ?? false
+    if onThisDevice {
+      DevicePorts.main.seedFromOwnHub(links.grants.flatMap(\.aToB).map { DevicePorts.Port(protocol: $0.protocol, port: $0.port) })
+    }
+    var links = links
+    links.devicePorts = DevicePorts.main.list(hubPort: onThisDevice ? hub.settings.address.port.map(UInt16.init) ?? 1997 : nil)
+      .map { .init(protocol: $0.protocol, port: $0.port) }
+    return links
   }
 
   /// While serving as the hub's inviter, mirror every member from

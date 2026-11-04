@@ -49,6 +49,7 @@ struct DeviceSettingsPage: View {
         ForEach(hubs.list) { hub in
           HubKeysSection(hub: hub)
         }
+        DevicePortsSection()
         KitSection("Shared Keys", meta: ["kept by Reset Data"], systemImage: "key", hue: .gray) {
           VStack(spacing: 8) {
             Text("Hubs from before each hub got keys of its own stay on these, and so does the hub this \(KitDevice.nameInSentence) runs.")
@@ -90,6 +91,47 @@ struct DeviceSettingsPage: View {
     isResetting = true
     _ = await HubReset.resetData()
     isResetting = false
+  }
+}
+
+/// What another device may open here over Hub Network: a Hub can narrow this, never widen it
+private struct DevicePortsSection: View {
+  @State private var isSSHEnabled = DevicePorts.main.isSSHEnabled
+  @State private var allowed = DevicePorts.main.allowed
+  @State private var newPort = ""
+
+  var body: some View {
+    KitSection("Open Ports", meta: ["besides what you share"], systemImage: "lock.open", hue: .orange) {
+      VStack(spacing: 8) {
+        Text("A hub can only open a port on this \(KitDevice.nameInSentence) that's shared from it or listed here, whatever the hub signs.")
+          .kitFont(.caption).fixedSize(horizontal: false, vertical: true)
+          .frame(maxWidth: .infinity, alignment: .leading)
+#if os(macOS)
+        Toggle("SSH (port \(DevicePorts.main.sshPort))", isOn: $isSSHEnabled)
+          .onChange(of: isSSHEnabled) { _, enabled in DevicePorts.main.setSSH(enabled) }
+#endif
+        ForEach(allowed, id: \.self) { port in
+          HStack {
+            Text(port.title).frame(maxWidth: .infinity, alignment: .leading)
+            Button("Remove", systemImage: "xmark") {
+              DevicePorts.main.remove(port)
+              allowed = DevicePorts.main.allowed
+            }
+            .labelStyle(.iconOnly).buttonStyle(.plain)
+          }
+        }
+        HStack {
+          TextField("tcp/8080", text: $newPort).kitField().keyboard(style: .code)
+          Button("Allow") {
+            guard let port = DevicePorts.Port(newPort) else { return }
+            DevicePorts.main.allow(port)
+            allowed = DevicePorts.main.allowed
+            newPort = ""
+          }
+          .buttonStyle(.kit).controlSize(.small).disabled(DevicePorts.Port(newPort) == nil)
+        }
+      }.padding(8)
+    }
   }
 }
 

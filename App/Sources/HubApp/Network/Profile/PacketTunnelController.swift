@@ -837,7 +837,7 @@ private struct UnsafeSendable<Value>: @unchecked Sendable {
   let value: Value
 }
 
-/// `network/links` as the hub sends it (Core/HubServer `PeerLinks.swift`), passed to the extension unchanged
+/// `network/links` as the hub sends it (Core/HubServer `PeerLinks.swift`), passed to the extension with this device's list
 struct HubNetworkPeerLinks: Codable, Equatable, Sendable {
   struct Grant: Codable, Equatable, Sendable {
     struct Side: Codable, Equatable, Sendable {
@@ -871,4 +871,6 @@ struct HubNetworkPeerLinks: Codable, Equatable, Sendable {
   let coordinator: String
   let hubHost: Bool
   let grants: [Grant]
+  /// What this device lets open (`DevicePorts`), set here and never taken from the Hub
+  var devicePorts: [Grant.Port]? = nil
 }

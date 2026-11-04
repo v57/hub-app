@@ -676,6 +676,7 @@ enum CameraShareAttestation {
     let formatter = ISO8601DateFormatter()
     formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
     let now = Date()
+    DevicePorts.main.noteAttested(protocol: share.protocol.rawValue, port: share.target.port)
     let unsigned = AgentAttestation(
       attestationId: UUID().uuidString.lowercased(), serviceKey: serviceKey, key: identity.publicKey(), shareName: share.name,
       protocol: share.protocol, target: share.target, issuedAt: formatter.string(from: now),

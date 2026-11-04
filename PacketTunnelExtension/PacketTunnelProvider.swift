@@ -376,7 +376,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     coordinatorClient = client
     linkManager = manager
     linkTicker = Task {
-      if let stored { await manager.update(grants: stored.grants) }
+      if let stored { await manager.update(grants: stored.grants, devicePorts: stored.devicePorts ?? []) }
       while !Task.isCancelled {
         try? await Task.sleep(for: .seconds(30))
         await manager.tick()
@@ -405,7 +405,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
       startCoordinator(profile: profile)
       return
     }
-    await linkManager?.update(grants: links.grants)
+    await linkManager?.update(grants: links.grants, devicePorts: links.devicePorts ?? [])
   }
 
   private static var linksURL: URL? {

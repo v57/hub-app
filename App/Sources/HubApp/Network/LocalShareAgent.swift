@@ -204,6 +204,7 @@ final class LocalShareAgent: @unchecked Sendable {
         protocol: unsigned.protocol, target: unsigned.target, issuedAt: unsigned.issuedAt, expiresAt: unsigned.expiresAt,
         signature: identity.sign(data: input)
       )
+      DevicePorts.main.noteAttested(protocol: networkProtocol.rawValue, port: target.port)
       return (200, try JSONEncoder().encode(attestation))
     } catch {
       return failure(500, "agent_unavailable", "\(error)")

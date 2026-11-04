@@ -56,7 +56,7 @@ final class LinkTests: XCTestCase {
     try await machine.waitPresent()
 
     let grant = signedGrant(hub: hub, member: member, machine: machine)
-    await member.manager.update(grants: [grant])
+    await member.manager.update(grants: [grant], devicePorts: everyPort)
 
     let onMachine = try await machine.waitLinked(to: member)
     let onMember = try await member.waitLinked(to: machine)
@@ -74,6 +74,32 @@ final class LinkTests: XCTestCase {
 
   /// A share the hub's machine fronts after the link came up: the member's new grant opens the link again, and the
   /// machine lets the member reach the share's port too, over the same path
+  /// A Hub signs whatever it likes: the device opens only what's also on its own list, and a port it hasn't enabled stays
+  /// shut even with a good signature
+  func testAHubSignedGrantCantOpenPort22OnADeviceThatHasntEnabledIt() async throws {
+    let hub = Curve25519.Signing.PrivateKey()
+    let hubPort = PeerLinkGrant.Port(protocol: "tcp", port: 1997)
+    let ssh = PeerLinkGrant.Port(protocol: "tcp", port: 22)
+    let member = LinkDevice(port: port, trusting: hub, name: "member")
+    let machine = LinkDevice(port: port, trusting: hub, name: "machine", devicePorts: [hubPort])
+    member.start()
+    machine.start()
+    defer {
+      member.client.stop()
+      machine.client.stop()
+    }
+    try await member.waitPresent()
+    try await machine.waitPresent()
+    await member.manager.update(grants: [signedGrant(hub: hub, member: member, machine: machine, ports: [ssh, hubPort])], devicePorts: [])
+    let onMachine = try await machine.waitLinked(to: member)
+    XCTAssertEqual(onMachine.ports, [hubPort], "the grant verifies, and port 22 still isn't opened")
+    // Turning SSH on opens it for the grant already there; turning it off closes it again
+    await machine.manager.update(grants: [], devicePorts: [hubPort, ssh])
+    XCTAssertEqual(machine.appliedPeers.first { $0.key == member.serviceKey }?.ports, [ssh, hubPort])
+    await machine.manager.update(grants: [], devicePorts: [hubPort])
+    XCTAssertEqual(machine.appliedPeers.first { $0.key == member.serviceKey }?.ports, [hubPort])
+  }
+
   func testANewGrantReachesTheMachineOverALiveLink() async throws {
     let hub = Curve25519.Signing.PrivateKey()
     let member = LinkDevice(port: port, trusting: hub, name: "member")
@@ -86,12 +112,12 @@ final class LinkTests: XCTestCase {
     }
     try await member.waitPresent()
     try await machine.waitPresent()
-    await member.manager.update(grants: [signedGrant(hub: hub, member: member, machine: machine)])
+    await member.manager.update(grants: [signedGrant(hub: hub, member: member, machine: machine)], devicePorts: everyPort)
     let before = try await machine.waitLinked(to: member)
     XCTAssertEqual(before.ports, [PeerLinkGrant.Port(protocol: "tcp", port: 1997)])
 
     let ports: [PeerLinkGrant.Port] = [.init(protocol: "tcp", port: 1997), .init(protocol: "tcp", port: 8642)]
-    await member.manager.update(grants: [signedGrant(hub: hub, member: member, machine: machine, ports: ports)])
+    await member.manager.update(grants: [signedGrant(hub: hub, member: member, machine: machine, ports: ports)], devicePorts: everyPort)
     try await member.waitLog("renewed with")
     let after = try XCTUnwrap(machine.appliedPeers.first { $0.key == member.serviceKey })
     XCTAssertEqual(after.ports, ports)
@@ -117,7 +143,7 @@ final class LinkTests: XCTestCase {
     try await tablet.waitPresent()
     try await phone.waitPresent()
     let camera = [PeerLinkGrant.Port(protocol: "tcp", port: 50000)]
-    await tablet.manager.update(grants: [signedGrant(hub: hub, purpose: "share", member: tablet, machine: phone, ports: camera)])
+    await tablet.manager.update(grants: [signedGrant(hub: hub, purpose: "share", member: tablet, machine: phone, ports: camera)], devicePorts: everyPort)
 
     let onPhone = try await phone.waitLinked(to: tablet)
     let onTablet = try await tablet.waitLinked(to: phone)
@@ -127,7 +153,7 @@ final class LinkTests: XCTestCase {
     XCTAssertEqual(onTablet.ports, [])
     // A gateway grant isn't a link this way
     let gateway = LinkDevice(port: port, trusting: hub, name: "member")
-    await gateway.manager.update(grants: [signedGrant(hub: hub, purpose: "gateway", member: gateway, machine: phone)])
+    await gateway.manager.update(grants: [signedGrant(hub: hub, purpose: "gateway", member: gateway, machine: phone)], devicePorts: everyPort)
     XCTAssertTrue(gateway.logged("rejected: malformed"))
   }
 
@@ -147,9 +173,9 @@ final class LinkTests: XCTestCase {
     try await phone.waitPresent()
     let phoneCamera = [PeerLinkGrant.Port(protocol: "tcp", port: 50000)]
     let tabletCamera = [PeerLinkGrant.Port(protocol: "tcp", port: 50001)]
-    await tablet.manager.update(grants: [signedGrant(hub: hub, purpose: "share", member: tablet, machine: phone, ports: phoneCamera)])
+    await tablet.manager.update(grants: [signedGrant(hub: hub, purpose: "share", member: tablet, machine: phone, ports: phoneCamera)], devicePorts: everyPort)
     _ = try await phone.waitLinked(to: tablet)
-    await phone.manager.update(grants: [signedGrant(hub: hub, purpose: "share", member: phone, machine: tablet, ports: tabletCamera)])
+    await phone.manager.update(grants: [signedGrant(hub: hub, purpose: "share", member: phone, machine: tablet, ports: tabletCamera)], devicePorts: everyPort)
     try await tablet.waitLog("link.incoming")
     try await phone.waitLog("renewed with")
 
@@ -172,7 +198,7 @@ final class LinkTests: XCTestCase {
     let machine = LinkDevice(port: port, trusting: hub, name: "machine")
     let grants = others.map { signedGrant(hub: hub, purpose: "share", member: viewer, machine: $0, ports: []) }
       + [signedGrant(hub: hub, member: viewer, machine: machine)]
-    await viewer.manager.update(grants: grants)
+    await viewer.manager.update(grants: grants, devicePorts: everyPort)
     let linked = await viewer.manager.status.map(\.peer.key)
     XCTAssertEqual(linked.count, 16)
     XCTAssertTrue(linked.contains(machine.serviceKey))
@@ -193,13 +219,13 @@ final class LinkTests: XCTestCase {
     }
     try await member.waitPresent()
     try await machine.waitPresent()
-    await member.manager.update(grants: [signedGrant(hub: hub, member: member, machine: machine)])
+    await member.manager.update(grants: [signedGrant(hub: hub, member: member, machine: machine)], devicePorts: everyPort)
     let before = try await machine.waitLinked(to: member)
     XCTAssertEqual(before.endpoint, "198.51.100.2:41000")
 
     member.candidate = "203.0.113.7"
     let ports: [PeerLinkGrant.Port] = [.init(protocol: "tcp", port: 1997), .init(protocol: "tcp", port: 8642)]
-    await member.manager.update(grants: [signedGrant(hub: hub, member: member, machine: machine, ports: ports)])
+    await member.manager.update(grants: [signedGrant(hub: hub, member: member, machine: machine, ports: ports)], devicePorts: everyPort)
     try await machine.waitLog("up with \(member.serviceKey.suffix(8)) at 203.0.113.7:41000")
     XCTAssertFalse(machine.logged("renewed with"))
     XCTAssertEqual(machine.appliedPeers.first { $0.key == member.serviceKey }?.ports, ports)
@@ -221,7 +247,7 @@ final class LinkTests: XCTestCase {
     }
     try await member.waitPresent()
     try await machine.waitPresent()
-    await member.manager.update(grants: [signedGrant(hub: hub, member: member, machine: machine)])
+    await member.manager.update(grants: [signedGrant(hub: hub, member: member, machine: machine)], devicePorts: everyPort)
 
     let onMachine = try await machine.waitLinked(to: member)
     XCTAssertEqual(onMachine.endpoint, "91.122.18.4:51947")
@@ -256,13 +282,13 @@ final class LinkTests: XCTestCase {
     try await machine.waitPresent()
     try await intruder.waitPresent()
 
-    await intruder.manager.update(grants: [signedGrant(hub: attacker, member: intruder, machine: machine)])
+    await intruder.manager.update(grants: [signedGrant(hub: attacker, member: intruder, machine: machine)], devicePorts: everyPort)
     try await intruder.waitLog("closed: link_rejected")
     XCTAssertTrue(machine.logged("rejected: untrustedHub"))
     XCTAssertEqual(machine.appliedPeers, [], "nothing of the intruder reached WireGuard")
     // Its own copy of the forged grant gets the member nowhere either
     let member = LinkDevice(port: port, trusting: hub, name: "member")
-    await member.manager.update(grants: [signedGrant(hub: attacker, member: member, machine: machine)])
+    await member.manager.update(grants: [signedGrant(hub: attacker, member: member, machine: machine)], devicePorts: everyPort)
     XCTAssertTrue(member.logged("rejected: untrustedHub"))
     XCTAssertEqual(member.appliedPeers, [])
   }
@@ -320,6 +346,9 @@ func spki(_ key: Curve25519.Signing.PublicKey) -> String {
 
 /// A device with its own key, coordinator client and link manager. WireGuard is faked: a peer counts as handshaken
 /// once it has an endpoint, or once its packets came from somewhere (`roam`), which WireGuard then answers.
+/// Every port these tests name, as a device that lets them all open
+let everyPort: [PeerLinkGrant.Port] = [1997, 8642, 50000, 50001].map { .init(protocol: "tcp", port: $0) }
+
 final class LinkDevice: @unchecked Sendable {
   let key = Curve25519.Signing.PrivateKey()
   let serviceKey: String
@@ -343,7 +372,7 @@ final class LinkDevice: @unchecked Sendable {
   var host: Int { ["machine": 1, "member": 2, "phone": 3, "tablet": 4][name] ?? 9 }
   var addresses: [String] { ["100.96.0.\(host)", "fd48:5542:4e45::\(host)"] }
 
-  init(port: UInt16, trusting hub: Curve25519.Signing.PrivateKey, name: String) {
+  init(port: UInt16, trusting hub: Curve25519.Signing.PrivateKey, name: String, devicePorts: [PeerLinkGrant.Port] = everyPort) {
     self.name = name
     let key = self.key
     serviceKey = spki(key.publicKey)
@@ -368,7 +397,7 @@ final class LinkDevice: @unchecked Sendable {
     )
     let client = client!
     candidateAddress = "198.51.100.\(host)"
-    manager = LinkManager(ownKey: serviceKey, trustedHubKey: spki(hub.publicKey), dependencies: .init(
+    manager = LinkManager(ownKey: serviceKey, trustedHubKey: spki(hub.publicKey), devicePorts: devicePorts, dependencies: .init(
       open: { try await client.openLink($0) },
       send: { try await client.sendLink($0, linkId: $1, endpoints: $2) },
       probe: { try sendUDP($0, port: port) },
