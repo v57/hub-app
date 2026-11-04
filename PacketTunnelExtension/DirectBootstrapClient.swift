@@ -377,6 +377,10 @@ enum DirectBootstrapClient {
     if let identity = try? KeyChain.hubIdentity(), identity.publicKey() == expectedKey {
       return identity
     }
+    // Keys of its own for this invitation (the app's AppCredentials.joinScope)
+    if let identity = try? KeyChain.hubIdentity(keyScope: "join:\(transactionId)"), identity.publicKey() == expectedKey {
+      return identity
+    }
     let accessGroup = Bundle.main.object(forInfoDictionaryKey: "HubKeychainAccessGroup") as? String
     let key = try KeyChain(
       keychain: .init(

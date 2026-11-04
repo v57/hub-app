@@ -24,6 +24,8 @@ struct HubNetworkProfileConfiguration: Codable, Equatable, Sendable {
   let hubURL: URL
   let hubNetworkID: String
   let profilePublicKey: String
+  /// What the profile's key is derived from on this device, as `Hub.Settings.keys`; `nil` for the app's shared key
+  let keyScope: String?
   let overlayIPv4Address: String
   let overlayIPv6Address: String
   let dnsSuffix: String
@@ -57,6 +59,7 @@ struct HubNetworkProfileConfiguration: Codable, Equatable, Sendable {
     hubURL: URL,
     hubNetworkID: String,
     profilePublicKey: String,
+    keyScope: String? = nil,
     overlayIPv4Address: String,
     overlayIPv6Address: String,
     dnsSuffix: String = "hub.invalid",
@@ -81,6 +84,7 @@ struct HubNetworkProfileConfiguration: Codable, Equatable, Sendable {
     self.hubURL = hubURL
     self.hubNetworkID = hubNetworkID
     self.profilePublicKey = profilePublicKey
+    self.keyScope = keyScope
     self.overlayIPv4Address = overlayIPv4Address
     self.overlayIPv6Address = overlayIPv6Address
     self.dnsSuffix = dnsSuffix
@@ -110,6 +114,7 @@ struct HubNetworkProfileConfiguration: Codable, Equatable, Sendable {
       hubURL: hubURL,
       hubNetworkID: hubNetworkID,
       profilePublicKey: profilePublicKey,
+      keyScope: keyScope,
       overlayIPv4Address: overlayIPv4Address,
       overlayIPv6Address: overlayIPv6Address,
       dnsSuffix: dnsSuffix,

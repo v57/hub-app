@@ -204,7 +204,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     guard inviter == nil else { return }
     let identity: KeyChain
     do {
-      identity = try KeyChain.hubIdentity()
+      identity = try KeyChain.hubIdentity(keyScope: profile.keyScope)
     } catch {
       extensionDiagnostics("inviter not started: no hub identity in the keychain: \(error)")
       return
@@ -305,7 +305,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     guard coordinatorClient == nil else { return }
     let identity: KeyChain
     do {
-      identity = try KeyChain.hubIdentity()
+      identity = try KeyChain.hubIdentity(keyScope: profile.keyScope)
     } catch {
       extensionDiagnostics("coordinator not started: no hub identity in the keychain: \(error)")
       return
@@ -533,7 +533,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
           return try JSONEncoder().encode(StateResponse(state: exitState))
         #if DEBUG
         case "keychainProof":
-          let key = try KeyChain.hubIdentity()
+          let key = try KeyChain.hubIdentity(keyScope: (try? Profile.load())?.keyScope)
           let signature = key.sign(text: "hub-network/readiness-keychain-proof/v1")
           let encoded = try JSONEncoder().encode(
             KeychainProof(publicKey: key.publicKey(), signature: signature)
@@ -541,7 +541,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
           return encoded
         #endif
         case "inviterStatus":
-          let key = try? KeyChain.hubIdentity()
+          let key = try? KeyChain.hubIdentity(keyScope: (try? Profile.load())?.keyScope)
           let status = InviterStatus(
             registered: inviterRegistered,
             serviceKey: key?.publicKey() ?? "",

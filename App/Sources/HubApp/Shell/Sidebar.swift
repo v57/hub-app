@@ -167,8 +167,7 @@ struct HubMenu: View {
     if case .hubKeyChanged = hub.refusal {
       // Only when the hub was really reinstalled: otherwise another server answers at this address
       Button("Trust New Hub Key", systemImage: "checkmark.shield") {
-        hub.refusal = nil
-        hub.client.forgetHubKey()
+        Hubs.main.trustNewKey(of: hub)
       }
     }
     Divider()

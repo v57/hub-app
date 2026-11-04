@@ -35,7 +35,7 @@ struct ExtensionReadinessAssertion: Encodable {
       expiresAt: ISO8601DateFormatter.js.string(from: now.addingTimeInterval(30)), signature: ""
     )
     let input = try HubNetworkSignedEnvelope.signatureInput(for: unsigned, domain: extensionReadinessDomain)
-    let identity = try KeyChain.hubIdentity()
+    let identity = try KeyChain.hubIdentity(keyScope: profile.keyScope)
     let signature = identity.sign(data: input)
     // profile.profilePublicKey is canonical SPKI on the owner path (hub.key)
     // and raw base64 on the joiner path (the staged key's rawRepresentation);
@@ -192,6 +192,22 @@ struct ExtensionNativeJoinResponse: Encodable {
 }
 
 extension KeyChain {
+  /// The service key of a profile: derived from the device key when the app derives that hub's (protocol.md section 2)
+  static func hubIdentity(keyScope: String?) throws -> Self {
+    guard let keyScope else { return try hubIdentity() }
+    let accessGroup = Bundle.main.object(forInfoDictionaryKey: "HubKeychainAccessGroup") as? String
+    let device = try KeyChain(
+      keychain: .init(
+        service: DeviceKey.keychainService,
+        account: "ed25519-private-key",
+        accessGroup: accessGroup?.isEmpty == false ? accessGroup : nil,
+        useDataProtectionKeychain: true
+      ),
+      createIfMissing: false
+    )
+    return device.hubCredential(.hubApp, address: keyScope)
+  }
+
   static func hubIdentity() throws -> Self {
     let accessGroup = Bundle.main.object(forInfoDictionaryKey: "HubKeychainAccessGroup") as? String
     return try KeyChain(

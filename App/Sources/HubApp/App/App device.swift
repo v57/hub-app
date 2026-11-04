@@ -103,7 +103,8 @@ enum AppDevice {
 #endif
   }
 
-  static func description() async -> DeviceDescription {
+  /// This device for a hub that knows it by `device`, which signs its SSH host keys there
+  static func description(device: DeviceKey) async -> DeviceDescription {
     let storage = storage()
     return DeviceDescription(
       name: name, os: os, arch: arch,
@@ -112,7 +113,7 @@ enum AppDevice {
         memory: Int64(ProcessInfo.processInfo.physicalMemory),
         disks: storage.map { [.init(name: "System", total: $0.total, free: $0.free)] },
         power: Battery.current == nil ? .ac : .battery,
-        ssh: await ssh(),
+        ssh: await ssh(device: device),
         model: model
       )
     )
@@ -138,9 +139,8 @@ enum AppDevice {
   /// key so other devices pin it through the hub, which opens the port in its members' links to this Mac. macOS starts
   /// sshd from launchd on the `ssh` service, so the port is 22 whatever sshd_config says. A Linux machine reports
   /// its sshd the same way, on the port distributions start it on
-  static func ssh() async -> Capabilities.SSH? {
+  static func ssh(device: DeviceKey) async -> Capabilities.SSH? {
 #if os(macOS) || os(Linux)
-    guard let device = DeviceIdentity.app?.key else { return nil }
     let keys = await hostKeys(port: 22)
     guard let preferred = keys.first else { return nil }
     return Capabilities.SSH(port: 22, user: NSUserName(), hostKey: preferred, otherHostKeys: Array(keys.dropFirst()), device: device)

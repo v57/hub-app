@@ -72,7 +72,10 @@ struct NativeJoinCoordinator {
   static let live = NativeJoinCoordinator { invitation, report in
     let transactionId = invitation.replayId
     report(.init(transactionId: transactionId, state: .staging))
-    let record = try await NativeJoinStore.main.stage(tokenId: transactionId)
+    // This invitation decides where the app's keys go only later, so it gets keys of its own (auth v2)
+    let joinScope = AppCredentials.joinScope(transactionId: transactionId)
+    let joinIdentity = AppCredentials.service(scope: joinScope)
+    let record = try await NativeJoinStore.main.stage(tokenId: transactionId, keyScope: joinScope, identity: joinIdentity)
     let tunnel = try PacketTunnelController()
     var bootstrapIdentity: PacketTunnelBootstrapIdentity?
     var bindClient: HubClient?
@@ -176,17 +179,19 @@ struct NativeJoinCoordinator {
         enrollment = recorded
         let identityKey = try await NativeJoinStore.main.serviceKey(
           transactionId: transactionId,
-          profilePublicKey: record.profilePublicKey
+          profilePublicKey: record.profilePublicKey,
+          identity: record.keyScope.map(AppCredentials.service(scope:))
         )
-        let client = bindingClient(hubURL, identityKey: identityKey)
+        let client = bindingClient(hubURL, identityKey: identityKey, keyScope: record.keyScope)
         bindClient = client
         try await failIfRefused(client)
       } else {
         let identityKey = try await NativeJoinStore.main.serviceKey(
           transactionId: transactionId,
-          profilePublicKey: record.profilePublicKey
+          profilePublicKey: record.profilePublicKey,
+          identity: record.keyScope.map(AppCredentials.service(scope:))
         )
-        let client = bindingClient(hubURL, identityKey: identityKey)
+        let client = bindingClient(hubURL, identityKey: identityKey, keyScope: record.keyScope)
         bindClient = client
         // The bind approves the app's device only on the hub-bound connection that carries its certificate
         try await failIfRefused(client)
@@ -279,7 +284,7 @@ struct NativeJoinCoordinator {
         Hubs.main.remove(with: stale.settings)
       }
       let hub = Hubs.main.insert(with: Hub.Settings(
-        name: header.name, address: hubURL, identityTag: identityTag
+        name: header.name, address: hubURL, identityTag: identityTag, keys: record.keyScope ?? Hub.Settings.sharedKeys
       ))
       guard hub.settings.identityTag == identityTag,
             Hubs.main.selectedHub === hub else {
@@ -304,10 +309,14 @@ struct NativeJoinCoordinator {
     }
   }
 
-  /// The app's own identity joins as the app's device; a legacy membership key joins without one
-  private static func bindingClient(_ url: URL, identityKey: KeyChain) -> HubClient {
+  /// The join's keys join as this device on that hub, the app's own identity as the app's device; a legacy membership
+  /// key joins without one
+  private static func bindingClient(_ url: URL, identityKey: KeyChain, keyScope: String?) -> HubClient {
     let isAppIdentity = identityKey.publicKey() == KeyChain.main.publicKey()
-    return HubClient(url, keyChain: identityKey, options: .init(device: isAppIdentity ? .app : nil, instance: "Hub"))
+    let device = keyScope.flatMap(AppCredentials.device(scope:)) ?? (isAppIdentity ? .app : nil)
+    return HubClient(url, keyChain: identityKey, options: .init(
+      hubKeys: keyScope != nil ? HubKeyPins.beside(.main) : nil, device: device, instance: "Hub"
+    ))
   }
 
   /// Cleanup is deliberately best-effort: original join failure remains visible.
@@ -421,6 +430,7 @@ struct NativeJoinCoordinator {
       hubURL: hubURL,
       hubNetworkID: record.transactionId,
       profilePublicKey: record.profilePublicKey,
+      keyScope: record.keyScope,
       overlayIPv4Address: "100.127.254.10/32",
       overlayIPv6Address: "fd48:5542:4e45:fffe::10/128",
       trustedHubKey: invitation.agentKey,
@@ -473,6 +483,7 @@ struct NativeJoinCoordinator {
       hubURL: hubURL,
       hubNetworkID: enrollment.hubNetworkId,
       profilePublicKey: record.profilePublicKey,
+      keyScope: record.keyScope,
       overlayIPv4Address: "\(ipv4)/32",
       overlayIPv6Address: "\(ipv6)/128",
       trustedHubKey: enrollment.hubKey,

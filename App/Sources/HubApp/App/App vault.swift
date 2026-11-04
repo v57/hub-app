@@ -10,6 +10,7 @@
 
 #if canImport(VaultHub)
 import Foundation
+import HubService
 import VaultHub
 import VaultKit
 
@@ -31,9 +32,29 @@ enum AppVault {
     for hub in hubs { add(hub) }
   }
 
-  /// The hub joins the vault's records, turned on for this device
+  /// The hub joins the vault's records, turned on for this device, on the same keys as the app: the app and the vault
+  /// are one device on a hub. A hub on the shared keys also starts from the app's pin, so it's asked to prove that key
   static func add(_ settings: Hub.Settings) {
-    _ = try? directory?.add(url: settings.address.absoluteString, name: settings.name)
+    let keys = settings.keys.map(HubKeyScope.init(field:))
+    guard let hub = try? directory?.add(url: settings.address.absoluteString, name: settings.name, keys: keys) else { return }
+    if keys == .shared, hub.hubKey == nil, let pin = HubKeyPins.beside(.main).key(for: settings.address) {
+      var pinned = hub
+      pinned.hubKey = pin
+      Vault.shared.save(pinned)
+    }
+  }
+
+  /// What the vault's record of an address says about its keys; `nil` without a record
+  static func scope(for address: URL) -> String? {
+    let vault = Vault.shared
+    guard vault.store != nil, let hub = record(of: address) else { return nil }
+    return (directory ?? HubDirectory(vault: vault)).keyScope(of: hub)?.field
+  }
+
+  /// The user trusts the key the hub at this address has now
+  static func forgetKey(_ settings: Hub.Settings) {
+    guard let directory, let hub = record(of: settings) else { return }
+    directory.forgetKey(of: hub)
   }
 
   /// This device stops connecting to the hub; the record stays for the user's other devices
@@ -63,7 +84,11 @@ enum AppVault {
 #endif
 
   private static func record(of settings: Hub.Settings) -> VaultHubServer? {
-    let url = HubDirectory.normalized(settings.address.absoluteString)
+    record(of: settings.address)
+  }
+
+  private static func record(of address: URL) -> VaultHubServer? {
+    let url = HubDirectory.normalized(address.absoluteString)
     return Vault.shared.hubs.first { HubDirectory.normalized($0.url) == url }
   }
 }

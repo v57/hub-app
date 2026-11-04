@@ -92,6 +92,7 @@ extension PacketTunnelController {
           hubURL: current.hubURL,
           hubNetworkID: current.hubNetworkID,
           profilePublicKey: current.profilePublicKey,
+          keyScope: current.keyScope,
           overlayIPv4Address: current.overlayIPv4Address,
           overlayIPv6Address: current.overlayIPv6Address,
           dnsSuffix: current.dnsSuffix,
@@ -136,6 +137,7 @@ extension PacketTunnelController {
         hubURL: hub.settings.address,
         hubNetworkID: registration.hubNetworkId,
         profilePublicKey: hub.key,
+        keyScope: hub.tunnelKeyScope,
         overlayIPv4Address: "\(registration.ipv4)/32",
         overlayIPv6Address: "\(registration.ipv6)/128",
         trustedHubKey: registration.hubKey,
@@ -203,6 +205,7 @@ extension PacketTunnelController {
         hubURL: hub.settings.address,
         hubNetworkID: registration.hubNetworkId,
         profilePublicKey: hub.key,
+        keyScope: hub.tunnelKeyScope,
         overlayIPv4Address: "\(registration.ipv4)/32",
         overlayIPv6Address: "\(registration.ipv6)/128",
         dnsRecords: [

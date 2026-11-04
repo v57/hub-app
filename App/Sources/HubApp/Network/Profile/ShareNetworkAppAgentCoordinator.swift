@@ -95,7 +95,7 @@ final class ShareNetworkAppAgentCoordinator {
   }
 
   init(hub: Hub) {
-    agentServices = hub.service.group(enabled: false).hubNetworkAgentService()
+    agentServices = hub.service.group(enabled: false).hubNetworkAgentService(identity: hub.identity)
     runtime = Runtime(
       isConnected: { [weak hub] in hub?.isConnected == true },
       supports: { [weak hub] in hub?.api.contains($0) == true },

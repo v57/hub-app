@@ -58,6 +58,7 @@ extension HubService.Group {
   }
 
   func hubNetworkAgentService(
+    identity: KeyChain = .main,
     nodeEndpoint: @escaping @Sendable () -> String
       = { HubNetworkNodeEndpointStore.shared.current() },
     inviterOnline: @escaping @Sendable () async -> Bool = {
@@ -82,7 +83,7 @@ extension HubService.Group {
       var expires = UInt32(Date().addingTimeInterval(7 * 24 * 60 * 60).timeIntervalSince1970).bigEndian
       let noncePart = withUnsafeBytes(of: &nonce) { Data($0).base64URLEncodedString() }
       let expiresPart = withUnsafeBytes(of: &expires) { Data($0).base64URLEncodedString() }
-      let spki = Data(base64Encoded: KeyChain.main.publicKey())!
+      let spki = Data(base64Encoded: identity.publicKey())!
       let publicKey = Data(spki.suffix(32)).base64URLEncodedString()
       var payload = "\(publicKey).\(expiresPart).\(noncePart)"
       // Invitations carry their node: there is no default one
@@ -92,7 +93,7 @@ extension HubService.Group {
         withAllowedCharacters: HubNetworkInvitationQuery.allowed
       ) ?? endpoint
       payload += "?e=" + escaped
-      let signature = try KeyChain.main.signature(for: Data(payload.utf8)).base64URLEncodedString()
+      let signature = try identity.signature(for: Data(payload.utf8)).base64URLEncodedString()
       return "\(payload)/\(signature)"
     }
   }

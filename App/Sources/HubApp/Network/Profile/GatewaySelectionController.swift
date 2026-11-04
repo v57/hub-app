@@ -174,6 +174,7 @@ final class GatewaySelectionController {
       hubURL: current.hubURL,
       hubNetworkID: current.hubNetworkID,
       profilePublicKey: current.profilePublicKey,
+      keyScope: current.keyScope,
       overlayIPv4Address: current.overlayIPv4Address,
       overlayIPv6Address: current.overlayIPv6Address,
       dnsSuffix: current.dnsSuffix,

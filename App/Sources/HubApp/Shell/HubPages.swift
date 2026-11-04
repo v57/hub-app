@@ -57,8 +57,7 @@ struct HubUnreachable: View {
         ) {
           if case .hubKeyChanged = hub.refusal {
             Button("Trust New Hub Key") {
-              hub.refusal = nil
-              hub.client.forgetHubKey()
+              Hubs.main.trustNewKey(of: hub)
             }
             .buttonStyle(.kit)
           }

@@ -19,6 +19,9 @@ struct Profile: Decodable {
   let hubURL: URL
   let hubNetworkID: String
   let profilePublicKey: String
+  /// Which credentials this profile's key comes from: nil is the key the Hub was approved with (`KeyChain.hubIdentity`),
+  /// otherwise it's derived for this scope, like the app's `Hub.Settings.keys`
+  let keyScope: String?
   /// The profile's key as the hub writes it (SPKI): a join stores the raw 32-byte key
   var profileKey: String { KeyChain.spkiPublicKey(rawBase64: profilePublicKey) ?? profilePublicKey }
   let overlayIPv4Address: String

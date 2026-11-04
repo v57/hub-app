@@ -54,19 +54,25 @@ extension KeyChain {
   @ObservationIgnored let identity: KeyChain
 
   init(settings: Settings) {
+    var settings = settings
+    let scope = settings.keys ?? AppCredentials.scope(for: settings.address)
+    settings.keys = scope
     self.settings = settings
-    let identity = settings.identityTag.map(KeyChain.keychain) ?? .main
+    let identity = AppCredentials.service(scope: scope, tag: settings.identityTag)
+    let device = AppCredentials.device(scope: scope)
     self.identity = identity
     key = identity.publicKey()
     let address = settings.address
     self.client = HubClient(settings.address, keyChain: identity, options: .init(
-      device: .app, instance: "Hub",
+      // A derived key has no place of its own to pin beside; a legacy membership key has
+      hubKeys: settings.identityTag == nil ? HubKeyPins.beside(.main) : nil,
+      device: device, instance: "Hub",
       // Away from the hub's own address, its machine still answers on Hub Network through the link to it
       alternateURLs: { await HubNet.alternateURLs(for: address) }
     ))
     client.debugNetwork = true
-    if client.device != nil {
-      client.report(description: AppDevice.description, data: AppDevice.data)
+    if let device {
+      client.report(description: { await AppDevice.description(device: device.key) }, data: AppDevice.data)
     }
     isConnected = client.isConnected
     client.onRefused = { [weak self] in
@@ -117,6 +123,12 @@ extension KeyChain {
     var name: String
     var address: URL
     var identityTag: String? = nil
+    /// Which keys the app uses on this hub (App credentials.swift): `sharedKeys`, or what its own are derived from
+    var keys: String? = nil
+  }
+  /// What the packet tunnel derives this hub's key from; `nil` for the app's shared key, which it reads as it is
+  var tunnelKeyScope: String? {
+    settings.identityTag == nil && settings.keys != Settings.sharedKeys ? settings.keys : nil
   }
   func require(permissions: String...) -> Bool {
     !permissions.contains { !api.contains($0) }
@@ -179,10 +191,16 @@ class Hubs {
     if let data = UserDefaults.standard.data(forKey: "hubs") {
       do {
         list = []
-        for settings in try JSONDecoder().decode([Hub.Settings].self, from: data) {
+        let pins = HubKeyPins.beside(.main)
+        for var settings in try JSONDecoder().decode([Hub.Settings].self, from: data) {
+          // Kept from before auth v2: a pinned hub was approved with the shared keys, so nobody pairs again
+          if settings.keys == nil, settings.identityTag != nil || pins.key(for: settings.address) != nil {
+            settings.keys = Hub.Settings.sharedKeys
+          }
           let hub = Hub(settings: settings)
           list.append(hub)
         }
+        save()
         if let selected = UserDefaults.standard.url(forKey: "selected") {
           self.selected = selected
         }
@@ -197,8 +215,10 @@ class Hubs {
   }
   @discardableResult
   func insert(with settings: Hub.Settings) -> Hub {
+    var settings = settings
     let hub: Hub
     if let index = list.firstIndex(where: { $0.id == settings.id }) {
+      if settings.keys == nil { settings.keys = list[index].settings.keys }
       if list[index].settings == settings {
         hub = list[index]
       } else {
@@ -213,9 +233,25 @@ class Hubs {
     selected = settings.id
     save()
 #if canImport(VaultHub)
-    AppVault.add(settings)
+    AppVault.add(hub.settings)
 #endif
     return hub
+  }
+  /// The user says the hub at this address has a new key on purpose. Whatever answers there is a new hub to this device,
+  /// so a hub on the shared keys moves to keys of its own, and an owner approves it again.
+  func trustNewKey(of hub: Hub) {
+    hub.refusal = nil
+    var settings = hub.settings
+#if canImport(VaultHub)
+    AppVault.forgetKey(settings)
+#endif
+    guard settings.keys == Hub.Settings.sharedKeys, settings.identityTag == nil else {
+      hub.client.forgetHubKey()
+      return
+    }
+    hub.client.hubKeys.forget(settings.address)
+    settings.keys = HubAddress.canonical(settings.address) ?? settings.address.absoluteString
+    insert(with: settings)
   }
   func remove(with settings: Hub.Settings) {
     guard let index = self.list.firstIndex(where: { $0.id == settings.id }) else { return }

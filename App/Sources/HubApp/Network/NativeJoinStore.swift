@@ -24,6 +24,8 @@ struct NativeJoinRecord: Codable, Equatable, Sendable {
   let transactionId: String
   let tokenDigest: String
   let profilePublicKey: String
+  /// What the service key is derived from on this device (`AppCredentials.joinScope`); `nil` for older transactions
+  var keyScope: String? = nil
   let wireGuardPublicKey: String
   let createdAt: Date
   var updatedAt: Date
@@ -160,19 +162,19 @@ actor NativeJoinStore {
     decoder.dateDecodingStrategy = .iso8601
   }
 
-  func stage(tokenId: String) throws -> NativeJoinRecord {
+  func stage(tokenId: String, keyScope: String? = nil, identity: KeyChain? = nil) throws -> NativeJoinRecord {
     guard !tokenId.isEmpty, tokenId.utf8.count <= 512 else {
       throw NativeJoinStoreError.invalidToken
     }
     if let existing = try load(transactionId: tokenId) {
-      _ = try identity(for: existing)
+      _ = try self.identity(for: existing)
       return existing
     }
 
     try rejectDifferentUnfinishedTransaction(tokenId)
-    // The joiner is the app's own service key (identity.v1) on the app's device; the invitation approves the
-    // device instead of replacing the identity, so the app keeps its key and owner rights on other hubs.
-    let profile = appIdentity()
+    // The joiner is a service key of its own (`AppCredentials.joinScope`) on a device key of its own: nothing an
+    // invitation leads to can use them on another hub. It keeps the app's owner rights elsewhere untouched.
+    let profile = identity ?? appIdentity()
     let wireGuard = Curve25519.KeyAgreement.PrivateKey()
     let accounts = secretAccounts(tokenId)
     do {
@@ -183,6 +185,7 @@ actor NativeJoinStore {
         transactionId: tokenId,
         tokenDigest: Self.digest(tokenId),
         profilePublicKey: profile.data.base64EncodedString(),
+        keyScope: keyScope,
         wireGuardPublicKey: wireGuard.publicKey.rawRepresentation.base64EncodedString(),
         createdAt: timestamp,
         updatedAt: timestamp,
@@ -278,11 +281,12 @@ actor NativeJoinStore {
   /// the transaction's own key for transactions staged before the device layer.
   func serviceKey(
     transactionId: String,
-    profilePublicKey: String
+    profilePublicKey: String,
+    identity: KeyChain? = nil
   ) throws -> KeyChain {
     let record = try requiredRecord(transactionId)
     guard try hasStagedProfileKey(transactionId: transactionId) else {
-      let identity = appIdentity()
+      let identity = identity ?? appIdentity()
       guard record.profilePublicKey == profilePublicKey,
             identity.data.base64EncodedString() == profilePublicKey
       else { throw NativeJoinStoreError.corruptRecord }
@@ -329,6 +333,9 @@ actor NativeJoinStore {
         throw NativeJoinStoreError.corruptRecord
       }
       profilePublicKey = profile.publicKey.rawRepresentation.base64EncodedString()
+    } else if record.keyScope != nil {
+      // Derived on the main actor when needed; `serviceKey` checks it
+      profilePublicKey = record.profilePublicKey
     } else {
       profilePublicKey = appIdentity().data.base64EncodedString()
     }

@@ -221,7 +221,8 @@ final class LocalHub {
       return
     }
     let selected = Hubs.main.selected
-    Hubs.main.insert(with: Hub.Settings(name: status.name ?? AppDevice.name, address: url))
+    // Its key is pinned above and the app is its owner: it stays on the shared keys
+    Hubs.main.insert(with: Hub.Settings(name: status.name ?? AppDevice.name, address: url, keys: Hub.Settings.sharedKeys))
     // Keep the hub the user was looking at
     if let selected { Hubs.main.select(selected) }
   }
