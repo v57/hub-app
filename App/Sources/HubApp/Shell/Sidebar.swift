@@ -216,8 +216,9 @@ struct OpenHubSections: View {
   var body: some View {
     let pages = HubPage.allCases.filter { hub.canOpen($0) }
     KitSection(Text(hub.settings.name)) {
+      // `.hub(hub)` on the row itself: the sticky copy of a section at the bottom edge sits outside this view's environment
       ForEach(pages.filter { $0.group == .hub }, id: \.self) { page in
-        HubPageRow(hub: hub, page: page)
+        HubPageRow(hub: hub, page: page).hub(hub)
       }
     } icon: {
       HubTile(hub: hub, size: idiom == .mac ? 24 : 28)
@@ -239,14 +240,14 @@ struct OpenHubSections: View {
     if !access.isEmpty {
       KitSection("Access", meta: AccessMeta.parts(facts: facts, hub: hub, lockdown: whitelist.enabled), systemImage: "shield", hue: .orange) {
         ForEach(access, id: \.self) { page in
-          HubPageRow(hub: hub, page: page)
+          HubPageRow(hub: hub, page: page).hub(hub)
         }
       }
       .kitSticky(top: .none, bottom: sticky(.access))
     }
     // The Hub Network card shows the network this device is on; another hub's network is a page of its own
     if hub.canViewNetwork, HubNetworkCard.hub(profile: nil)?.id != hub.id {
-      NetworkSection(hub: hub)
+      NetworkSection(hub: hub).hub(hub)
         .kitSticky(top: .none, bottom: sticky(.network))
     }
   }

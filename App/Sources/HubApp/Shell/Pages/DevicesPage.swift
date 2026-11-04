@@ -15,6 +15,7 @@ struct DevicesPage: View {
   @Environment(Hub.self) private var hub
   @HubState(\.devices) private var devices
   @HubState(\.pendingDevices) private var pending
+  @HubState(\.attachRequests) private var attachRequests
   @AppStorage("devices.style") private var style = ListStyle.grid
   @State private var search = ""
   @State private var filter = DeviceFilter.all
@@ -37,7 +38,11 @@ struct DevicesPage: View {
   var body: some View {
     PageWithInspector(name: "devices", showsInspector: selected != nil) {
       VStack(spacing: KitMetrics.gutter) {
-        ForEach(pending.prefix(3)) { device in
+        ForEach(attachRequests.prefix(3)) { request in
+          AttachRequestBanner(request: request)
+        }
+        // One asking to attach is asked about above
+        ForEach(pending.filter { device in !attachRequests.contains { $0.id == device.id } }.prefix(3)) { device in
           PendingDeviceBanner(device: device)
         }
         if style == .list || idiom == .phone {
@@ -78,6 +83,7 @@ struct DevicesPage: View {
       }
       .padding(KitMetrics.gutter)
       .animation(.kit, value: pending.map(\.id))
+      .animation(.kit, value: attachRequests.map(\.id))
     } inspector: {
       if let device = selected {
         DeviceInspector(device: device)
@@ -189,12 +195,44 @@ struct PendingDeviceBanner: View {
   }
 }
 
+/// A device asking to attach: its safety code to compare, and signing for it with this device's key
+struct AttachRequestBanner: View {
+  let request: AttachRequest
+  @Environment(Hub.self) private var hub
+  @Environment(\.kitIdiom) private var idiom
+
+  var body: some View {
+    let code = hub.safetyCode(of: request)
+    let thisDevice = hub.client.device?.key
+    Banner(
+      "\(request.name) wants to attach to this \(KitDevice.nameInSentence)",
+      message: MetaLine.join([
+        request.platform.map(Device.systemName) ?? "",
+        "it starts with nothing, you link what it gets",
+        code.map { "check its safety code \($0) on the device" } ?? "this hub gives no safety code to check",
+      ]),
+      systemImage: Device.symbol(platform: request.platform), hue: .orange
+    ) {
+      if idiom != .phone {
+        AsyncButton("Deny") { try await hub.client.devices.dismissAttach(request.id) }.buttonStyle(.kit)
+      }
+      if code != nil, let thisDevice, let hubKey = hub.client.hubKey {
+        AsyncButton(idiom == .phone ? "Attach" : "Attach…") {
+          try await hub.client.devices.attach(request, signingWith: thisDevice, hubKey: hubKey)
+        }
+        .buttonStyle(.kitPrimary)
+      }
+    }
+  }
+}
+
 /// A device's card: what it is and runs, its live load, its Hub Network address
 struct DeviceCard: View {
   let device: Device
   var isSelected = false
   var action: () -> Void
   @Environment(Hub.self) private var hub
+  @HubState(\.devices) private var devices
   @Environment(\.kitIdiom) private var idiom
   @State private var data: DeviceData?
 
@@ -212,7 +250,7 @@ struct DeviceCard: View {
             StatusDot(hue: device.online ? .green : .gray, isHollow: !device.online)
           }
           Text(device.name).kitFont(.headline).lineLimit(1)
-          Text(MetaLine.join(device.cardLine(isThisDevice: device.key == hub.client.device?.key.publicKey, compact: true)))
+          Text(MetaLine.join(device.cardLine(isThisDevice: device.key == hub.client.device?.key.publicKey, compact: true, parent: devices.first { $0.id == device.attachedTo }?.name)))
             .kitFont(.caption).lineLimit(1)
         }
         .padding(6)
@@ -221,7 +259,7 @@ struct DeviceCard: View {
         RichHeader(Text(device.name)) {
           Tile(systemImage: Device.symbol(platform: device.platform), hue: device.online ? .blue : .gray, size: idiom == .phone ? 30 : 24)
         } meta: {
-          MetaLine(device.cardLine(isThisDevice: device.key == hub.client.device?.key.publicKey, compact: idiom == .phone))
+          MetaLine(device.cardLine(isThisDevice: device.key == hub.client.device?.key.publicKey, compact: idiom == .phone, parent: devices.first { $0.id == device.attachedTo }?.name))
         } accessory: {
           HStack(spacing: 6) {
             if let battery = data?.battery {
@@ -266,6 +304,7 @@ private struct DeviceTable: View {
   let devices: [Device]
   @Binding var selection: String?
   @Binding var sort: KitGridSort?
+  @HubState(\.devices) private var everyone
 
   var body: some View {
     let rows = sorted
@@ -299,6 +338,7 @@ private struct DeviceTable: View {
           Text(device.name).lineLimit(1)
         }
       },
+      KitGridColumn("Under", width: 120, value: { device in everyone.first { $0.id == device.attachedTo }?.name ?? "–" }),
       KitGridColumn("System", width: 100, value: { $0.platform.map(Device.systemName) }),
       KitGridColumn("Status", width: 90) { device in
         Chip(device.online ? "Online" : "Offline", hue: device.online ? .green : .gray).controlSize(.small)
@@ -318,6 +358,7 @@ struct DeviceInspector: View {
   @Environment(Hub.self) private var hub
   @HubState(\.networkAgents) private var networkAgents
   @HubState(\.networkGateways) private var gatewayStatuses
+  @HubState(\.devices) private var devices
   @State private var data: DeviceData?
   @State private var isRevoking = false
   @State private var isRenaming = false
@@ -337,8 +378,12 @@ struct DeviceInspector: View {
         if let os = device.os {
           InspectorRow("System", value: [device.platform.map(Device.systemName), os, device.arch].compactMap { $0 }.joined(separator: " "), copyable: false)
         }
+        if let parent = device.attachedTo {
+          InspectorRow("Attached to", value: devices.first { $0.id == parent }?.name ?? "…" + parent.suffix(8), copyable: false)
+        }
+        // Only what it says about itself: a parent's signature is what attaches a device
         if let parent = device.parent {
-          InspectorRow("Runs in", value: parent, copyable: false)
+          InspectorRow("Says it runs in", value: parent, copyable: false)
         }
         if let overlay = device.overlay {
           InspectorRow("Hub Network", value: overlay.address)
@@ -383,6 +428,7 @@ struct DeviceInspector: View {
           }
         }
       }
+      if !device.revoked { DeviceLinksSection(device: device) }
       if !isThisDevice && hub.require(permissions: "hub/device/revoke") {
         Button("Revoke \(device.name)…", role: .destructive) { isRevoking = true }
           .buttonStyle(.kit)
@@ -400,9 +446,10 @@ struct DeviceInspector: View {
     }
     .kitDialog(
       "Revoke \(device.name)?", isPresented: $isRevoking,
-      message: device.services.count == 1
+      message: (device.services.count == 1
         ? "For a lost or compromised device. Its connections close, its service key is revoked, its grants and Hub Network peers are removed, and it can never be approved again."
-        : "For a lost or compromised device. Its connections close, its \(device.services.count) service keys are revoked, its grants and Hub Network peers are removed, and it can never be approved again.",
+        : "For a lost or compromised device. Its connections close, its \(device.services.count) service keys are revoked, its grants and Hub Network peers are removed, and it can never be approved again.")
+        + (devices.contains { $0.attachedTo == device.id && !$0.revoked } ? " Every device attached below it is revoked too." : ""),
       systemImage: "xmark.shield", hue: .red, confirm: "Revoke", role: .destructive
     ) {
       Task { try? await hub.client.devices.revoke(device.id) }
@@ -411,6 +458,136 @@ struct DeviceInspector: View {
       NameSheet(title: "Rename \(device.name)", systemImage: Device.symbol(platform: device.platform), hue: .blue, confirm: "Rename", name: device.name) { name in
         Task { _ = try? await hub.client.devices.rename(device.id, to: name) }
       }
+    }
+  }
+}
+
+/// A device's place in the chain and what it holds, for owners: "Only what I link". A new child holds nothing. A grant
+/// the owner links passes to children the owner links, and comes back as a copy on them.
+private struct DeviceLinksSection: View {
+  let device: Device
+  @Environment(Hub.self) private var hub
+  @HubState(\.devices) private var devices
+  @HubState(\.grants) private var grants
+  @State private var isAdding = false
+  @State private var isDetaching = false
+
+  private var children: [Device] { devices.filter { $0.attachedTo == device.id && !$0.revoked } }
+  private var held: [Grant] { grants.filter { $0.subject == .device(device.id) } }
+
+  var body: some View {
+    if hub.require(permissions: "hub/grants") {
+      if device.attachedTo != nil {
+        KitSection("Link to parent", meta: [device.linked == true ? "gets what you link" : "gets nothing"], systemImage: "link", hue: .blue) {
+          HStack {
+            Text("Gets linked grants").kitFont(.body)
+            Spacer()
+            linkToggle(device, title: "Gets linked grants")
+          }
+          .padding(.horizontal, 8).padding(.vertical, 2)
+          Button("Detach from Parent", role: .destructive) { isDetaching = true }
+            .buttonStyle(.kit).frame(maxWidth: .infinity)
+        }
+      }
+      if !children.isEmpty {
+        KitSection("Attached", meta: ["\(children.count)"], systemImage: "point.3.connected.trianglepath.dotted", hue: .blue) {
+          ForEach(children) { child in
+            SidebarRow(child.name, subtitle: child.linked == true ? "gets what you link" : "gets nothing") {
+              Tile(systemImage: Device.symbol(platform: child.platform), hue: child.online ? .blue : .gray, size: 18)
+            } trailing: {
+              linkToggle(child, title: "Linked")
+            }
+          }
+        }
+      }
+      KitSection("Access", meta: [held.isEmpty ? "nothing granted" : "\(held.count)"], systemImage: "key", hue: .orange) {
+        ForEach(held) { grant in
+          SidebarRow(grant.object.title, subtitle: subtitle(of: grant)) {
+            Tile(systemImage: grant.copyOf == nil ? "key" : "link", hue: grant.copyOf == nil ? .orange : .blue, size: 18)
+          } trailing: {
+            if grant.copyOf == nil {
+              HStack(spacing: 6) {
+                if !children.isEmpty {
+                  Toggle("Passes down", isOn: Binding { grant.linked == true } set: { linked in
+                    Task { _ = try? await hub.client.devices.setGrantLinked(grant.id, linked) }
+                  })
+                  .toggleStyle(.kitSwitch).labelsHidden().controlSize(.small)
+                }
+                AsyncButton("Remove", systemImage: "xmark") { try await hub.client.devices.removeGrant(grant.id) }
+                  .buttonStyle(.kitIcon)
+              }
+            }
+          }
+        }
+      } accessory: {
+        Button("Grant", systemImage: "plus") { isAdding = true }.buttonStyle(.kitIcon)
+      }
+      .kitSheet(isPresented: $isAdding) {
+        GrantSheet(device: device) { object in
+          Task { _ = try? await hub.client.devices.addGrant(.device(device.id), object) }
+        }
+      }
+      .kitDialog(
+        "Detach \(device.name)?", isPresented: $isDetaching,
+        message: "What it got through this link goes. It stays approved, with what you gave it directly.",
+        systemImage: "link", hue: .orange, confirm: "Detach", role: .destructive
+      ) {
+        Task { _ = try? await hub.client.devices.detach(device.id) }
+      }
+    }
+  }
+
+  private func linkToggle(_ child: Device, title: String) -> some View {
+    Toggle(title, isOn: Binding { child.linked == true } set: { linked in
+      Task { _ = try? await hub.client.devices.setLinked(child.id, linked) }
+    })
+    .toggleStyle(.kitSwitch).labelsHidden().controlSize(.small)
+  }
+
+  private func subtitle(of grant: Grant) -> String {
+    guard let source = grant.copyOf else { return grant.linked == true ? "passes down" : "only this device" }
+    guard case .device(let parent)? = grants.first(where: { $0.id == source })?.subject else { return "from its parent" }
+    return "from \(devices.first { $0.id == parent }?.name ?? "its parent")"
+  }
+}
+
+/// Grants a device a path, or everything under `path/*`
+private struct GrantSheet: View {
+  let device: Device
+  let action: (Grant.Object) -> Void
+  @Environment(\.kitDismiss) private var dismiss
+  @State private var path = ""
+
+  private var object: Grant.Object? {
+    let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return nil }
+    return trimmed.hasSuffix("*") ? .prefix(String(trimmed.dropLast())) : .path(trimmed)
+  }
+
+  var body: some View {
+    KitSheet(title: "Grant \(device.name)", meta: "a path, or everything under s3/*", systemImage: "key", hue: .orange) {
+      FormCard {
+        FormRow("Path", systemImage: "point.topleft.down.to.point.bottomright.curvepath") {
+          TextField("s3/read", text: $path).kitField().frame(maxWidth: 240)
+        }
+      }
+    } footer: {
+      Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
+      Button("Grant") {
+        if let object { action(object) }
+        dismiss()
+      }
+      .buttonStyle(.kitPrimary).keyboardShortcut(.defaultAction).disabled(object == nil)
+    }
+  }
+}
+
+extension Grant.Object {
+  var title: String {
+    switch self {
+    case .path(let path): path
+    case .prefix(let prefix): prefix + "*"
+    case .share(let share): "Share " + share.prefix(8)
     }
   }
 }
@@ -432,10 +609,11 @@ extension Device {
     }
   }
   /// The card's line: system, what it runs, services, or when it was last seen
-  @MainActor func cardLine(isThisDevice: Bool, compact: Bool) -> [String] {
+  @MainActor func cardLine(isThisDevice: Bool, compact: Bool, parent: String? = nil) -> [String] {
     var parts = [String]()
     if !compact, let platform { parts.append(Device.systemName(platform)) }
     if isThisDevice { parts.append("this \(KitDevice.nameInSentence)") }
+    if let parent { parts.append("under \(parent)") }
     if online || compact {
       parts.append(services.count == 1 ? "1 service" : "\(services.count) services")
     }

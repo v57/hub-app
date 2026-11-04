@@ -139,6 +139,11 @@ extension KeyChain {
     if isDemo { return device.safetyCode }
     return client.hubKey.flatMap { device.verifiedCode(hubKey: $0) }
   }
+  /// The same for a device asking to attach. Without it there's nothing to compare, so nothing to sign.
+  func safetyCode(of request: AttachRequest) -> String? {
+    if isDemo { return request.safetyCode }
+    return client.hubKey.flatMap { request.verifiedCode(hubKey: $0) }
+  }
   /// What the packet tunnel derives this hub's key from; `nil` for the app's shared key, which it reads as it is
   var tunnelKeyScope: String? {
     settings.identityTag == nil && settings.keys != Settings.sharedKeys ? settings.keys : nil

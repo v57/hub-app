@@ -37,6 +37,7 @@ struct HubStateStorage {
   let networkGateways = Sync("network/gateway/list", [GatewayStatus]())
   let devices = Sync("hub/devices", [Device]())
   let pendingDevices = Sync("hub/devices/pending", [PendingDevice]())
+  let attachRequests = Sync("hub/device/attach/requests", [AttachRequest]())
   let securityMode = Sync("hub/security/mode", SecurityMode(mode: .defaultAllow))
   let grants = Sync("hub/grants", [Grant]())
   
