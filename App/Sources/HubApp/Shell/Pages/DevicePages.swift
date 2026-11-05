@@ -9,6 +9,9 @@
 import SwiftUI
 import ComponentKit
 import HubService
+#if canImport(VaultUI)
+import VaultUI
+#endif
 
 /// This device's own pages
 struct DevicePageView: View {
@@ -37,7 +40,7 @@ struct DevicePageView: View {
   }
 }
 
-/// This device's keys, and Reset Data
+/// This device's keys, the iCloud switch every v57 app shares, and Reset Data
 struct DeviceSettingsPage: View {
   @State private var hubs = Hubs.main
   @State private var isConfirming = false
@@ -46,6 +49,9 @@ struct DeviceSettingsPage: View {
   var body: some View {
     ScrollView {
       VStack(spacing: KitMetrics.gutter) {
+#if canImport(VaultUI)
+        VaultICloudCard()
+#endif
         ForEach(hubs.list) { hub in
           HubKeysSection(hub: hub)
         }

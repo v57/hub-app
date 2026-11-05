@@ -23,6 +23,8 @@ func v57(_ name: String) -> Package.Dependency {
 
 /// The vault isn't built for tvOS and visionOS (the code checks `canImport(VaultHub)`).
 let vault = TargetDependencyCondition.when(platforms: [.macOS, .iOS, .linux, .windows])
+/// The switch that turns iCloud off, on the devices that have iCloud (the code checks `canImport(VaultUI)`).
+let iCloud = TargetDependencyCondition.when(platforms: [.macOS, .iOS])
 /// The security camera, on the devices that have cameras (the code checks `canImport(PlatformCamera)`).
 let camera = TargetDependencyCondition.when(platforms: [.macOS, .iOS])
 
@@ -45,6 +47,7 @@ let package = Package(
         .product(name: "ComponentKit", package: "Component"),
         .product(name: "VaultKit", package: "Vault", condition: vault),
         .product(name: "VaultHub", package: "Vault", condition: vault),
+        .product(name: "VaultUI", package: "Vault", condition: iCloud),
         .product(name: "PlatformPower", package: "Platform"),
         .product(name: "PlatformSystem", package: "Platform"),
         .product(name: "PlatformCamera", package: "Platform", condition: camera),
