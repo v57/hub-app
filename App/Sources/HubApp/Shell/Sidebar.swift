@@ -170,9 +170,19 @@ struct HubMenu: View {
       Button("Trust New Hub Key", systemImage: "checkmark.shield") {
         Hubs.main.trustNewKey(of: hub)
       }
+      .kitMenuPreview(trustSentence)
     }
     Divider()
     Button("Remove…", systemImage: "trash", role: .destructive) { shell.removing = hub }
+  }
+
+  /// What Trust New Hub Key does (Hubs.trustNewKey): a hub on the shared keys moves to keys of its own, so it sees
+  /// this device as a new one
+  private var trustSentence: String {
+    let name = hub.settings.name
+    let movesKeys = hub.settings.keys == Hub.Settings.sharedKeys && hub.settings.identityTag == nil
+    let approval = movesKeys ? " \(name) then sees this \(KitDevice.nameInSentence) as a new device, and an owner approves it again." : ""
+    return "Accepts the key \(name) now shows.\(approval) Do this only if you know why it changed."
   }
 }
 

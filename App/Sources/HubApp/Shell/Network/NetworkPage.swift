@@ -624,6 +624,7 @@ struct SharedAppRow: View {
     Button("Stop Sharing", systemImage: "trash", role: .destructive) {
       run { try await hub.net.share(app: nil, port: app.port ?? 0, udp: app.id.hasPrefix("udp-"), enabled: false) }
     }
+    .kitMenuPreview("Takes \(app.name) off the network, so devices on \(hub.settings.name) can’t connect to it anymore.")
   }
 
   private func run(_ action: @escaping () async throws -> Void) {
