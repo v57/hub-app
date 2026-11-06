@@ -19,7 +19,7 @@ struct ConnectionsPage: View {
   @HubState(\.groups) private var groups
   @HubState(\.hostPending) private var pending
   @HubState(\.whitelist) private var whitelist
-  @AppStorage("connections.style") private var style = ListStyle.grid
+  @KitStorage("connections.style") private var style = ListStyle.grid
   @State private var search = ""
   @State private var selection: String?
   @State private var pushed: String?

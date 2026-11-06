@@ -77,7 +77,7 @@ struct RootView: View {
       if Navigator.main.route?.hubID == hub.id { Navigator.main.route = .allHubs }
       Hubs.main.remove(with: hub.settings)
     }
-    .onChange(of: navigator.route) { _, _ in compactColumn = .detail }
+    .modifier(RouteFollower(compactColumn: $compactColumn))
     .onChange(of: NetworkInvitationRouter.main.pendingInput) { _, input in
       if !input.isEmpty { shell.sheet = .connect }
     }
@@ -120,6 +120,17 @@ struct RootView: View {
       }
     }
 #endif
+  }
+}
+
+/// A new page shows the detail column (iPhone). A modifier of its own, so a page change updates it, not the window's
+/// body with the split view, the sidebar and the page.
+private struct RouteFollower: ViewModifier {
+  @Binding var compactColumn: NavigationSplitViewColumn
+  @State private var navigator = Navigator.main
+
+  func body(content: Content) -> some View {
+    content.onChange(of: navigator.route) { _, _ in compactColumn = .detail }
   }
 }
 

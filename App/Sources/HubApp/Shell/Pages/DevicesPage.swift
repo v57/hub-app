@@ -16,7 +16,7 @@ struct DevicesPage: View {
   @HubState(\.devices) private var devices
   @HubState(\.pendingDevices) private var pending
   @HubState(\.attachRequests) private var attachRequests
-  @AppStorage("devices.style") private var style = ListStyle.grid
+  @KitStorage("devices.style") private var style = ListStyle.grid
   @State private var search = ""
   @State private var filter = DeviceFilter.all
   @State private var selection: String?

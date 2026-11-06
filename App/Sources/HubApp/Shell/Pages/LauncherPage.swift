@@ -15,7 +15,7 @@ struct LauncherPage: View {
   @Environment(Hub.self) private var hub
   @HubState(\.launcherInfo) private var info
   @HubState(\.launcherStatus) private var statuses
-  @AppStorage("launcher.style") private var style = ListStyle.grid
+  @KitStorage("launcher.style") private var style = ListStyle.grid
   @State private var selection: String?
   @State private var pushed: String?
   @State private var creating = false

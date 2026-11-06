@@ -30,7 +30,7 @@ struct HubSidebar: View {
           .kitSticky()
       }
       if let hub = navigator.openHub, search.isEmpty, idiom != .phone {
-        OpenHubSections(hub: hub, page: navigator.route?.hubPage).hub(hub)
+        OpenHubSections(hub: hub).hub(hub)
       }
       if search.isEmpty {
         // This device's network, whichever hub is open: at the bottom on the Mac and iPad, under the hubs on iPhone
@@ -38,8 +38,7 @@ struct HubSidebar: View {
         } else if idiom == .phone {
           HubNetworkCard()
         } else {
-          HubNetworkCard()
-            .kitSticky(top: .none, bottom: navigator.route?.hubPage == .network || navigator.openHub == nil ? .content : .title)
+          StickyNetworkCard()
         }
         ThisDeviceSection()
       }
@@ -65,6 +64,17 @@ struct HubSidebar: View {
       try? await Task.sleep(for: .seconds(2))
       withAnimation(.kit) { copied = false }
     }
+  }
+}
+
+/// The Hub Network card at the bottom on the Mac and iPad: whole there while its page (or no hub) is open, else its
+/// title. A view of its own so the sidebar's body doesn't read the route (every page change rebuilt the sidebar).
+private struct StickyNetworkCard: View {
+  @State private var navigator = Navigator.main
+
+  var body: some View {
+    HubNetworkCard()
+      .kitSticky(top: .none, bottom: navigator.route?.hubPage == .network || navigator.openHub == nil ? .content : .title)
   }
 }
 
@@ -215,10 +225,14 @@ private struct HubSwitcherMenu: View {
 
 /// The open hub's pages in three cards. The card with the open page waits at the bottom whole while it's below the
 /// visible area, the others by their titles.
+///
+/// It reads the open page itself (for which card stays whole at the bottom), so a new page updates these cards, not the
+/// whole sidebar.
 struct OpenHubSections: View {
   let hub: Hub
-  let page: HubPage?
   var facts = HubFacts()
+  @State private var navigator = Navigator.main
+  private var page: HubPage? { navigator.route?.hubPage }
   @State private var showsMenu = false
   @Environment(\.kitIdiom) private var idiom
   @HubState(\.whitelist) private var whitelist
