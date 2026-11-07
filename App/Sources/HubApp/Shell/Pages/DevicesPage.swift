@@ -174,14 +174,15 @@ struct PendingDeviceBanner: View {
   @Environment(\.kitIdiom) private var idiom
 
   var body: some View {
-    let name = device.name ?? "A device"
+    let name = device.name ?? String(localized: "A device")
+    let message = MetaLine.join([
+      device.platform.map(Device.systemName) ?? "",
+      device.firstSeenDate.map { String(localized: "asked \($0.formatted(.relative(presentation: .named)))") } ?? "",
+      hub.safetyCode(of: device).map { String(localized: "check its safety code \($0) on the device") }
+        ?? String(localized: "this hub gives no safety code to check"),
+    ])
     Banner(
-      "\(name) wants to join \(hub.settings.name)",
-      message: MetaLine.join([
-        device.platform.map(Device.systemName) ?? "",
-        device.firstSeenDate.map { "asked \($0.formatted(.relative(presentation: .named)))" } ?? "",
-        hub.safetyCode(of: device).map { "check its safety code \($0) on the device" } ?? "this hub gives no safety code to check",
-      ]),
+      "\(name) wants to join \(hub.settings.name)", message: "\(message)",
       systemImage: Device.symbol(platform: device.platform), hue: .orange
     ) {
       if hub.require(permissions: "hub/device/approve") {
@@ -204,13 +205,14 @@ struct AttachRequestBanner: View {
   var body: some View {
     let code = hub.safetyCode(of: request)
     let thisDevice = hub.client.device?.key
+    let message = MetaLine.join([
+      request.platform.map(Device.systemName) ?? "",
+      String(localized: "it starts with nothing, you link what it gets"),
+      code.map { String(localized: "check its safety code \($0) on the device") }
+        ?? String(localized: "this hub gives no safety code to check"),
+    ])
     Banner(
-      "\(request.name) wants to attach to this \(KitDevice.nameInSentence)",
-      message: MetaLine.join([
-        request.platform.map(Device.systemName) ?? "",
-        "it starts with nothing, you link what it gets",
-        code.map { "check its safety code \($0) on the device" } ?? "this hub gives no safety code to check",
-      ]),
+      "\(request.name) wants to attach to this \(KitDevice.nameInSentence)", message: "\(message)",
       systemImage: Device.symbol(platform: request.platform), hue: .orange
     ) {
       if idiom != .phone {
@@ -446,10 +448,7 @@ struct DeviceInspector: View {
     }
     .kitDialog(
       "Revoke \(device.name)?", isPresented: $isRevoking,
-      message: (device.services.count == 1
-        ? "For a lost or compromised device. Its connections close, its service key is revoked, its grants and Hub Network peers are removed, and it can never be approved again."
-        : "For a lost or compromised device. Its connections close, its \(device.services.count) service keys are revoked, its grants and Hub Network peers are removed, and it can never be approved again.")
-        + (devices.contains { $0.attachedTo == device.id && !$0.revoked } ? " Every device attached below it is revoked too." : ""),
+      message: revokeMessage,
       systemImage: "xmark.shield", hue: .red, confirm: "Revoke", role: .destructive
     ) {
       Task { try? await hub.client.devices.revoke(device.id) }
@@ -458,6 +457,19 @@ struct DeviceInspector: View {
       NameSheet(title: "Rename \(device.name)", systemImage: Device.symbol(platform: device.platform), hue: .blue, confirm: "Rename", name: device.name) { name in
         Task { _ = try? await hub.client.devices.rename(device.id, to: name) }
       }
+    }
+  }
+
+  private var revokeMessage: LocalizedStringKey {
+    switch (device.services.count, devices.contains { $0.attachedTo == device.id && !$0.revoked }) {
+    case (1, false):
+      "For a lost or compromised device. Its connections close, its service key is revoked, its grants and Hub Network peers are removed, and it can never be approved again."
+    case (1, true):
+      "For a lost or compromised device. Its connections close, its service key is revoked, its grants and Hub Network peers are removed, and it can never be approved again. Every device attached below it is revoked too."
+    case (let count, false):
+      "For a lost or compromised device. Its connections close, its \(count) service keys are revoked, its grants and Hub Network peers are removed, and it can never be approved again."
+    case (let count, true):
+      "For a lost or compromised device. Its connections close, its \(count) service keys are revoked, its grants and Hub Network peers are removed, and it can never be approved again. Every device attached below it is revoked too."
     }
   }
 }
@@ -492,7 +504,7 @@ private struct DeviceLinksSection: View {
       if !children.isEmpty {
         KitSection("Attached", meta: ["\(children.count)"], systemImage: "point.3.connected.trianglepath.dotted", hue: .blue) {
           ForEach(children) { child in
-            SidebarRow(child.name, subtitle: child.linked == true ? "gets what you link" : "gets nothing") {
+            SidebarRow("\(child.name)", subtitle: child.linked == true ? "gets what you link" : "gets nothing") {
               Tile(systemImage: Device.symbol(platform: child.platform), hue: child.online ? .blue : .gray, size: 18)
             } trailing: {
               linkToggle(child, title: "Linked")

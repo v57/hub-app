@@ -257,7 +257,7 @@ struct HubNetworkPage: View {
     .frame(maxWidth: .infinity)
   }
 
-  private var internetLine: String {
+  private var internetLine: LocalizedStringKey {
     if let using = facts.usingInternet { return "Using \(using.name)’s internet" }
     let offering = facts.internetDevices.filter(\.sharesInternet)
     switch offering.count {
@@ -549,7 +549,11 @@ struct NetworkDeviceList: View {
           }
           if folded && rows.count > visible.count {
             let more = online.count - min(online.count, Self.shown)
-            SidebarRow([more > 0 ? "\(more) more online" : nil, asleep.isEmpty ? nil : "\(asleep.count) asleep"].compactMap { $0 }.joined(separator: ", ")) {
+            let line = [
+              more > 0 ? String(localized: "\(more) more online") : nil,
+              asleep.isEmpty ? nil : String(localized: "\(asleep.count) asleep"),
+            ].compactMap { $0 }.joined(separator: ", ")
+            SidebarRow("\(line)") {
               Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold)).foregroundStyle(.kitSecondary).frame(width: 24)
             } trailing: {
               EmptyView()
@@ -717,10 +721,15 @@ struct NetworkAdvanced: View {
     return "\(state) · \(membership.alias)"
   }
 
-  private var helperLine: String {
-    let host = node.flatMap { HubNetworkNodeEndpoint.host(from: $0) } ?? "Not set"
+  private var helperLine: LocalizedStringKey {
+    let host = node.flatMap { HubNetworkNodeEndpoint.host(from: $0) }
     let isDefault = node == nil || node == HubNetworkNodeEndpoint.default
-    return "\(host)\(isDefault ? " (the default)" : "") · helps your devices find each other and never sees what they send"
+    return switch (host, isDefault) {
+    case (let host?, true): "\(host) (the default) · helps your devices find each other and never sees what they send"
+    case (let host?, false): "\(host) · helps your devices find each other and never sees what they send"
+    case (nil, true): "Not set (the default) · helps your devices find each other and never sees what they send"
+    case (nil, false): "Not set · helps your devices find each other and never sees what they send"
+    }
   }
 }
 #endif

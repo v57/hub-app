@@ -122,7 +122,7 @@ struct ServicesPage: View {
               ForEach(groups) { group in
                 KitSection(group.name, meta: [group.children?.count == 1 ? "1 API" : "\(group.children?.count ?? 0) APIs"], systemImage: "hexagon", hue: .blue) {
                   ForEach(group.children ?? []) { row in
-                    SidebarRow(row.name, subtitle: "\(row.service?.requests ?? 0) requests") {
+                    SidebarRow("\(row.name)", subtitle: "\(row.service?.requests ?? 0) requests") {
                       EmptyView()
                     } trailing: {
                       HStack(spacing: 8) {
@@ -271,7 +271,7 @@ struct APIInspector: View {
           Text(row.needsApproval ? "Waits for an owner to allow it" : "No provider is connected").kitFont(.caption).padding(8)
         }
         ForEach(providers) { provider in
-          SidebarRow(provider.name ?? "Service", subtitle: "…" + provider.id.suffix(8)) {
+          SidebarRow(provider.name.map { "\($0)" } ?? "Service", subtitle: "…\(String(provider.id.suffix(8)))") {
             Tile(systemImage: "server.rack", hue: .gray, size: 18)
           } trailing: {
             EmptyView()

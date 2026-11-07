@@ -121,7 +121,7 @@ struct JoinNetworkSheet: View {
     ) {
       if let inviter {
         FormCard {
-          FormRow(inviter, help: hubName.map { "Shares its internet · in \($0)" } ?? "Shares its internet", systemImage: "desktopcomputer", hue: .indigo)
+          FormRow("\(inviter)", help: hubName.map { "Shares its internet · in \($0)" } ?? "Shares its internet", systemImage: "desktopcomputer", hue: .indigo)
         }
       }
       VStack(alignment: .leading, spacing: 12) {

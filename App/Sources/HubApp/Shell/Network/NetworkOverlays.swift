@@ -46,7 +46,7 @@ struct NetworkDeviceSheet: View {
         FormCard {
           FormRow(
             "Use \(device.name)’s internet", help: "Browse as if you were where \(device.name) is. Handy on public Wi-Fi.",
-            systemImage: "arrow.up.forward.app", hue: .orange, error: error
+            systemImage: "arrow.up.forward.app", hue: .orange, error: error.map { "\($0)" }
           ) {
             Toggle("Use \(device.name)’s internet", isOn: Binding { isUsing } set: { use($0, device) })
               .toggleStyle(.kitSwitch).labelsHidden().disabled(busy || !facts.isJoined)
@@ -172,8 +172,9 @@ struct NetworkWhySheet: View {
     KitSheet(
       title: "Why can’t I reach \(device.name)?",
       meta: device.status == .cantReach
-        ? "Can’t reach right now · tried \(device.unreachableSince.map { $0.formatted(.relative(presentation: .named)) } ?? "just now")"
-        : device.statusLine,
+        ? device.unreachableSince.map { "Can’t reach right now · tried \($0.formatted(.relative(presentation: .named)))" }
+          ?? "Can’t reach right now · tried just now"
+        : "\(device.statusLine)",
       systemImage: "exclamationmark.triangle", hue: .orange, status: trying ? .working : .idle
     ) {
       Text(explanation(device)).kitFont(.body).fixedSize(horizontal: false, vertical: true)
@@ -228,7 +229,7 @@ private struct ConnectManuallySheet: View {
   var body: some View {
     KitSheet(title: "Connect Manually", meta: "To \(device.name), at an address you know", systemImage: "point.3.connected.trianglepath.dotted", hue: .teal, status: busy ? .working : .idle) {
       FormCard(footer: "The address and UDP port \(device.name) answers on, from its own Hub Network page or its router.") {
-        FormRow("Address", systemImage: "network", error: error, field: TextField("host:port", text: $endpoint).kitFont(.mono).autocorrectionDisabled())
+        FormRow("Address", systemImage: "network", error: error.map { "\($0)" }, field: TextField("host:port", text: $endpoint).kitFont(.mono).autocorrectionDisabled())
       }
     } footer: {
       Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
@@ -424,7 +425,7 @@ struct ShareAppSheet: View {
       if choice == .another || idiom.isTouch && choice == nil {
         FormCard {
           FormRow("Name", systemImage: "textformat", field: TextField("Jellyfin", text: $name).autocorrectionDisabled())
-          FormRow("Port", help: "The port the app listens on, on this \(KitDevice.nameInSentence)", systemImage: "number", error: error, field: TextField("8096", text: $port).kitFont(.mono).autocorrectionDisabled())
+          FormRow("Port", help: "The port the app listens on, on this \(KitDevice.nameInSentence)", systemImage: "number", error: error.map { "\($0)" }, field: TextField("8096", text: $port).kitFont(.mono).autocorrectionDisabled())
           FormRow("Kind", systemImage: "arrow.left.arrow.right", hue: .gray) {
             KitSegmented(selection: $udp, options: [("TCP", false), ("UDP", true)]).fixedSize()
           }
@@ -460,7 +461,7 @@ struct ShareAppSheet: View {
 
   private func appRow(_ app: ListeningApps.Found) -> some View {
     let isShared = facts.sharedApps.contains { $0.id == "tcp-\(app.port)" }
-    return FormRow(NetworkAppNames.main.name(port: app.port), help: "\(app.app.kind) · port \(app.port)", systemImage: KnownPorts.symbol(app.port), hue: .blue) {
+    return FormRow("\(NetworkAppNames.main.name(port: app.port))", help: "\(app.app.kind) · port \(app.port)", systemImage: KnownPorts.symbol(app.port), hue: .blue) {
       if isShared {
         Chip("Shared", hue: .green)
       } else if choice == .app(app.port) {

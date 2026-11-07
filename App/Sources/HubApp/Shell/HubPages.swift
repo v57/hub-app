@@ -49,11 +49,11 @@ struct HubUnreachable: View {
     Group {
       switch hub.reach {
       case .connecting:
-        EmptyState(systemImage: "hexagon", title: "Connecting to \(hub.settings.name)…", message: hub.settings.address.absoluteString, status: .working)
+        EmptyState(systemImage: "hexagon", title: "Connecting to \(hub.settings.name)…", message: "\(hub.settings.address.absoluteString)", status: .working)
       case .refused:
         EmptyState(
           systemImage: "exclamationmark.shield", title: "\(hub.settings.name) Refused This \(KitDevice.name)",
-          message: hub.refusal?.description
+          message: hub.refusal.map { "\($0.description)" }
         ) {
           if case .hubKeyChanged = hub.refusal {
             Button("Trust New Hub Key") {

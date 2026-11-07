@@ -76,12 +76,14 @@ struct OverviewPage: View {
     return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: KitMetrics.gutter), count: width < 640 ? 2 : 4), spacing: KitMetrics.gutter) {
       KitStatCard(
         "APIs", value: "\(status.services.count)", systemImage: "hexagon", hue: .blue,
-        detail: MetaLine.join(["\(online) online", waiting > 0 ? "\(waiting) waiting" : ""])
+        detail: waiting > 0 ? "\(online) online · \(waiting) waiting" : "\(online) online"
       ) { Navigator.main.open(hub, .services) }
       if hub.canOpen(.devices) {
         KitStatCard(
           "Devices", value: "\(devices.count)", systemImage: "laptopcomputer", hue: .gray,
-          detail: MetaLine.join(["\(devices.filter(\.online).count) online", facts.pendingDevices.isEmpty ? "" : "\(facts.pendingDevices.count) waiting"])
+          detail: facts.pendingDevices.isEmpty
+            ? "\(devices.filter(\.online).count) online"
+            : "\(devices.filter(\.online).count) online · \(facts.pendingDevices.count) waiting"
         ) { Navigator.main.open(hub, .devices) }
       }
       KitStatCard(
@@ -92,7 +94,7 @@ struct OverviewPage: View {
       if hub.canOpen(.connections) {
         KitStatCard(
           "Connections", value: "\(facts.users.count)", systemImage: "wifi", hue: .teal,
-          detail: MetaLine.join(["\(facts.users.filter { $0.services > 0 }.count) with services"])
+          detail: "\(facts.users.filter { $0.services > 0 }.count) with services"
         ) { Navigator.main.open(hub, .connections) }
       }
     }

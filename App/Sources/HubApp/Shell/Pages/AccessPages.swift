@@ -63,7 +63,9 @@ struct ConnectionsPage: View {
             } else {
               VStack(spacing: 2) {
                 ForEach(section.users) { user in
-                  SidebarRow(user.name.isEmpty ? "Unauthorized" : user.name, subtitle: user.line(isMe: user.key == hub.key)) {
+                  SidebarRow(
+                    user.name.isEmpty ? "Unauthorized" : "\(user.name)", subtitle: "\(user.line(isMe: user.key == hub.key))"
+                  ) {
                     Tile(systemImage: user.icon.symbol?.name ?? "hexagon", hue: .gray, size: 20)
                   } trailing: {
                     StatusDot(hue: user.key == nil ? .orange : .green)
@@ -127,7 +129,7 @@ private struct GroupHeader: View {
   let permissions: Int?
 
   var body: some View {
-    RichHeader(name?.capitalized ?? "No group", meta: [
+    RichHeader(name.map { "\($0.capitalized)" } ?? "No group", meta: [
       count == 1 ? "1 connection" : "\(count) connections",
       name == "owners" ? "every permission" : permissions.map { $0 == 1 ? "1 permission" : "\($0) permissions" } ?? "no permissions",
     ], systemImage: name == "owners" ? "key" : name == nil ? "questionmark" : "person.2", hue: name == "owners" ? .red : name == nil ? .gray : .purple)

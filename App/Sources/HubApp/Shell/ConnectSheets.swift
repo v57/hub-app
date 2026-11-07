@@ -112,9 +112,9 @@ struct ConnectSheet: View {
     }
   }
 
-  private var inputError: String? {
+  private var inputError: LocalizedStringKey? {
     switch entry {
-    case .badInvitation(let message): return message
+    case .badInvitation(let message): return "\(message)"
     case .unknown: return "Not an address or an invitation"
     default: return nil
     }
