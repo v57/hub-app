@@ -190,9 +190,18 @@ class Hubs {
   static let main = Hubs()
   var selected: Hub.ID? {
     didSet {
-      guard selected != oldValue else { return }
+      guard selected != oldValue, Self.persists else { return }
       UserDefaults.standard.set(selected, forKey: "selected")
     }
+  }
+  /// Whether choices are kept across launches: not in the demo, whose hubs would replace the real ones' (a Debug
+  /// build shares the app's container).
+  static var persists: Bool {
+#if DEBUG
+    !HubDemo.isOn
+#else
+    true
+#endif
   }
   var list = [Hub]()
   var selectedHub: Hub? {

@@ -9,6 +9,9 @@
 import SwiftUI
 import HubService
 import ComponentKit
+#if DEBUG
+import notify
+#endif
 
 /// A page of one hub, in the sidebar's order: the hub's own card, then Access, then Hub Network.
 enum HubPage: String, Hashable, CaseIterable, Sendable {
@@ -104,7 +107,7 @@ final class Navigator {
       guard let id = route?.hubID, id != oldValue?.hubID else { return }
       Hubs.main.select(id)
       opened[id.absoluteString] = Date().timeIntervalSince1970
-      UserDefaults.standard.set(opened, forKey: "hubs.opened")
+      if Hubs.persists { UserDefaults.standard.set(opened, forKey: "hubs.opened") }
     }
   }
   /// The last hub opened: its pages stay in the sidebar while All Hubs is open
@@ -113,7 +116,7 @@ final class Navigator {
     return Hubs.main.list.first { $0.id == id }
   }
   var sort: HubSort {
-    didSet { UserDefaults.standard.set(sort.rawValue, forKey: "hubs.sort") }
+    didSet { if Hubs.persists { UserDefaults.standard.set(sort.rawValue, forKey: "hubs.sort") } }
   }
   /// When each hub was last opened
   private var opened: [String: Double]
@@ -130,6 +133,7 @@ final class Navigator {
     }
 #if DEBUG
     if let open = Self.openAtLaunch { route = Self.route(open: open) }
+    Self.listenForOpenRequests()
 #endif
   }
 #if DEBUG
@@ -139,6 +143,26 @@ final class Navigator {
     if let index = arguments.firstIndex(of: "--open"), index + 1 < arguments.count { return arguments[index + 1] }
     return ScreenshotPage.current?.open
   }()
+  /// `notifyutil -s dev.v57.hub.debug.open <n> -p dev.v57.hub.debug.open` opens a page without clicks or accessibility
+  /// lookups, for performance runs (the app's sandbox reads no file from outside): 0 All Hubs, 1–4 this device's
+  /// pages (`DevicePage` in order), 100 × (hub index + 1) + `HubPage` index a hub's page (101 the first hub's
+  /// Services).
+  private static func listenForOpenRequests() {
+    var token: Int32 = 0
+    notify_register_dispatch("dev.v57.hub.debug.open", &token, .main) { token in
+      var state: UInt64 = 0
+      notify_get_state(token, &state)
+      MainActor.assumeIsolated { Navigator.main.route = route(state: Int(state)) }
+    }
+  }
+  private static func route(state: Int) -> Route {
+    let devicePages: [DevicePage] = [.localHub, .sharedServices, .farm, .settings]
+    if state == 0 { return .allHubs }
+    if state < 100 { return state <= devicePages.count ? .device(devicePages[state - 1]) : .allHubs }
+    let hubs = Hubs.main.list, index = state / 100 - 1, page = state % 100
+    guard hubs.indices.contains(index), HubPage.allCases.indices.contains(page) else { return .allHubs }
+    return .hub(hubs[index].id, HubPage.allCases[page])
+  }
   private static func route(open: String) -> Route {
     let parts = open.split(separator: "/").map(String.init)
     if let hub = Hubs.main.list.first(where: { $0.settings.name == parts.first }) {
