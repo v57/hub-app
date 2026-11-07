@@ -57,7 +57,7 @@ struct PeerLinksState: Codable, Equatable, Sendable {
   let hubNetworkId: String
   let coordinator: String
   let hubHost: Bool
-  let grants: [PeerLinkGrant]
+  var grants: [PeerLinkGrant]
   /// What this device lets open, the app's `DevicePorts`: a grant's port opens only if it's also here. Missing (a file
   /// from before this list), nothing opens until the app hands the list over
   var devicePorts: [PeerLinkGrant.Port]? = nil
@@ -66,6 +66,22 @@ struct PeerLinksState: Codable, Equatable, Sendable {
 
   /// The secret to hold: none from a Hub that gives none, whose members can't hold one either
   var presenceSecretData: Data? { presenceSecret.flatMap { Data(base64Encoded: $0) } }
+
+  /// A Hub names no machine while the one it runs on hasn't registered again (its app relaunching, its tunnel
+  /// restarting), so its `hub` grant goes missing for a while. A member keeps the one it had until it expires: without
+  /// it the link to the machine is gone for good, and with it the path to the Hub that would send the next grant. A
+  /// Hub on another machine sends a grant of its own, which replaces it
+  func keepingHubGrant(of previous: PeerLinksState?, now: Date = Date()) -> PeerLinksState {
+    guard !hubHost, !grants.contains(where: { $0.purpose == "hub" }), let previous, previous.hubKey == hubKey,
+      previous.hubNetworkId == hubNetworkId,
+      let kept = previous.grants.first(where: { grant in
+        grant.purpose == "hub" && CoordinatorClient.parseRFC3339(grant.expiresAt).map { $0 > now } == true
+      })
+    else { return self }
+    var links = self
+    links.grants.insert(kept, at: 0)
+    return links
+  }
 }
 
 enum PeerLinkGrantError: Error, Equatable {
@@ -276,10 +292,25 @@ actor LinkManager {
     await openWhereNeeded()
   }
 
-  /// Periodic upkeep: drops expired grants and opens links whose path went quiet
+  /// Periodic upkeep: drops expired grants and attempts nobody answered, and opens links whose path went quiet
   func tick() async {
+    dropUnansweredAttempts()
     await removeStale()
     await openWhereNeeded()
+  }
+
+  /// An attempt ends with a punch, `link.closed` or an error. One the coordinator never answered (a message lost while
+  /// its connection came back) would keep its link from opening again, however long the path stays quiet
+  private func dropUnansweredAttempts() {
+    // Probing for a minute, then up to 5 s until `punchAt` and the punch window
+    let lifetime = 60 * probeInterval + 5 + punchWindow + 15
+    let now = dependencies.now()
+    for (linkId, attempt) in attempts where now.timeIntervalSince(attempt.startedAt) > lifetime {
+      attempt.probing?.cancel()
+      attempt.punching?.cancel()
+      attempts.removeValue(forKey: linkId)
+      dependencies.log("link \(linkId.prefix(8)) to \(attempt.link.other.key.suffix(8)) dropped: no answer in \(Int(lifetime)) s")
+    }
   }
 
   var status: [(peer: Peer, opens: Bool, attempting: Bool)] {

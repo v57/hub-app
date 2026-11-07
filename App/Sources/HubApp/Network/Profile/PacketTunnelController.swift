@@ -94,11 +94,14 @@ final class PacketTunnelController: PacketTunnelControlling {
     guard let manager = try await loadManager() else {
       throw PacketTunnelControllerError.notInstalled
     }
-    guard manager.isEnabled else {
-      throw PacketTunnelControllerError.disabled
-    }
     let usesGateway = (try? store.load())?.usesGateway == true
-    if manager.isOnDemandEnabled != usesGateway {
+    if !manager.isEnabled || manager.isOnDemandEnabled != usesGateway {
+      if !manager.isEnabled {
+        // Turned off by the system (another VPN chosen in Settings) or left so by an older build's failed join:
+        // starting means enabling it again, while there's a membership to run
+        guard (try? store.loadWithoutValidation()) != nil else { throw PacketTunnelControllerError.disabled }
+        manager.isEnabled = true
+      }
       Self.keepConnected(manager, usesGateway)
       try await save(manager)
       try await load(manager)

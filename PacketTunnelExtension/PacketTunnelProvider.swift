@@ -427,7 +427,11 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
 
   /// The app forwarded `network/links`: keep it for restarts away from the hub, follow its coordinator and hand the
   /// grants to the link manager (which checks each one itself)
-  private func receiveLinks(_ links: PeerLinksState) async {
+  private func receiveLinks(_ received: PeerLinksState) async {
+    let links = received.keepingHubGrant(of: Self.storedLinks())
+    if links != received, let kept = links.grants.first {
+      extensionDiagnostics("network/links names no hub machine: keeping link grant \(kept.grantId.prefix(8)) to \(kept.b.key.suffix(8))")
+    }
     Self.storeLinks(links)
     guard let profile = activeBootstrapProfile else { return }
     if coordinatorClient == nil || coordinatorClient?.nodeEndpointValue != links.coordinator {

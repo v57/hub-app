@@ -81,18 +81,22 @@ struct NativeJoinCoordinator {
     var bindClient: HubClient?
     var bindingRecorded = record.stage != .staged
 
-    do {
-      // A tunnel stopped just before (an earlier join's, or one this device left) may still be going down
-      await tunnel.waitUntilDisconnected()
-      switch await tunnel.status {
-      case .connected, .connecting, .reasserting, .disconnecting:
-        throw NativeJoinError.activeVPNConflict
-      case .invalid:
-        throw NativeJoinError.activeVPNConflict
-      case .notInstalled, .disconnected:
-        break
-      }
+    // A tunnel stopped just before (an earlier join's, or one this device left) may still be going down. One that is up
+    // stays exactly as it is: nothing of this join has touched it yet, so there's nothing to roll back
+    await tunnel.waitUntilDisconnected()
+    switch await tunnel.status {
+    case .connected, .connecting, .reasserting, .disconnecting, .invalid:
+      if !bindingRecorded { try? await NativeJoinStore.main.cleanup(transactionId: transactionId) }
+      throw NativeJoinError.activeVPNConflict
+    case .notInstalled, .disconnected:
+      break
+    }
+    // What a join that fails puts back: the membership this device had, with its WireGuard key
+    let previous = (try? tunnel.installedConfiguration()).map {
+      PreviousMembership(configuration: $0, wireGuardKey: try? HubNetworkWireGuardKeyStore().loadOrCreate())
+    }
 
+    do {
       report(.init(transactionId: transactionId, state: .awaitingVPNConsent))
       try await classified(.vpnInstall, invitation: invitation, record: record) {
         // The extension reads the device WireGuard identity (wireguard.v1)
@@ -303,10 +307,17 @@ struct NativeJoinCoordinator {
         tunnel: tunnel,
         identity: bootstrapIdentity,
         bindClient: bindClient,
-        preserveEnrollment: bindingRecorded
+        preserveEnrollment: bindingRecorded,
+        previous: previous
       )
       throw error
     }
+  }
+
+  /// The membership a join replaces, kept until the join commits
+  struct PreviousMembership {
+    let configuration: HubNetworkProfileConfiguration
+    let wireGuardKey: Curve25519.KeyAgreement.PrivateKey?
   }
 
   /// The join's keys join as this device on that hub, the app's own identity as the app's device; a legacy membership
@@ -325,7 +336,8 @@ struct NativeJoinCoordinator {
     tunnel: PacketTunnelController,
     identity: PacketTunnelBootstrapIdentity?,
     bindClient: HubClient?,
-    preserveEnrollment: Bool
+    preserveEnrollment: Bool,
+    previous: PreviousMembership?
   ) async {
     if let identity {
       let cancel = PacketTunnelNativeJoinCancel(
@@ -339,7 +351,20 @@ struct NativeJoinCoordinator {
     }
     bindClient?.stop()
     if !preserveEnrollment {
-      try? await tunnel.remove()
+      if let previous {
+        // The membership from before comes back, stopped as the join found it and enabled, with its own WireGuard key
+        // in place of the one the join installed
+        await tunnel.stop()
+        if let key = previous.wireGuardKey { try? HubNetworkWireGuardKeyStore().install(key) }
+        do {
+          try await tunnel.install(configuration: previous.configuration)
+        } catch {
+          trace("couldn't put back the membership from before the join: \(error)")
+          try? await tunnel.remove()
+        }
+      } else {
+        try? await tunnel.remove()
+      }
       try? await NativeJoinStore.main.cleanup(transactionId: transactionId)
     }
   }

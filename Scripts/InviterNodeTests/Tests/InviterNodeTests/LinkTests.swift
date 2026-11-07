@@ -391,6 +391,60 @@ final class LinkTests: XCTestCase {
       now: now.addingTimeInterval(40 * 24 * 3600))) { XCTAssertEqual($0 as? PeerLinkGrantError, .expired) }
   }
 
+  /// The Hub's machine relaunched and hasn't registered again, so the Hub names no machine and sends no `hub` grant: the
+  /// member keeps the one it had, which still lets it reach the machine. A grant from the Hub replaces it, an expired
+  /// one isn't kept, and the machine itself keeps nothing
+  func testAHubGrantMissingWhileTheMachineIsAwayIsKept() {
+    let hub = Curve25519.Signing.PrivateKey()
+    let member = LinkDevice(port: port, trusting: hub, name: "member")
+    let machine = LinkDevice(port: port, trusting: hub, name: "machine")
+    let phone = LinkDevice(port: port, trusting: hub, name: "phone")
+    let grant = signedGrant(hub: hub, member: member, machine: machine)
+    let share = signedGrant(hub: hub, purpose: "share", member: member, machine: phone)
+    func state(_ grants: [PeerLinkGrant], hubHost: Bool = false) -> PeerLinksState {
+      PeerLinksState(version: 1, hubKey: spki(hub.publicKey), hubNetworkId: "network-1", coordinator: "ws://node",
+        hubHost: hubHost, grants: grants)
+    }
+    let before = state([grant, share])
+    XCTAssertEqual(state([]).keepingHubGrant(of: before).grants, [grant])
+    XCTAssertEqual(state([share]).keepingHubGrant(of: before).grants, [grant, share])
+    let renewed = signedGrant(hub: hub, member: member, machine: machine)
+    XCTAssertEqual(state([renewed]).keepingHubGrant(of: before).grants, [renewed])
+    XCTAssertEqual(state([], hubHost: true).keepingHubGrant(of: before).grants, [])
+    XCTAssertEqual(state([]).keepingHubGrant(of: before, now: Date().addingTimeInterval(7200)).grants, [])
+    let otherHub = PeerLinksState(version: 1, hubKey: "other", hubNetworkId: "network-1", coordinator: "ws://node",
+      hubHost: false, grants: [])
+    XCTAssertEqual(otherHub.keepingHubGrant(of: before).grants, [])
+  }
+
+  /// The coordinator took a `link.open` and never said more about it: the attempt goes once its time is up, and the next
+  /// tick opens the link again instead of waiting on it for good
+  func testAnAttemptNobodyAnswersIsDroppedAndOpenedAgain() async {
+    let hub = Curve25519.Signing.PrivateKey()
+    let member = LinkDevice(port: port, trusting: hub, name: "member")
+    let machine = LinkDevice(port: port, trusting: hub, name: "machine")
+    let now = Locked(Date())
+    let opens = Locked(0)
+    let lines = Locked<[String]>([])
+    let manager = LinkManager(ownKey: member.serviceKey, trustedHubKey: spki(hub.publicKey), dependencies: .init(
+      open: { _ in
+        let count = opens.update { $0 += 1; return $0 }
+        return .init(linkId: "link-\(count)", probeToken: "token", peerKey: machine.serviceKey)
+      },
+      send: { _, _, _ in }, probe: { _ in }, apply: { _ in }, lastHandshake: { _ in nil }, candidates: { [] },
+      log: { line in lines.update { $0.append(line) } }, now: { now.value }
+    ))
+    await manager.presenceChanged(true)
+    await manager.update(grants: [signedGrant(hub: hub, member: member, machine: machine)], devicePorts: everyPort)
+    XCTAssertEqual(opens.value, 1)
+    await manager.tick()
+    XCTAssertEqual(opens.value, 1, "still waiting for link.ready")
+    now.update { $0 = $0.addingTimeInterval(200) }
+    await manager.tick()
+    XCTAssertEqual(opens.value, 2)
+    XCTAssertTrue(lines.value.contains { $0.contains("link link-1 to \(machine.serviceKey.suffix(8)) dropped: no answer") })
+  }
+
   private func signedGrant(
     hub: Curve25519.Signing.PrivateKey, purpose: String = "hub", member: LinkDevice, machine: LinkDevice,
     ports: [PeerLinkGrant.Port] = [.init(protocol: "tcp", port: 1997)]
@@ -416,6 +470,15 @@ final class LinkTests: XCTestCase {
     object["signature"] = try! hub.signature(for: input).base64EncodedString()
     return try! JSONDecoder().decode(PeerLinkGrant.self, from: JSONSerialization.data(withJSONObject: object))
   }
+}
+
+/// A value the tests' fakes change from any task
+final class Locked<Value>: @unchecked Sendable {
+  private let lock = NSLock()
+  private var stored: Value
+  init(_ value: Value) { stored = value }
+  var value: Value { lock.withLock { stored } }
+  @discardableResult func update<Result>(_ change: (inout Value) -> Result) -> Result { lock.withLock { change(&stored) } }
 }
 
 func spki(_ key: Curve25519.Signing.PublicKey) -> String {
