@@ -261,8 +261,16 @@ final class CameraAlerts {
     if let event = alert.event { info["event"] = event }
     return UserNotification(
       id: "camera-\(subscription.id)-\(alert.event ?? UUID().uuidString)", title: "Motion at \(place)",
-      body: [alert.device, subscription.hubName].compactMap { $0 }.joined(separator: " · "), thread: "camera-\(subscription.id)",
+      body: body(place: place, device: alert.device, hub: subscription.hubName), thread: "camera-\(subscription.id)",
       image: image, info: info)
+  }
+
+  /// The device and the hub, each once and only when the title doesn't already name it: a Mac's own camera is
+  /// usually placed and hubbed under the Mac's name
+  static func body(place: String, device: String?, hub: String) -> String {
+    var parts: [String] = []
+    for part in [device, hub].compactMap({ $0 }) where part != place && !parts.contains(part) { parts.append(part) }
+    return parts.joined(separator: " · ")
   }
 
   /// The camera's picture now, for the notification; nil when it doesn't come within 5 s

@@ -104,8 +104,12 @@ final class CameraAlertListener: @unchecked Sendable {
   /// Worded as the app's own (App's CameraAlerts.notification)
   private static func post(_ alert: Alert, from subscription: CameraAlertSubscription, image: Data?) {
     let content = UNMutableNotificationContent()
-    content.title = "Motion at \(alert.place ?? subscription.place)"
-    content.body = [alert.device, subscription.hubName].compactMap { $0 }.joined(separator: " · ")
+    let place = alert.place ?? subscription.place
+    content.title = "Motion at \(place)"
+    // The device and the hub, each once and only when the title doesn't already name it (App's CameraAlerts.body)
+    var parts: [String] = []
+    for part in [alert.device, subscription.hubName].compactMap({ $0 }) where part != place && !parts.contains(part) { parts.append(part) }
+    content.body = parts.joined(separator: " · ")
     content.sound = .default
     content.threadIdentifier = "camera-\(subscription.id)"
     var info = ["hub": subscription.hub, "camera": subscription.id]
