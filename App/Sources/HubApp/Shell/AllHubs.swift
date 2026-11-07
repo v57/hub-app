@@ -114,6 +114,7 @@ struct HubCard: View {
   @State private var homeApps = HomeApps.main
   @State private var showsMenu = false
   @State private var width: CGFloat = 0
+  @Environment(\.kitWindowIsActive) private var windowIsActive
 
   private var widgets: [(AppHeader, WidgetSize)] {
     facts.apps.compactMap { app in
@@ -195,7 +196,9 @@ struct HubCard: View {
       }
     case .connecting:
       Image(systemName: "wifi").foregroundStyle(Hue.orange.text)
-        .symbolEffect(.variableColor.iterative.dimInactiveLayers.reversing, options: .repeating)
+        // Only while the window is in front: the endless effect drew the whole window again every frame (about 60%
+        // of the main thread with the demo's connecting hub), and went on after the page was left.
+        .symbolEffect(.variableColor.iterative.dimInactiveLayers.reversing, options: .repeating, isActive: windowIsActive)
         .padding(6).background(Hue.orange.soft(), in: .rect(cornerRadius: KitMetrics.radiusSmall))
     case .offline, .refused:
       Button("More", systemImage: "ellipsis") { showsMenu = true }

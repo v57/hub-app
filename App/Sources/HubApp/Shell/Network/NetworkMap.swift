@@ -279,8 +279,20 @@ struct NetworkMap: View {
   }
 }
 
-/// A slow pulse, for the hub while this device connects
+/// A slow pulse, for the hub while this device connects; still while the window is in the background (an endless
+/// animation draws the whole window again every frame)
 private struct Pulse: ViewModifier {
+  @Environment(\.kitWindowIsActive) private var isActive
+  func body(content: Content) -> some View {
+    if isActive {
+      content.modifier(Pulsing())
+    } else {
+      content
+    }
+  }
+}
+
+private struct Pulsing: ViewModifier {
   @State private var on = false
   func body(content: Content) -> some View {
     content.opacity(on ? 1 : 0.2)
