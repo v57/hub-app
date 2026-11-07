@@ -107,7 +107,15 @@ enum CameraSelfTest {
       check(jpeg.prefix(2) == Data([0xFF, 0xD8]), "snapshot is a JPEG (\(jpeg.count / 1024) KB)")
       try? jpeg.write(to: URL.temporaryDirectory.appending(path: "camera-selftest-snapshot.jpg"))
 
+      // Alerts: a follower of /alerts, as the app runs one, hears of the event as it starts
+      let alerts = AlertLines()
+      let subscription = CameraAlertSubscription(
+        id: "self-test", hub: "self-test", hubName: "Self test", place: "Self test", host: "127.0.0.1", port: port, password: password)
+      let following = Task.detached { await CameraAlerts.listen(subscription) { alerts.add($0) } }
+      try await Task.sleep(for: .seconds(1))
+
       // A clip around a simulated motion event: prebuffer, 5 s of motion, post-roll
+      let motionStarted = Date()
       engine.simulateMotion(true)
       try await Task.sleep(for: .seconds(5))
       engine.simulateMotion(false)
@@ -117,6 +125,10 @@ enum CameraSelfTest {
       let events = try JSONDecoder.camera.decode([CameraEvent].self, from: try await URLSession.shared.data(for: eventsRequest).0)
       log("events \(events.map { "\($0.id) \(Int($0.duration)) s \($0.size / 1024) KB" })")
       check(events.count == 1 && events.first?.end != nil, "one finished event")
+      following.cancel()
+      let alert = alerts.all.first
+      log("alerts \(alerts.all.map { "\($0.kind.rawValue) \($0.event ?? "-") at \(String(format: "%+.2f", $0.time.timeIntervalSince(motionStarted))) s" })")
+      check(alerts.all.count == 1 && alert?.event == events.first?.id, "a follower of /alerts gets the event as it starts")
       if let event = events.first {
         var clipRequest = URLRequest(url: base.appending(path: "events/\(event.id)/clip.mp4"))
         clipRequest.setValue("Bearer \(password)", forHTTPHeaderField: "Authorization")
@@ -309,6 +321,13 @@ private struct MP4Boxes {
   }
 
   func count(_ type: String) -> Int { types.filter { $0 == type }.count }
+}
+/// The motion lines a self-test follower received
+final class AlertLines: @unchecked Sendable {
+  private let lock = NSLock()
+  private var lines: [CameraAlert] = []
+  func add(_ alert: CameraAlert) { lock.withLock { lines.append(alert) } }
+  var all: [CameraAlert] { lock.withLock { lines } }
 }
 #elseif DEBUG
 /// No camera on this platform: nothing to test

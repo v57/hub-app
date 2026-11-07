@@ -11,6 +11,8 @@
 //      GET /events                  [CameraEvent] (JSON), newest first
 //      GET /events/<id>/thumbnail.jpg, GET /events/<id>/clip.mp4
 //      DELETE /events/<id>          deletes the event and its clip, wherever it's kept
+//      GET /alerts                  CameraAlert lines (JSON) until either side closes: hello, motion as each event
+//                                   starts, and a ping every 20 s so a dead link shows
 //
 //  Every request carries `Authorization: Bearer <password>`.
 //
@@ -223,6 +225,30 @@ struct CameraEvent: Codable, Hashable, Identifiable, Sendable {
   /// The clip's file name (device) or key (hub)
   var clip: String?
   var duration: Double { (end ?? Date()).timeIntervalSince(start) }
+}
+
+/// One line of `GET /alerts`. A device that follows a camera's alerts shows a notification for each `motion`, with no
+/// push service: the line reaches it over Hub Network. PacketTunnelExtension's `CameraAlertListener` reads the same JSON.
+struct CameraAlert: Codable, Hashable, Sendable {
+  enum Kind: String, Codable, Sendable {
+    /// Sent once a follower connects
+    case hello
+    /// Motion started a new event
+    case motion
+    /// Keeps the connection's silence short
+    case ping
+  }
+
+  var kind: Kind
+  /// The place it watches (Front Door)
+  var place: String?
+  /// The camera device's name
+  var device: String?
+  /// The motion event, for `motion`
+  var event: String?
+  var time: Date
+
+  static let pingInterval: Double = 20
 }
 
 extension JSONEncoder {

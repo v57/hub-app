@@ -45,6 +45,8 @@ nonisolated(unsafe) var extensionDiagnosticsBuffer: [String] = []
 final class PacketTunnelProvider: NEPacketTunnelProvider {
   private lazy var wireGuardAdapter = PacketTunnelWireGuardAdapter(provider: self)
   private var dnsListener: LocalReservedDNSListener?
+  /// Motion alerts of the cameras the app follows, while the tunnel runs (CameraAlertListener, iOS 18)
+  private var cameraAlerts: AnyObject?
   private var gatewayServingState = GatewayServingState.disabled
   private var gatewayExpiryTask: Task<Void, Never>?
   /// Watches whether the gateway answers, for a profile that falls back to this device's own network
@@ -143,6 +145,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         extensionDiagnostics("inviter off in this profile")
       }
       startCoordinator(profile: profile)
+      startCameraAlerts()
     } catch {
       gatewayServingState = profile.servesGateway ? .unavailable : .disabled
       await wireGuardAdapter.stop()
@@ -159,6 +162,30 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         throw error
       }
     }
+  }
+
+  // MARK: Camera alerts
+
+  /// On iPhone and iPad only: the Mac's app follows its cameras itself
+  private func startCameraAlerts() {
+#if os(iOS)
+    guard #available(iOS 18, *) else { return }
+    if let listener = cameraAlerts as? CameraAlertListener { return listener.reload() }
+    weak let provider = self
+    let listener = CameraAlertListener(interface: { provider?.virtualInterface })
+    cameraAlerts = listener
+    listener.reload()
+#endif
+  }
+
+  private func reloadCameraAlerts() {
+    guard #available(iOS 18, macOS 15, *) else { return }
+    (cameraAlerts as? CameraAlertListener)?.reload()
+  }
+
+  private func stopCameraAlerts() {
+    if #available(iOS 18, macOS 15, *) { (cameraAlerts as? CameraAlertListener)?.stop() }
+    cameraAlerts = nil
   }
 
   /// Temporary diagnostics: the app's acceptance reads this file after a
@@ -178,6 +205,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     gatewayPathTask = nil
     exitState = .disabled
     reset()
+    stopCameraAlerts()
     dnsListener?.stop()
     dnsListener = nil
     await wireGuardAdapter.stop()
@@ -502,6 +530,10 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
   override func handleAppMessage(_ messageData: Data) async -> Data? {
     if messageData == Data("hn9xx-diag".utf8) {
       return Data(extensionDiagnosticsBuffer.joined(separator: "\n").utf8)
+    }
+    if let message = try? JSONDecoder().decode(GatewayProviderMessage.self, from: messageData), message.command == "cameraAlerts" {
+      if cameraAlerts == nil { startCameraAlerts() } else { reloadCameraAlerts() }
+      return try? JSONEncoder().encode(MemberPeersResponse(ok: true))
     }
     if let message = try? JSONDecoder().decode(LinksMessage.self, from: messageData), message.command == "links" {
       await receiveLinks(message.links)

@@ -262,7 +262,12 @@ final class CameraViewer {
   }
 
   static func savedPassword(_ camera: HubCamera) -> String? {
-    (try? KeyChain.loadData(keychain: keychain(camera))).flatMap { String(data: $0, encoding: .utf8) }
+    savedPassword(id: camera.id)
+  }
+
+  static func savedPassword(id: String) -> String? {
+    let item = KeyChain.KeychainConfiguration(service: "dev.v57.Hub.camera.v1", account: id, useDataProtectionKeychain: true)
+    return (try? KeyChain.loadData(keychain: item)).flatMap { String(data: $0, encoding: .utf8) }
   }
 
   static func save(_ password: String, for camera: HubCamera) {

@@ -28,6 +28,10 @@ final class CameraServer: @unchecked Sendable {
   private let queue = DispatchQueue(label: "dev.v57.Hub.camera-server")
   private var listener: ByteStreamListener?
   private var live: [ObjectIdentifier: LiveViewer] = [:]
+  /// Devices following the camera's alerts (`GET /alerts`)
+  private var followers: [ObjectIdentifier: ByteStream] = [:]
+  private var alerts: Task<Void, Never>?
+  private var pings: DispatchSourceTimer?
   private var failures: [String: [Date]] = [:]
   /// Answers only while the camera's share is published on its hub; set on `queue`
   private var isPublished = false
@@ -39,9 +43,21 @@ final class CameraServer: @unchecked Sendable {
     self.info = info
   }
 
-  /// Listens on a free port and returns it
-  func start() async throws -> UInt16 {
-    let listener = makeByteStreamListener(ListenAddress(port: 0))
+  /// Listens on `port` when it's free (the camera's port from before, so devices that follow its alerts in the
+  /// background still find it), otherwise on any free port, and returns the port
+  func start(port: UInt16 = 0) async throws -> UInt16 {
+    let bound: UInt16
+    do {
+      bound = try await listen(port)
+    } catch where port != 0 {
+      bound = try await listen(0)
+    }
+    followAlerts()
+    return bound
+  }
+
+  private func listen(_ port: UInt16) async throws -> UInt16 {
+    let listener = makeByteStreamListener(ListenAddress(port: port))
     self.listener = listener
     return try await withCheckedThrowingContinuation { continuation in
       listener.start(queue: queue) { result in
@@ -53,10 +69,14 @@ final class CameraServer: @unchecked Sendable {
   }
 
   func stop() {
+    alerts?.cancel()
+    alerts = nil
     queue.sync {
       isPublished = false
       listener?.stop()
       listener = nil
+      pings?.cancel()
+      pings = nil
       closeLiveViewers()
     }
   }
@@ -79,6 +99,9 @@ final class CameraServer: @unchecked Sendable {
       viewer.stopWatching()
       viewer.stream.close()
     }
+    let followers = followers.values
+    self.followers = [:]
+    for stream in followers { stream.close() }
   }
 
   // MARK: Requests
@@ -104,6 +127,7 @@ final class CameraServer: @unchecked Sendable {
     } onClose: { [weak self, weak stream] in
       guard let self, let stream else { return }
       if let viewer = self.live.removeValue(forKey: ObjectIdentifier(stream)) { viewer.stopWatching() }
+      self.followers[ObjectIdentifier(stream)] = nil
     }
   }
 
@@ -133,6 +157,8 @@ final class CameraServer: @unchecked Sendable {
       respond(stream, json: info)
     case "live" where parts.count == 1:
       startLive(on: stream)
+    case "alerts" where parts.count == 1:
+      startAlerts(on: stream)
     case "snapshot.jpg" where parts.count == 1:
       let width = request.query["width"].flatMap(Int.init).map { min(max($0, 64), 3840) } ?? 1280
       answer(stream) { [engine] in
@@ -247,6 +273,42 @@ final class CameraServer: @unchecked Sendable {
       viewer?.timer?.cancel()
       viewer?.timer = nil
     }
+  }
+
+  // MARK: Alerts
+
+  /// A line for each event as it starts, to every follower
+  private func followAlerts() {
+    alerts?.cancel()
+    alerts = Task { [weak self, recorder] in
+      for await event in await recorder.eventStarts() {
+        guard let self else { return }
+        self.queue.async { self.sendAlert(.motion, event: event.id, time: event.start) }
+      }
+    }
+    let timer = DispatchSource.makeTimerSource(queue: queue)
+    timer.schedule(deadline: .now() + CameraAlert.pingInterval, repeating: CameraAlert.pingInterval)
+    timer.setEventHandler { [weak self] in self?.sendAlert(.ping, event: nil, time: Date()) }
+    timer.resume()
+    queue.sync { pings = timer }
+  }
+
+  private func startAlerts(on stream: ByteStream) {
+    stream.write(Self.head(status: 200, headers: ["Content-Type": "application/x-ndjson", "Cache-Control": "no-store"]))
+    followers[ObjectIdentifier(stream)] = stream
+    stream.write(alertLine(.hello, event: nil, time: Date()))
+  }
+
+  private func sendAlert(_ kind: CameraAlert.Kind, event: String?, time: Date) {
+    guard !followers.isEmpty else { return }
+    let line = alertLine(kind, event: event, time: time)
+    for stream in followers.values { stream.write(line) }
+  }
+
+  private func alertLine(_ kind: CameraAlert.Kind, event: String?, time: Date) -> Data {
+    let info = info()
+    let alert = CameraAlert(kind: kind, place: info.place, device: info.name, event: event, time: time)
+    return ((try? JSONEncoder.camera.encode(alert)) ?? Data("{}".utf8)) + Data("\n".utf8)
   }
 
   /// Writes a frame unless the viewer is behind; one that fell behind starts again at a keyframe

@@ -34,6 +34,7 @@ struct CamerasPage: View {
   @State private var span = EventSpan.today
   @State private var addsCamera = false
   @State private var camera = SecurityCamera.main
+  @State private var alerts = CameraAlerts.main
 
   private var cameras: [HubCamera] {
     resources.compactMap(HubCamera.init).sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
@@ -52,6 +53,13 @@ struct CamerasPage: View {
             routed(route, viewers: viewers, back: nil).hub(hub)
           }
       }
+    }
+    // A notification the user opened: its camera's page
+    .task(id: [alerts.pendingOpen.map { "\($0.hub)|\($0.camera)" } ?? "", cameras.map(\.id).joined()]) {
+      guard let open = alerts.pendingOpen, open.hub == hub.id.absoluteString,
+            let camera = cameras.first(where: { $0.id == open.camera }) else { return }
+      alerts.pendingOpen = nil
+      pushed = .camera(camera)
     }
 #if DEBUG
     .task(id: cameras.map(\.id)) {

@@ -59,6 +59,8 @@ actor CameraRecorder {
   private(set) var lastError: String?
   /// No clips while paused (someone is using the Mac): motion is still detected, for the live view
   private(set) var isPaused = false
+  /// Who follows new events (the server's alert followers)
+  private var starts: [UUID: AsyncStream<CameraEvent>.Continuation] = [:]
 
   private struct Recording {
     var id: String
@@ -112,6 +114,19 @@ actor CameraRecorder {
     stopping?.cancel()
     stopping = nil
     await finish()
+  }
+
+  /// Each event as it starts: a clip of motion, so nothing while paused
+  func eventStarts() -> AsyncStream<CameraEvent> {
+    let (stream, continuation) = AsyncStream<CameraEvent>.makeStream(bufferingPolicy: .bufferingNewest(8))
+    let id = UUID()
+    starts[id] = continuation
+    continuation.onTermination = { [weak self] _ in Task { await self?.endStarts(id) } }
+    return stream
+  }
+
+  private func endStarts(_ id: UUID) {
+    starts[id] = nil
   }
 
   /// Pausing ends the clip being recorded now; the next motion after resuming starts a new one
@@ -202,10 +217,10 @@ actor CameraRecorder {
       await self?.finish()
     }
     recording = Recording(id: id, file: file, task: task)
-    events.insert(
-      CameraEvent(id: id, start: now, end: nil, peak: peak, size: 0, storage: CameraStoragePolicy.Target.device.rawValue, clip: clip),
-      at: 0)
+    let event = CameraEvent(id: id, start: now, end: nil, peak: peak, size: 0, storage: CameraStoragePolicy.Target.device.rawValue, clip: clip)
+    events.insert(event, at: 0)
     changed()
+    for continuation in starts.values { continuation.yield(event) }
   }
 
   private func grew(_ id: String, by bytes: Int, peak: Double) {

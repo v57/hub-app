@@ -29,6 +29,7 @@ struct CameraPage: View {
   @State private var saving: URL?
   @State private var savesClip = false
   @State private var deletes = false
+  @State private var alerts = CameraAlerts.main
 
   init(camera: HubCamera, viewers: CameraViewers, playing: String? = nil, back: (() -> Void)?, openSettings: @escaping () -> Void) {
     self.camera = camera
@@ -93,6 +94,14 @@ struct CameraPage: View {
         ToolGroup {
           Button("Settings", systemImage: "gearshape") { openSettings() }
         }
+      } else {
+        ToolGroup {
+          let follows = alerts.isFollowing(camera, on: hub)
+          Button(follows ? "Motion Alerts On" : "Motion Alerts", systemImage: follows ? "bell.fill" : "bell") {
+            Task { await setAlerts(!follows) }
+          }
+          .help(follows ? "This device shows a notification when \(camera.name) sees motion. Click to stop." : "Show a notification on this device when \(camera.name) sees motion")
+        }
       }
     }
     .fileMover(isPresented: $savesClip, file: saving) { _ in saving = nil }
@@ -116,6 +125,16 @@ struct CameraPage: View {
     .onDisappear {
       viewers.release(camera)
       clip.close()
+    }
+  }
+
+  /// Motion alerts straight from the camera over Hub Network, no push service; notifications are asked for here
+  private func setAlerts(_ on: Bool) async {
+    await alerts.setFollowing(on, camera, on: hub)
+    if let problem = alerts.problem {
+      showToast(problem, systemImage: "bell.slash")
+    } else {
+      showToast(on ? "Motion alerts on for \(camera.name)" : "Motion alerts off", systemImage: on ? "bell.fill" : "bell.slash")
     }
   }
 

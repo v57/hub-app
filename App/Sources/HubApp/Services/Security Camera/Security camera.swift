@@ -407,7 +407,10 @@ final class SecurityCamera {
       if let engine { info.motion = engine.motion }
       return info
     }
-    let port = try await server.start()
+    // The same port as last time where it's free: devices following the camera's alerts in the background know it
+    let portKey = "camera.port.\(setup.id)"
+    let port = try await server.start(port: UInt16(clamping: UserDefaults.standard.integer(forKey: portKey)))
+    UserDefaults.standard.set(Int(port), forKey: portKey)
     units[setup.id] = Unit(
       id: setup.id, engine: engine, recorder: recorder, server: server, port: port, info: box,
       shareName: HubCamera.sharePrefix + setup.place, password: password)

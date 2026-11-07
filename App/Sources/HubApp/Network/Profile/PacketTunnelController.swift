@@ -355,6 +355,11 @@ final class PacketTunnelController: PacketTunnelControlling {
     }
   }
 
+  /// Tells the running extension the cameras whose alerts it follows changed (the app's keychain item, Camera alerts.swift)
+  func reloadCameraAlerts() async throws {
+    _ = try await providerData("cameraAlerts")
+  }
+
   /// The extension's links: presence at the coordinator and each linked device (NETTEST)
   /// Saves a renewed gateway grant and hands it to the running extension, which keeps its tunnel and flows; false
   /// when the extension doesn't take it (another gateway, not running), and the caller restarts the tunnel instead

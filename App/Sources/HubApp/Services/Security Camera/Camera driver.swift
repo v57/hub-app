@@ -7,7 +7,9 @@
 //  prints the password and what changes; `--camera-device Front` picks the camera whose name has that in it (and keeps it
 //  in the settings). `--camera-watch --camera-password <password>`: watches the hub's cameras and
 //  prints their state, frame rate, how far frames are behind and events; the password is saved, so the Cameras page
-//  then shows them live. Both flags run both.
+//  then shows them live. Both flags run both. `--camera-motion-every <seconds>`: with `--camera-on`, 3 s of simulated
+//  motion that often (an event, and an alert to followers, without anyone moving). `--camera-follow [--camera-password
+//  <password>]`: this device follows every other camera's motion alerts (asks for notifications) and prints them.
 //  On an iPhone: `xcrun devicectl device process launch --console --terminate-existing --device <id> dev.v57.Hub
 //  --camera-on`.
 //
@@ -18,7 +20,8 @@ import PlatformCamera
 
 @MainActor
 enum CameraDriver {
-  static var isRequested: Bool { isOn || isWatching }
+  static var isRequested: Bool { isOn || isWatching || isFollowing }
+  private static var isFollowing: Bool { CommandLine.arguments.contains("--camera-follow") }
   private static var isOn: Bool { CommandLine.arguments.contains("--camera-on") }
   private static var isWatching: Bool { CommandLine.arguments.contains("--camera-watch") }
 
@@ -66,6 +69,10 @@ enum CameraDriver {
       return log("result fail: no connected hub on Hub Network")
     }
     log("hub \(hub.settings.name) \(hub.settings.address.absoluteString)")
+    if isFollowing {
+      if isOn { Task { await turnOn(hub) } }
+      return await follow(hub)
+    }
     // Both: this device's camera runs beside the watch (two members each watching the other's camera)
     if isOn, isWatching {
       Task { await turnOn(hub) }
@@ -114,6 +121,17 @@ enum CameraDriver {
     for setup in camera.settings.cameras where setup.isOn {
       log("\(setup.place) password \(camera.password(setup.id)) \(setup.video.title)")
     }
+    if let every = argument("--camera-motion-every").flatMap(Double.init) {
+      Task {
+        while true {
+          try? await Task.sleep(for: .seconds(every))
+          log("simulated motion")
+          for unit in camera.orderedUnits { unit.engine.simulateMotion(true) }
+          try? await Task.sleep(for: .seconds(3))
+          for unit in camera.orderedUnits { unit.engine.simulateMotion(false) }
+        }
+      }
+    }
     var last = ""
     var tick = 0
     while true {
@@ -136,6 +154,29 @@ enum CameraDriver {
       }
       tick += 1
       try? await Task.sleep(for: .milliseconds(500))
+    }
+  }
+
+  private static func follow(_ hub: Hub) async {
+    let subscription = hub.state.networkResources.subscribe(hub: hub)
+    defer { _ = subscription }
+    let own = Set(SecurityCamera.main.units.values.compactMap(\.resourceId))
+    guard let cameras = await wait(60, {
+      let cameras = hub.state.networkResources.value.compactMap(HubCamera.init).filter { !own.contains($0.id) }
+      return cameras.isEmpty ? nil : cameras
+    }) else {
+      return log("result fail: no cameras")
+    }
+    let password = argument("--camera-password")
+    for camera in cameras {
+      if let password { CameraViewer.save(password, for: camera) }
+      await CameraAlerts.main.setFollowing(true, camera, on: hub)
+      log("following \(camera.name): \(CameraAlerts.main.isFollowing(camera, on: hub)) problem=\(CameraAlerts.main.problem ?? "-")")
+    }
+    log("listens in \(CameraAlerts.listensInTunnel ? "the tunnel" : "the app")")
+    while true {
+      try? await Task.sleep(for: .seconds(10))
+      log("alerts \(CameraAlerts.main.debugState)")
     }
   }
 

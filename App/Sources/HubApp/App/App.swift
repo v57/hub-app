@@ -23,6 +23,9 @@ public struct HubApp: App {
     // Line by line, also into a file or `devicectl --console`, so a run's log reads as it goes
     setvbuf(stdout, nil, _IOLBF, 0)
 #endif
+#if canImport(PlatformCamera)
+    CameraAlerts.handleOpens()
+#endif
   }
   public var body: some Scene {
     WindowGroup {
@@ -69,6 +72,8 @@ public struct HubApp: App {
 #if canImport(PlatformCamera)
       // The security camera comes back on where the user left it on
       .task { SecurityCamera.main.restore() }
+      // Motion alerts of the cameras this device follows
+      .task { CameraAlerts.main.start() }
 #endif
 #if canImport(HubServer)
       // The hub this device runs: started at launch when it's on, again after iOS suspended it

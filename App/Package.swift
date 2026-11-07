@@ -50,6 +50,8 @@ let package = Package(
         .product(name: "VaultUI", package: "Vault", condition: iCloud),
         .product(name: "PlatformPower", package: "Platform"),
         .product(name: "PlatformSystem", package: "Platform"),
+        .product(name: "PlatformHTTP", package: "Platform"),
+        .product(name: "PlatformNotifications", package: "Platform"),
         .product(name: "PlatformCamera", package: "Platform", condition: camera),
         .product(name: "PlatformMedia", package: "Platform", condition: camera),
         .product(name: "ChannelServer", package: "HubServer"),
