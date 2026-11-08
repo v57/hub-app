@@ -477,7 +477,7 @@ struct PermissionsPage: View {
 
   var body: some View {
     PageWithInspector(name: "permissions", showsInspector: selectedGroup != nil) {
-      ScrollView([.vertical, .horizontal]) {
+      VStack(alignment: .leading, spacing: 0) {
         if idiom == .phone, let name = edits.keys.sorted().first, let group = groups.groups.first(where: { $0.name == name }) {
           // No inspector beside the table: the changes wait in the group's page, with Save and Revert
           Banner(
@@ -489,6 +489,7 @@ struct PermissionsPage: View {
           .frame(maxWidth: 360)
           .padding([.horizontal, .top], KitMetrics.gutter)
         }
+        // Banners stay on screen: the table below scrolls sideways on a phone
         if groups.groups.isEmpty && !permissions.sections.isEmpty {
           Banner(
             "No permission groups yet",
@@ -502,15 +503,17 @@ struct PermissionsPage: View {
           .frame(maxWidth: 720)
           .padding([.horizontal, .top], KitMetrics.gutter)
         }
-        Grid(alignment: .leading, horizontalSpacing: 0, verticalSpacing: 2) {
-          headerRow
-          ForEach(permissions.sections) { section in
-            sectionRows(section)
+        ScrollView([.vertical, .horizontal]) {
+          Grid(alignment: .leading, horizontalSpacing: 0, verticalSpacing: 2) {
+            headerRow
+            ForEach(permissions.sections) { section in
+              sectionRows(section)
+            }
           }
+          .kitFont(.body)
+          .padding(KitMetrics.gutter)
+          .disabled(!canEdit)
         }
-        .kitFont(.body)
-        .padding(KitMetrics.gutter)
-        .disabled(!canEdit)
       }
     } inspector: {
       if let group = groups.groups.first(where: { $0.name == selectedGroup }) {
@@ -519,15 +522,16 @@ struct PermissionsPage: View {
     }
     .navigationDestination(item: $pushedGroup) { name in
       if let group = groups.groups.first(where: { $0.name == name }) {
-        ScrollView { GroupInspector(group: group, edits: $edits).padding(KitMetrics.gutter) }
+        ScrollView { GroupInspector(group: group, edits: $edits) { pushedGroup = nil }.padding(KitMetrics.gutter) }
           .kitPane(.content)
           .pageToolbar(group.name.capitalized, meta: [edits[group.name] == nil ? String(localized: "\(group.permissions.count) permissions") : String(localized: "\(edits[group.name]?.count ?? 0) permissions, unsaved")], systemImage: "person.2", hue: .purple) { }
           .hub(hub)
       }
     }
-    // A deleted group's inspector goes with it
+    // A deleted group's inspector and unsaved edits go with it
     .onChange(of: groups.groups.map(\.name)) { _, names in
       if let pushedGroup, !names.contains(pushedGroup) { self.pushedGroup = nil }
+      edits = edits.filter { names.contains($0.key) }
       if let selectedGroup, !names.contains(selectedGroup) { self.selectedGroup = nil }
     }
     .pageToolbar(String(localized: "Permissions"), meta: PageMeta.parts(hub, [
@@ -673,6 +677,8 @@ struct PermissionsPage: View {
 private struct GroupInspector: View {
   let group: GroupList.Group
   @Binding var edits: [String: Set<String>]
+  /// After the group is deleted (iPhone: the pushed page goes back)
+  var onDelete: (() -> Void)?
   @Environment(Hub.self) private var hub
   @HubState(\.users) private var users
   @State private var isDeleting = false
@@ -722,7 +728,10 @@ private struct GroupInspector: View {
       }
     }
     .kitDialog("Delete \(group.name.capitalized)?", isPresented: $isDeleting, message: "Its members lose its permissions.", systemImage: "trash", hue: .red, confirm: "Delete", role: .destructive) {
-      Task { try? await hub.client.send("hub/group/remove", group.name) }
+      Task {
+        guard (try? await hub.client.send("hub/group/remove", group.name)) != nil else { return }
+        onDelete?()
+      }
     }
   }
 }
