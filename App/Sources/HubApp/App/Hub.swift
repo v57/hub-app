@@ -70,7 +70,10 @@ extension KeyChain {
       // Away from the hub's own address, its machine still answers on Hub Network through the link to it
       alternateURLs: { await HubNet.alternateURLs(for: address) }
     ))
-    client.debugNetwork = true
+    // Every frame on stdout, invitation and pairing codes included: Debug builds only (security audit L34).
+    #if DEBUG
+      client.debugNetwork = true
+    #endif
     if let device {
       client.report(description: { await AppDevice.description(device: device.key) }, data: AppDevice.data)
     }
