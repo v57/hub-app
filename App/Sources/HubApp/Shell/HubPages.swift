@@ -177,9 +177,13 @@ struct ServiceAppPage: View {
 #if canImport(ComponentKit)
 /// iPhone: a hub's pages in the sidebar's three cards; a page pushes
 struct HubPagesList: View {
+  /// The page the route opens over the list (`Navigator.open(hub, page)`)
+  var opening: HubPage?
   @Environment(Hub.self) private var hub
   var facts = HubFacts()
   @State private var pushed: HubPage?
+  @State private var navigator = Navigator.main
+  @State private var didOpen = false
   @State private var showsMenu = false
 
   var body: some View {
@@ -206,6 +210,20 @@ struct HubPagesList: View {
     }
     .navigationDestination(item: $pushed) { page in
       HubPageView(page: page).hub(hub)
+    }
+    // A page another opens (`Navigator.open(hub, page)`) is pushed in place of the one shown, and Back leaves the
+    // route on the list, so opening the same page again changes it
+    .onChange(of: opening) { _, page in
+      if let page, pushed != page { pushed = page }
+    }
+    // The routed page at first only: the list appears again after each Back, with the route's page still in `opening`
+    .onAppear {
+      guard !didOpen else { return }
+      didOpen = true
+      if let opening { pushed = opening }
+    }
+    .onChange(of: pushed) { _, page in
+      if page == nil, case .hub(hub.id, _) = navigator.route { navigator.route = .hubHome(hub.id) }
     }
   }
 }

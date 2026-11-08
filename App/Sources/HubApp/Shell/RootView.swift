@@ -130,7 +130,12 @@ private struct RouteFollower: ViewModifier {
   @State private var navigator = Navigator.main
 
   func body(content: Content) -> some View {
-    content.onChange(of: navigator.route) { _, _ in compactColumn = .detail }
+    content.onChange(of: navigator.route) { old, new in
+      // Back from a hub's page leaves the route on the hub's list, which is already on screen: showing the detail
+      // column again would push a second list when the column isn't known to be showing (a route restored at launch)
+      if case .hub(let id, _) = old, new == .hubHome(id) { return }
+      compactColumn = .detail
+    }
   }
 }
 
@@ -138,9 +143,29 @@ private struct RouteFollower: ViewModifier {
 struct DetailView: View {
   @State private var navigator = Navigator.main
   @State private var hubs = Hubs.main
+  @Environment(\.kitIdiom) private var idiom
 
   var body: some View {
-    switch navigator.route ?? .allHubs {
+    let route = navigator.route ?? .allHubs
+    if idiom == .phone, let target = Self.phoneHub(route), let hub = hubs.list.first(where: { $0.id == target.hub }) {
+      // iPhone: a hub's pages are its list, which pushes the routed page (a page opening another swaps it)
+      HubPagesList(opening: target.page).hub(hub).id(hub.id)
+    } else {
+      pages(route)
+    }
+  }
+
+  /// The hub and page of a route that iPhone shows as the hub's list, with the page pushed
+  private static func phoneHub(_ route: Route) -> (hub: Hub.ID, page: HubPage?)? {
+    switch route {
+    case .hub(let id, let page): (id, page)
+    case .hubHome(let id): (id, nil)
+    default: nil
+    }
+  }
+
+  @ViewBuilder private func pages(_ route: Route) -> some View {
+    switch route {
     case .allHubs:
       AllHubsView()
     case .hub(let id, let page):
