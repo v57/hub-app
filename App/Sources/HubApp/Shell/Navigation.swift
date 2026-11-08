@@ -110,6 +110,9 @@ final class Navigator {
       if Hubs.persists { UserDefaults.standard.set(opened, forKey: "hubs.opened") }
     }
   }
+  /// iPhone: a hub's list pops the page it pushed when this changes, before the hub goes (a page pushed on the
+  /// collapsed split view stays on screen once the list that pushed it is gone)
+  var popHubPages = 0
   /// The last hub opened: its pages stay in the sidebar while All Hubs is open
   var openHub: Hub? {
     guard let id = route?.hubID else { return nil }

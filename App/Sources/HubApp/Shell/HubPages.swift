@@ -222,6 +222,7 @@ struct HubPagesList: View {
       didOpen = true
       if let opening { pushed = opening }
     }
+    .onChange(of: navigator.popHubPages) { _, _ in pushed = nil }
     .onChange(of: pushed) { _, page in
       if page == nil, case .hub(hub.id, _) = navigator.route { navigator.route = .hubHome(hub.id) }
     }

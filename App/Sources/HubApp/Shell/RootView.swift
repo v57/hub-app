@@ -74,8 +74,14 @@ struct RootView: View {
       systemImage: "trash", hue: .red, confirm: "Remove", role: .destructive
     ) {
       guard let hub = shell.removing else { return }
-      if Navigator.main.route?.hubID == hub.id { Navigator.main.route = .allHubs }
-      Hubs.main.remove(with: hub.settings)
+      let isOpen = Navigator.main.route?.hubID == hub.id
+      // iPhone: the hub's pushed page goes back first, while the list that pushed it is still there to pop it
+      if isOpen && idiom == .phone { Navigator.main.popHubPages += 1 }
+      Task {
+        if isOpen && idiom == .phone { await Task.yield() }
+        if isOpen { Navigator.main.route = .allHubs }
+        Hubs.main.remove(with: hub.settings)
+      }
     }
     .modifier(RouteFollower(compactColumn: $compactColumn))
     .onChange(of: NetworkInvitationRouter.main.pendingInput) { _, input in
