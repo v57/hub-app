@@ -2,8 +2,8 @@
 //  ServicesPage.swift
 //  Hub
 //
-//  The hub's APIs as a table grouped by their first path part, with the selected API's providers, load balancer and
-//  requests in the inspector. On iPhone the groups are cards whose rows push the same details.
+//  The hub's APIs as a table grouped by their first path part, with the selected API's description, providers, load
+//  balancer and requests in the inspector. On iPhone the groups are cards whose rows push the same details.
 //
 
 #if canImport(ComponentKit)
@@ -266,6 +266,9 @@ struct APIInspector: View {
       }
       .titleAccessory { Chip(row.statusWord, hue: row.statusHue).controlSize(.small) }
       .padding(.horizontal, 4)
+      if row.children == nil {
+        APIDescriptionSection(path: row.name)
+      }
       KitSection("Providers", meta: [String(localized: "\(row.service?.services ?? 0) online"), String(localized: "\(row.service?.disabled ?? 0) disabled")], systemImage: "server.rack", hue: .indigo) {
         if providers.isEmpty {
           Text(row.needsApproval ? "Waits for an owner to allow it" : "No provider is connected").kitFont(.caption).padding(8)
