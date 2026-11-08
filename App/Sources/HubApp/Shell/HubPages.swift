@@ -50,6 +50,15 @@ struct HubUnreachable: View {
       switch hub.reach {
       case .connecting:
         EmptyState(systemImage: "hexagon", title: "Connecting to \(hub.settings.name)…", message: "\(hub.settings.address.absoluteString)", status: .working)
+      case .refused where hub.refusal == .hubNeedsUpdate:
+        // A Hub from before auth v2 can't prove its key, so it gets nothing from this device until it's updated
+        EmptyState(
+          systemImage: "arrow.down.circle", title: "\(hub.settings.name) Needs an Update",
+          message: HubClient.hubNeedsUpdateText
+        ) {
+          Button("Copy Update Command") { KitPasteboard.copy("hub update") }.buttonStyle(.kit)
+          Button("Remove…") { shell.removing = hub }.buttonStyle(.kit)
+        }
       case .refused:
         EmptyState(
           systemImage: "exclamationmark.shield", title: "\(hub.settings.name) Refused This \(KitDevice.name)",

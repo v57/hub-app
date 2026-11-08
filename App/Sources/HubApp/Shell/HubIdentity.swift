@@ -82,6 +82,7 @@ struct HubFacts: DynamicProperty {
       return [role, services == 1 ? "1 service" : "\(services) services", unencrypted].compactMap { $0 }.joined(separator: " · ")
     case .connecting: return "Connecting…"
     case .offline: return "Offline"
+    case .refused where hub.refusal == .hubNeedsUpdate: return "Needs an update"
     case .refused: return hub.refusal?.description ?? "Refused"
     }
   }
