@@ -17,8 +17,8 @@ import UIKit
 #endif
 
 extension DeviceIdentity {
-  /// The device key: the app's own (Keychain `dev.v57.Hub.device.v1`), which it also puts in the v57 keychain group
-  /// for every v57 app (VaultHub's `HubKeyStore`), so the Hub app and the v57 apps are one device on a hub, with the
+  /// The device key: the app's own (Keychain `dev.v57.Hub.device.v1`), which it also puts in the device keychain group
+  /// that Vault lists too (VaultHub's `HubKeyStore`), so the Hub app and the v57 apps are one device on a hub, with the
   /// app's approvals and Hub Network address. Without a key of its own the app takes the group's and keeps it. Without
   /// the group it keeps its own. `nil` when the Keychain refuses (then the app connects without a device).
   @MainActor static let app: DeviceIdentity? = {

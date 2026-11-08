@@ -18,10 +18,11 @@
 	<key>keychain-access-groups</key>
 	<array>
 		<string>$(AppIdentifierPrefix)dev.v57.Hub</string>
-		<string>$(AppIdentifierPrefix)dev.v57.shared</string>
+		<string>$(AppIdentifierPrefix)dev.v57.records</string>
+		<string>$(AppIdentifierPrefix)dev.v57.device</string>
 	</array>
-	<!-- The v57 vault (v57/Vault): the hubs, devices and hosts every v57 app shares, in the app group container, the
-	     device key in the shared keychain group, and iCloud sync through CloudKit. -->
+	<!-- The v57 vault (v57/Vault): the hubs, devices and hosts every v57 app shares, in the app group container, a copy of the vault keys
+	     in the records group, the Hub device key in the device group (no passwords or other keys: Hub decision 11), and iCloud sync through CloudKit. -->
 	<key>com.apple.developer.icloud-container-identifiers</key>
 	<array>
 		<string>iCloud.dev.v57</string>

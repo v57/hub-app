@@ -17,7 +17,8 @@
 	<key>keychain-access-groups</key>
 	<array>
 		<string>$(AppIdentifierPrefix)dev.v57.Hub</string>
-		<string>$(AppIdentifierPrefix)dev.v57.shared</string>
+		<string>$(AppIdentifierPrefix)dev.v57.records</string>
+		<string>$(AppIdentifierPrefix)dev.v57.device</string>
 	</array>
 </dict>
 </plist>

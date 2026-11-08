@@ -3,8 +3,9 @@
 //  Hub
 //
 //  The v57 vault (v57/Vault) the Hub app shares with every v57 app: its hubs are the vault's Hub records, turned on
-//  for this device, and it holds the Hub directory the Vault app holds otherwise. With the device key they share
-//  (App device.swift), each connection writes which Hub device this machine is and mirrors every hub's devices into
+//  for this device, and it holds the Hub directory the Vault app holds otherwise. It reads the vault with the copy of
+//  its keys in the records group and holds no passwords or SSH key (Hub decision 11). With the Hub device key they share
+//  (App device.swift, the device group), each connection writes which Hub device this machine is and mirrors every hub's devices into
 //  the hosts Code, Git, Shell and the others read, so they reach the user's devices without the Vault app.
 //
 
@@ -24,8 +25,6 @@ enum AppVault {
     let vault = Vault.shared
     guard vault.store != nil else { return }
     vault.startSync()
-    // This device's SSH key (the Secure Enclave key the v57 apps share), for the user's machines to authorize
-    try? vault.store?.publishDeviceKey()
     let directory = HubDirectory(vault: vault)
     self.directory = directory
     directory.start()
