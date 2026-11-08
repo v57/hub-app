@@ -167,31 +167,45 @@ enum DeviceFilter: String, CaseIterable, Hashable {
   }
 }
 
-/// A device asking to join: its safety code to compare on the device, Deny and Approve
+/// A device asking to join: its safety code to compare on the device, Deny and Approve. Approve asks first: to compare
+/// the code, or, when there's none that checks against the pinned hub key (an old hub, or a code that doesn't match),
+/// in red, since anyone who reaches the hub can ask under any name (security audit apps M15, decisions 1.0 Hub 10).
 struct PendingDeviceBanner: View {
   let device: PendingDevice
   @Environment(Hub.self) private var hub
   @Environment(\.kitIdiom) private var idiom
+  @State private var isApproving = false
 
   var body: some View {
     let name = device.name ?? String(localized: "A device")
+    let code = hub.safetyCode(of: device)
     let message = MetaLine.join([
       device.platform.map(Device.systemName) ?? "",
       device.firstSeenDate.map { String(localized: "asked \($0.formatted(.relative(presentation: .named)))") } ?? "",
-      hub.safetyCode(of: device).map { String(localized: "check its safety code \($0) on the device") }
-        ?? String(localized: "this hub gives no safety code to check"),
+      code.map { String(localized: "check its safety code \($0) on the device") }
+        ?? String(localized: "no safety code checks, so this may not be your device"),
     ])
     Banner(
       "\(name) wants to join \(hub.settings.name)", message: "\(message)",
-      systemImage: Device.symbol(platform: device.platform), hue: .orange
+      systemImage: Device.symbol(platform: device.platform), hue: code == nil ? .red : .orange
     ) {
       if hub.require(permissions: "hub/device/approve") {
         if idiom != .phone && hub.require(permissions: "hub/device/remove") {
           AsyncButton("Deny") { try await hub.client.devices.remove(device.id) }.buttonStyle(.kit)
         }
-        AsyncButton(idiom == .phone ? "Approve" : "Approve…") { _ = try await hub.client.devices.approve(device.id) }
+        Button("Approve…") { isApproving = true }
           .buttonStyle(.kitPrimary)
       }
+    }
+    .kitDialog(
+      code == nil ? "Approve \(name) Without a Safety Code?" : "Does \(name) Show \(code ?? "")?", isPresented: $isApproving,
+      message: code == nil
+        ? "This hub gives no safety code that checks against its key, so nothing shows this request came from your device. Anyone who can reach the hub can ask to join under any name, and an approved device can use what the hub shares. Approve only if you just asked from your own device and no one else could have."
+        : "Approve only if the safety code on the device asking to join is \(code ?? ""). If it shows another code or none, deny it.",
+      systemImage: code == nil ? "exclamationmark.shield" : "checkmark.shield", hue: code == nil ? .red : .blue,
+      confirm: code == nil ? "Approve Without a Code" : "Codes Match, Approve", role: code == nil ? .destructive : nil
+    ) {
+      Task { _ = try? await hub.client.devices.approve(device.id) }
     }
   }
 }
