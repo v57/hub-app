@@ -171,7 +171,8 @@ struct AddDeviceSheet: View {
       } else {
         NumberedStep(1, String(localized: "Open Hub on the other device"), String(localized: "A Mac, iPhone or iPad. Install Hub first if it isn’t there."))
         NumberedStep(2, String(localized: "Choose Add a Hub, then Scan Code"), String(localized: "Point it at this code."))
-        NumberedStep(3, String(localized: "That’s it"), String(localized: "It joins on its own. You don’t need to approve anything here."))
+        // An invited device still waits for an owner (Hub decision 4, security audit M3).
+        NumberedStep(3, String(localized: "An owner approves it"), String(localized: "It waits under Devices with a code. Approve it once that code matches the one the device shows."))
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
