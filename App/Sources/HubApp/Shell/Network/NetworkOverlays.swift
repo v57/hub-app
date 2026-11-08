@@ -543,7 +543,7 @@ struct ChoosePeopleSheet: View {
     KitSheet(title: "Who Can Use \(app.name)", meta: "People and devices in \(hub.settings.name)", systemImage: "person.2", hue: .teal, status: busy ? .working : .idle) {
       FormCard(footer: error) {
         ForEach(users.filter { $0.key != nil }) { user in
-          FormRow(user.name, help: user.group?.capitalized, systemImage: "person", hue: .gray) {
+          FormRow(user.name, help: user.group.map(Hub.groupTitle), systemImage: "person", hue: .gray) {
             Toggle(user.name, isOn: Binding { keys.contains(user.key ?? "") } set: { on in
               if on { keys.insert(user.key ?? "") } else { keys.remove(user.key ?? "") }
             })

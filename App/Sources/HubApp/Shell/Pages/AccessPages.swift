@@ -103,7 +103,7 @@ struct ConnectionsPage: View {
       if let user = users.first(where: { $0.id == id }) {
         ScrollView { ConnectionInspector(user: user).padding(KitMetrics.gutter) }
           .kitPane(.content)
-          .pageToolbar(user.name, meta: [user.group?.capitalized ?? String(localized: "No group")], systemImage: user.icon.symbol?.name ?? "hexagon", hue: .gray) { }
+          .pageToolbar(user.name, meta: [user.group.map(Hub.groupTitle) ?? String(localized: "No group")], systemImage: user.icon.symbol?.name ?? "hexagon", hue: .gray) { }
           .hub(hub)
       }
     }
@@ -129,7 +129,7 @@ private struct GroupHeader: View {
   let permissions: Int?
 
   var body: some View {
-    RichHeader(name.map { "\($0.capitalized)" } ?? "No group", meta: [
+    RichHeader(name.map { "\(Hub.groupTitle($0))" } ?? "No group", meta: [
       count == 1 ? String(localized: "1 connection") : String(localized: "\(count) connections"),
       name == "owners" ? String(localized: "every permission") : permissions.map { $0 == 1 ? String(localized: "1 permission") : String(localized: "\($0) permissions") } ?? String(localized: "no permissions"),
     ], systemImage: name == "owners" ? "key" : name == nil ? "questionmark" : "person.2", hue: name == "owners" ? .red : name == nil ? .gray : .purple)
@@ -182,7 +182,7 @@ struct ConnectionInspector: View {
       RichHeader(Text(user.name.isEmpty ? "Unauthorized" : user.name), size: .title) {
         Tile(systemImage: user.icon.symbol?.name ?? "hexagon", hue: .gray, size: 28)
       } meta: {
-        MetaLine([user.group?.capitalized ?? String(localized: "No group"), user.key == hub.key ? String(localized: "this app") : ""])
+        MetaLine([user.group.map(Hub.groupTitle) ?? String(localized: "No group"), user.key == hub.key ? String(localized: "this app") : ""])
       } accessory: {
         EmptyView()
       }
@@ -195,9 +195,9 @@ struct ConnectionInspector: View {
           }
         }
         if hub.canManageGroups && !groups.groups.isEmpty {
-          KitSection("Group", meta: [user.group?.capitalized ?? String(localized: "No group")], systemImage: "person.2", hue: .purple) {
+          KitSection("Group", meta: [user.group.map(Hub.groupTitle) ?? String(localized: "No group")], systemImage: "person.2", hue: .purple) {
             ForEach(groups.groups) { group in
-              SidebarRow(group.name.capitalized, systemImage: group.name == "owners" ? "key" : "person.2") {
+              SidebarRow(Hub.groupTitle(group.name), systemImage: group.name == "owners" ? "key" : "person.2") {
                 if user.group == group.name { Image(systemName: "checkmark").foregroundStyle(Hue.accent.text) }
               }
               .action { Task { try? await setGroup(group.name, key: key) } }
@@ -220,7 +220,7 @@ struct ConnectionInspector: View {
         HStack {
           Button("Copy Key") { KitPasteboard.copy(key) }.buttonStyle(.kit)
           if let group = user.group, hub.canManageGroups {
-            AsyncButton("Remove from \(group.capitalized)") { try await hub.remove(key: key, group: group) }
+            AsyncButton("Remove from \(Hub.groupTitle(group))") { try await hub.remove(key: key, group: group) }
               .buttonStyle(.kit).foregroundStyle(Hue.red.text)
           }
         }
@@ -433,7 +433,7 @@ struct LockdownPage: View {
               RichHeader(Text(user.name.isEmpty ? "Unauthorized" : user.name)) {
                 Tile(systemImage: user.icon.symbol?.name ?? "hexagon", hue: .gray, size: 24)
               } meta: {
-                MetaLine([user.group?.capitalized ?? String(localized: "No group"), user.key.map { "…" + $0.suffix(8) } ?? String(localized: "no key")])
+                MetaLine([user.group.map(Hub.groupTitle) ?? String(localized: "No group"), user.key.map { "…" + $0.suffix(8) } ?? String(localized: "no key")])
               } accessory: {
                 HStack(spacing: 8) {
                   StatusDot(hue: user.key == nil ? .orange : .green)
@@ -485,7 +485,7 @@ struct PermissionsPage: View {
         if idiom == .phone, let name = edits.keys.sorted().first, let group = groups.groups.first(where: { $0.name == name }) {
           // No inspector beside the table: the changes wait in the group's page, with Save and Revert
           Banner(
-            edits.count == 1 ? "\(group.name.capitalized) has unsaved changes" : "\(edits.count) groups have unsaved changes",
+            edits.count == 1 ? "\(Hub.groupTitle(group.name)) has unsaved changes" : "\(edits.count) groups have unsaved changes",
             message: "Members get them when you save.", systemImage: "clock", hue: .red
           ) {
             Button("Review") { pushedGroup = name }.buttonStyle(.kitPrimary)
@@ -528,7 +528,7 @@ struct PermissionsPage: View {
       if let group = groups.groups.first(where: { $0.name == name }) {
         ScrollView { GroupInspector(group: group, edits: $edits) { pushedGroup = nil }.padding(KitMetrics.gutter) }
           .kitPane(.content)
-          .pageToolbar(group.name.capitalized, meta: [edits[group.name] == nil ? String(localized: "\(group.permissions.count) permissions") : String(localized: "\(edits[group.name]?.count ?? 0) permissions, unsaved")], systemImage: "person.2", hue: .purple) { }
+          .pageToolbar(Hub.groupTitle(group.name), meta: [edits[group.name] == nil ? String(localized: "\(group.permissions.count) permissions") : String(localized: "\(edits[group.name]?.count ?? 0) permissions, unsaved")], systemImage: "person.2", hue: .purple) { }
           .hub(hub)
       }
     }
@@ -583,7 +583,7 @@ struct PermissionsPage: View {
     } label: {
       VStack(spacing: 1) {
         StatusDot(hue: Hue.lane(index), size: 6)
-        Text(group.name.capitalized).kitFont(.caption).fontWeight(.semibold).foregroundStyle(.kitLabel)
+        Text(Hub.groupTitle(group.name)).kitFont(.caption).fontWeight(.semibold).foregroundStyle(.kitLabel)
         Text(edits[group.name] == nil ? "\(group.permissions.count)" : "edited").font(.system(size: 9)).foregroundStyle(.kitTertiary)
       }
       .frame(width: 84).padding(.vertical, 4)
@@ -691,7 +691,7 @@ private struct GroupInspector: View {
     let members = users.filter { $0.group == group.name }
     let edited = edits[group.name]
     VStack(alignment: .leading, spacing: KitMetrics.gutter) {
-      KitSection(group.name.capitalized, meta: [members.count == 1 ? String(localized: "1 member") : String(localized: "\(members.count) members"), String(localized: "\(group.permissions.count) permissions")], systemImage: "person.2", hue: .purple) {
+      KitSection(Hub.groupTitle(group.name), meta: [members.count == 1 ? String(localized: "1 member") : String(localized: "\(members.count) members"), String(localized: "\(group.permissions.count) permissions")], systemImage: "person.2", hue: .purple) {
         ForEach(members) { user in
           SidebarRow(user.name, subtitle: user.key.map { "…" + $0.suffix(8) }) {
             Tile(systemImage: user.icon.symbol?.name ?? "hexagon", hue: .gray, size: 18)
@@ -727,16 +727,24 @@ private struct GroupInspector: View {
         }
       }
       if group.name != "owners" && hub.require(permissions: "hub/group/remove") {
-        Button("Delete \(group.name.capitalized)…", role: .destructive) { isDeleting = true }
+        Button("Delete \(Hub.groupTitle(group.name))…", role: .destructive) { isDeleting = true }
           .buttonStyle(.kit).frame(maxWidth: .infinity)
       }
     }
-    .kitDialog("Delete \(group.name.capitalized)?", isPresented: $isDeleting, message: "Its members lose its permissions.", systemImage: "trash", hue: .red, confirm: "Delete", role: .destructive) {
+    .kitDialog("Delete \(Hub.groupTitle(group.name))?", isPresented: $isDeleting, message: "Its members lose its permissions.", systemImage: "trash", hue: .red, confirm: "Delete", role: .destructive) {
       Task {
         guard (try? await hub.client.send("hub/group/remove", group.name)) != nil else { return }
         onDelete?()
       }
     }
+  }
+}
+
+extension Hub {
+  /// A group's name as the hub keeps it, with its first letter up for a title ("ZZ Group", "admins" → "Admins");
+  /// `owners` is the hub's own group, named in the app's language
+  nonisolated static func groupTitle(_ name: String) -> String {
+    name == "owners" ? String(localized: "Owners") : name.prefix(1).uppercased() + name.dropFirst()
   }
 }
 
