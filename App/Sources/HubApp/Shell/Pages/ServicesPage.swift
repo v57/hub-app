@@ -260,7 +260,7 @@ struct APIInspector: View {
       RichHeader(Text(row.name).monospaced(), size: .title) {
         Tile(systemImage: "hexagon", hue: .blue, size: 28)
       } meta: {
-        MetaLine([String(row.name.split(separator: "/").first ?? ""), row.service?.balancerType.title ?? "", (row.service?.running ?? 0) > 0 ? String(localized: "\(row.service?.running ?? 0) running") : ""])
+        MetaLine([String(row.name.split(separator: "/").first ?? ""), row.service == nil ? "" : balancer.title, (row.service?.running ?? 0) > 0 ? String(localized: "\(row.service?.running ?? 0) running") : ""])
       } accessory: {
         EmptyView()
       }
@@ -311,8 +311,9 @@ struct APIInspector: View {
       }
       .controlSize(.small)
     }
+    // The hub's choice, as its status says it; a pick shows at once and stays once the hub's status has it
+    .onChange(of: row.service?.balancerType ?? .counter, initial: true) { _, type in balancer = type }
     .task(id: row.id) {
-      balancer = row.service?.balancerType ?? .counter
       providers = []
       guard !row.needsApproval, !hub.isDemo, hub.require(permissions: "hub/devices") else { return }
       do {
