@@ -364,8 +364,12 @@ struct LockdownPage: View {
 
   var body: some View {
     let keyed = users.filter { search.isEmpty || $0.name.localizedCaseInsensitiveContains(search) }
-    let trusted = keyed.filter { $0.key.map(whitelist.users.contains) ?? false }
-    let untrusted = keyed.filter { !($0.key.map(whitelist.users.contains) ?? false) }
+    // Owners always connect (the hub lets them through Lockdown), this app's own key among them: they're trusted
+    let isTrusted = { (user: Hub.User) in
+      user.key == hub.key || user.group == "owners" || (user.key.map(whitelist.users.contains) ?? false)
+    }
+    let trusted = keyed.filter(isTrusted)
+    let untrusted = keyed.filter { !isTrusted($0) }
     ScrollView {
       VStack(alignment: .leading, spacing: KitMetrics.gutter) {
         HStack(spacing: 12) {
@@ -438,12 +442,12 @@ struct LockdownPage: View {
                       Task { try? await hub.lockdown(trust ? SetLockdown(add: [key]) : SetLockdown(remove: [key])) }
                     })
                     .toggleStyle(.kitSwitch).labelsHidden().controlSize(.small)
-                    .disabled(user.key == hub.key)
+                    .disabled(user.key == hub.key || user.group == "owners")
                   }
                 }
               }
               .padding(.horizontal, 4).padding(.top, 2)
-              Text(user.key == hub.key ? "You · always trusted" : !isTrusted && whitelist.enabled ? "Refused while Lockdown is on" : "")
+              Text(user.key == hub.key ? "You · always trusted" : user.group == "owners" ? "Owner · always trusted" : !isTrusted && whitelist.enabled ? "Refused while Lockdown is on" : "")
                 .kitFont(.caption).padding(.horizontal, 6)
             }
           }
