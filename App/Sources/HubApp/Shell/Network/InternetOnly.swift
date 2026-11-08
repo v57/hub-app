@@ -49,7 +49,7 @@ struct BrowseOwnInternetSheet: View {
 #else
       FormCard {
         FormRow("Invitation", help: "The link the other device shows under Can’t scan?", systemImage: "link", hue: .indigo, error: error.map { "\($0)" },
-                field: TextField("hub://join/…", text: $input).kitFont(.mono).autocorrectionDisabled().onSubmit { accept(input) })
+                field: TextField("hub://join/…", text: $input).kitFont(.mono).kitTextContent(.url).onSubmit { accept(input) })
       }
 #endif
       if let error, scanning {

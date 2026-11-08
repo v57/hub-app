@@ -165,6 +165,8 @@ struct NameSheet: View {
   let systemImage: String
   var hue: Hue = .accent
   let confirm: String
+  /// What the name is: prose for a device's name, verbatim for a group's (an id members are given by)
+  var content: KitFieldContent = .text
   @State var name: String
   let action: (String) -> Void
   @Environment(\.kitDismiss) private var dismiss
@@ -174,7 +176,7 @@ struct NameSheet: View {
     KitSheet(title: title, meta: meta, systemImage: systemImage, hue: hue) {
       FormCard {
         FormRow("Name", systemImage: "textformat") {
-          TextField("Name", text: $name).kitField().frame(maxWidth: 240)
+          TextField("Name", text: $name).kitField(content: content).frame(maxWidth: 240)
         }
       }
     } footer: {

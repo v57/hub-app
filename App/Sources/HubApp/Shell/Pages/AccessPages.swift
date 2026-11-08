@@ -545,7 +545,7 @@ struct PermissionsPage: View {
       }
     }
     .kitSheet(isPresented: $isAdding) {
-      NameSheet(title: String(localized: "New Group"), meta: String(localized: "Its connections get the permissions you tick for it."), systemImage: "person.2", hue: .purple, confirm: String(localized: "Create"), name: "") { name in
+      NameSheet(title: String(localized: "New Group"), meta: String(localized: "Its connections get the permissions you tick for it."), systemImage: "person.2", hue: .purple, confirm: String(localized: "Create"), content: .verbatim, name: "") { name in
         Task {
           try? await hub.client.send("hub/group/update", UpdateGroup(group: name, set: []))
           if idiom != .phone { selectedGroup = name }

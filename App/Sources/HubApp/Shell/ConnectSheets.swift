@@ -82,14 +82,14 @@ struct ConnectSheet: View {
           help: isInvitation ? "Puts this \(KitDevice.nameInSentence) on the hub's private network" : "mac.local, 192.168.1.5:1997 or an invitation",
           systemImage: isInvitation ? "person.badge.plus" : "network", hue: isInvitation ? .teal : .accent, error: inputError,
           field: TextField("Address or invitation", text: $input)
-            .kitFont(.mono).autocorrectionDisabled()
+            .kitFont(.mono).kitTextContent(.url)
             .onChange(of: input) { accept(input) }
         )
         if !isInvitation {
           FormRow(
             "Pairing code", help: "New hubs only: makes this \(KitDevice.nameInSentence) an owner", systemImage: "number",
             field: TextField("ABC-123", text: $code)
-              .kitFont(.mono).autocorrectionDisabled()
+              .kitFont(.mono).kitTextContent(.verbatim)
               .onChange(of: code) { if case .failed = pairing.state { pairing.reset() } }
           )
         }

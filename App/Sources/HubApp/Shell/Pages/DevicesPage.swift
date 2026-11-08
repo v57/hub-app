@@ -594,7 +594,7 @@ private struct GrantSheet: View {
     KitSheet(title: "Grant \(device.name)", meta: "a path, or everything under s3/*", systemImage: "key", hue: .orange) {
       FormCard {
         FormRow("Path", systemImage: "point.topleft.down.to.point.bottomright.curvepath") {
-          TextField("s3/read", text: $path).kitField().frame(maxWidth: 240)
+          TextField("s3/read", text: $path).kitField(mono: true, content: .verbatim).frame(maxWidth: 240)
         }
       }
     } footer: {

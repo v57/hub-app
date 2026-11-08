@@ -229,7 +229,7 @@ private struct ConnectManuallySheet: View {
   var body: some View {
     KitSheet(title: "Connect Manually", meta: "To \(device.name), at an address you know", systemImage: "point.3.connected.trianglepath.dotted", hue: .teal, status: busy ? .working : .idle) {
       FormCard(footer: "The address and UDP port \(device.name) answers on, from its own Hub Network page or its router.") {
-        FormRow("Address", systemImage: "network", error: error.map { "\($0)" }, field: TextField("host:port", text: $endpoint).kitFont(.mono).autocorrectionDisabled())
+        FormRow("Address", systemImage: "network", error: error.map { "\($0)" }, field: TextField("host:port", text: $endpoint).kitFont(.mono).kitTextContent(.verbatim))
       }
     } footer: {
       Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
@@ -427,7 +427,7 @@ struct ShareAppSheet: View {
       if choice == .another || idiom.isTouch && choice == nil {
         FormCard {
           FormRow("Name", systemImage: "textformat", field: TextField("Jellyfin", text: $name).autocorrectionDisabled())
-          FormRow("Port", help: "The port the app listens on, on this \(KitDevice.nameInSentence)", systemImage: "number", error: error.map { "\($0)" }, field: TextField("8096", text: $port).kitFont(.mono).autocorrectionDisabled())
+          FormRow("Port", help: "The port the app listens on, on this \(KitDevice.nameInSentence)", systemImage: "number", error: error.map { "\($0)" }, field: TextField("8096", text: $port).kitFont(.mono).kitTextContent(.number))
           FormRow("Kind", systemImage: "arrow.left.arrow.right", hue: .gray) {
             KitSegmented(selection: $udp, options: [("TCP", false), ("UDP", true)]).fixedSize()
           }

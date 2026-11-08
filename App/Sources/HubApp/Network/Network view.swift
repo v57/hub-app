@@ -699,7 +699,7 @@ struct CoordinatorSheet: View {
         FormRow(
           "Address", help: "A hub-net-node every device can reach", systemImage: "network", error: error,
           field: TextField("wss://node.example.com:1964", text: $address)
-            .kitFont(.mono).autocorrectionDisabled()
+            .kitFont(.mono).kitTextContent(.url)
             .onChange(of: address) { error = nil }
         )
         if trimmed != Self.v57 {
@@ -851,7 +851,7 @@ private struct NetworkResourceRow: View {
       KitSheet(title: "Connect Directly", meta: "The UDP endpoint of the device that provides \(resource.shareName).", systemImage: "point.3.connected.trianglepath.dotted", hue: .teal) {
         FormCard {
           FormRow("Endpoint", systemImage: "network") {
-            TextField("host:port", text: $peerEndpoint).kitField(mono: true).autocorrectionDisabled().frame(maxWidth: 220)
+            TextField("host:port", text: $peerEndpoint).kitField(mono: true).frame(maxWidth: 220)
           }
         }
       } footer: {
@@ -933,7 +933,7 @@ private struct NetworkPolicyEditor: View {
         }
         if mode == .group {
           FormRow("Group", systemImage: "person.3") {
-            TextField("Group name", text: $group).kitField().frame(maxWidth: 220)
+            TextField("Group name", text: $group).kitField(content: .verbatim).frame(maxWidth: 220)
           }
         } else if mode == .keys {
           FormRow("Keys", help: "One key per line", systemImage: "key") {

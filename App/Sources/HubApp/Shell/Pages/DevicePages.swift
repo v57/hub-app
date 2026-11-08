@@ -127,7 +127,7 @@ private struct DevicePortsSection: View {
           }
         }
         HStack {
-          TextField("tcp/8080", text: $newPort).kitField().keyboard(style: .code)
+          TextField("tcp/8080", text: $newPort).kitField(mono: true, content: .verbatim)
           Button("Allow") {
             guard let port = DevicePorts.Port(newPort) else { return }
             DevicePorts.main.allow(port)
