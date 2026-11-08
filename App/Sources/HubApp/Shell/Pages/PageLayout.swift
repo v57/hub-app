@@ -125,7 +125,8 @@ struct LabeledBar: View {
 
   var body: some View {
     HStack(spacing: 8) {
-      Text(label).kitFont(.caption).frame(width: 52, alignment: .leading)
+      // One line ("Memor/y" wrapped on iPhone's larger caption): a little room more, and smaller rather than broken
+      Text(label).kitFont(.caption).lineLimit(1).minimumScaleFactor(0.7).frame(width: 60, alignment: .leading)
       GeometryReader { proxy in
         ZStack(alignment: .leading) {
           Capsule().fill(.kitFill)

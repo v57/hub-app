@@ -132,8 +132,8 @@ extension AppServices {
     }
     var description: String {
       switch self {
-      case .imageEncoder: return "Compress images by converting them to .heic format"
-      case .videoEncoder: return "Compress images by converting them to .hevc format"
+      case .imageEncoder: return "Compress images by converting them to HEIC"
+      case .videoEncoder: return "Compress videos by converting them to HEVC"
       case .sensitiveContent: return "Detect if image or video contains sensitive content"
       case .translate: return "Translate text using on device translation"
       case .chat: return "Chat with apple intelligence on device model"
