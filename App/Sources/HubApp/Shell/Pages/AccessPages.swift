@@ -462,6 +462,8 @@ struct PermissionsPage: View {
   @State private var search = ""
   @State private var edits: [String: Set<String>] = [:]
   @State private var selectedGroup: String?
+  /// iPhone: the group whose inspector is pushed (no room beside the table)
+  @State private var pushedGroup: String?
   @State private var isAdding = false
   @State private var newName = ""
   @State private var collapsed: Set<String> = []
@@ -476,6 +478,17 @@ struct PermissionsPage: View {
   var body: some View {
     PageWithInspector(name: "permissions", showsInspector: selectedGroup != nil) {
       ScrollView([.vertical, .horizontal]) {
+        if idiom == .phone, let name = edits.keys.sorted().first, let group = groups.groups.first(where: { $0.name == name }) {
+          // No inspector beside the table: the changes wait in the group's page, with Save and Revert
+          Banner(
+            edits.count == 1 ? "\(group.name.capitalized) has unsaved changes" : "\(edits.count) groups have unsaved changes",
+            message: "Members get them when you save.", systemImage: "clock", hue: .red
+          ) {
+            Button("Review") { pushedGroup = name }.buttonStyle(.kitPrimary)
+          }
+          .frame(maxWidth: 360)
+          .padding([.horizontal, .top], KitMetrics.gutter)
+        }
         if groups.groups.isEmpty && !permissions.sections.isEmpty {
           Banner(
             "No permission groups yet",
@@ -504,6 +517,19 @@ struct PermissionsPage: View {
         GroupInspector(group: group, edits: $edits)
       }
     }
+    .navigationDestination(item: $pushedGroup) { name in
+      if let group = groups.groups.first(where: { $0.name == name }) {
+        ScrollView { GroupInspector(group: group, edits: $edits).padding(KitMetrics.gutter) }
+          .kitPane(.content)
+          .pageToolbar(group.name.capitalized, meta: [edits[group.name] == nil ? String(localized: "\(group.permissions.count) permissions") : String(localized: "\(edits[group.name]?.count ?? 0) permissions, unsaved")], systemImage: "person.2", hue: .purple) { }
+          .hub(hub)
+      }
+    }
+    // A deleted group's inspector goes with it
+    .onChange(of: groups.groups.map(\.name)) { _, names in
+      if let pushedGroup, !names.contains(pushedGroup) { self.pushedGroup = nil }
+      if let selectedGroup, !names.contains(selectedGroup) { self.selectedGroup = nil }
+    }
     .pageToolbar(String(localized: "Permissions"), meta: PageMeta.parts(hub, [
       groups.groups.count == 1 ? String(localized: "1 group") : String(localized: "\(groups.groups.count) groups"),
       String(localized: "\(permissions.sections.reduce(0) { $0 + $1.permissions.count }) permissions"),
@@ -522,7 +548,7 @@ struct PermissionsPage: View {
       NameSheet(title: String(localized: "New Group"), meta: String(localized: "Its connections get the permissions you tick for it."), systemImage: "person.2", hue: .purple, confirm: String(localized: "Create"), name: "") { name in
         Task {
           try? await hub.client.send("hub/group/update", UpdateGroup(group: name, set: []))
-          selectedGroup = name
+          if idiom != .phone { selectedGroup = name }
         }
       }
     }
@@ -540,7 +566,13 @@ struct PermissionsPage: View {
 
   private func groupHeader(_ group: GroupList.Group) -> some View {
     let index = groups.groups.firstIndex { $0.name == group.name } ?? 0
-    return Button { withAnimation(.kit) { selectedGroup = group.name } } label: {
+    return Button {
+      if idiom == .phone {
+        pushedGroup = group.name
+      } else {
+        withAnimation(.kit) { selectedGroup = group.name }
+      }
+    } label: {
       VStack(spacing: 1) {
         StatusDot(hue: Hue.lane(index), size: 6)
         Text(group.name.capitalized).kitFont(.caption).fontWeight(.semibold).foregroundStyle(.kitLabel)
