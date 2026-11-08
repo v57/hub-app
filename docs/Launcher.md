@@ -50,7 +50,7 @@ When updates are available:
 Choose **New App** and pick **Shell** or **Bun**:
 
 - **Name**
-- **Repository**: cloned into `~/Hub/apps` on the hub’s machine.
+- **Repository**: cloned into `~/Hub/Launcher/apps` on the hub’s machine.
 - **Directory**
 - **Install**: one command a line.
 - **Start command**
