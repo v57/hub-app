@@ -135,25 +135,32 @@ struct NeedsYouBanner: View {
 
   private var title: String {
     let requests = facts.requests
-    var parts = [String]()
-    if requests > 0 { parts.append(requests == 1 ? "1 request" : "\(requests) requests") }
-    if !updates.isEmpty { parts.append(updates.count == 1 ? "1 update" : "\(updates.count) updates") }
-    return parts.joined(separator: " and ") + (requests + updates.count == 1 ? " needs you" : " need you")
+    switch (requests, updates.count) {
+    case (1, 0): return String(localized: "1 request needs you")
+    case (_, 0): return String(localized: "\(requests) requests need you")
+    case (0, 1): return String(localized: "1 update needs you")
+    case (0, _): return String(localized: "\(updates.count) updates need you")
+    default:
+      let requestsPart = requests == 1 ? String(localized: "1 request") : String(localized: "\(requests) requests")
+      let updatesPart = updates.count == 1 ? String(localized: "1 update") : String(localized: "\(updates.count) updates")
+      return String(localized: "\(requestsPart) and \(updatesPart) need you")
+    }
   }
 
   private var message: String {
     var parts = [String]()
     let services = hostPending.list.map(\.name)
     if !services.isEmpty {
-      parts.append(services.formatted(.list(type: .and)) + (services.count == 1 ? " wants" : " want") + " to post APIs")
+      let names = services.formatted(.list(type: .and))
+      parts.append(services.count == 1 ? String(localized: "\(names) wants to post APIs") : String(localized: "\(names) want to post APIs"))
     }
     if let device = facts.pendingDevices.first {
-      parts.append("\(device.name ?? "A device") wants to join")
+      parts.append(String(localized: "\(device.name ?? String(localized: "A device")) wants to join"))
     }
     if updates.count == 1, let app = updates.first {
-      parts.append("\(app.id) has an update")
+      parts.append(String(localized: "\(app.id) has an update"))
     } else if updates.count > 1 {
-      parts.append("\(updates.count) apps have updates")
+      parts.append(String(localized: "\(updates.count) apps have updates"))
     }
     return parts.joined(separator: " · ")
   }
@@ -170,7 +177,7 @@ private struct WidgetCard: View {
         RichHeader(Text(app.name)) {
           AppTileIcon(app: app, size: 24)
         } meta: {
-          MetaLine([app.isOnline ? "live" : "offline"])
+          MetaLine([app.isOnline ? String(localized: "live") : String(localized: "offline")])
         } accessory: {
           EmptyView()
         }
@@ -194,7 +201,7 @@ struct AppsCard: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
-      RichHeader("Apps", meta: ["service apps on \(hub.settings.name)"], systemImage: "square.grid.3x3", hue: .purple)
+      RichHeader("Apps", meta: [String(localized: "service apps on \(hub.settings.name)")], systemImage: "square.grid.3x3", hue: .purple)
       LazyVGrid(columns: [GridItem(.adaptive(minimum: 72 * idiom.scale), spacing: 4)], spacing: 8) {
         ForEach(apps) { app in
           Button { Navigator.main.route = .app(hub.id, path: app.path) } label: {
@@ -204,7 +211,7 @@ struct AppsCard: View {
               AppTileIcon(app: app, size: 36 * idiom.scale)
             }
           }
-          .labelStyle(HubTileLabelStyle(badge: app.isOnline ? nil : "Offline"))
+          .labelStyle(HubTileLabelStyle(badge: app.isOnline ? nil : String(localized: "Offline")))
           .buttonStyle(.plain)
         }
       }

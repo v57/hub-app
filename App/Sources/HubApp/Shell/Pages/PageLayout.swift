@@ -75,7 +75,7 @@ struct PageWithInspector<Main: View, Inspector: View>: View {
 /// How a page lists its things: cards in a grid, or rows in a table
 enum ListStyle: String, CaseIterable, Hashable {
   case grid, list
-  var title: String { self == .grid ? "Grid" : "List" }
+  var title: String { self == .grid ? String(localized: "Grid") : String(localized: "List") }
   var systemImage: String { self == .grid ? "square.grid.2x2" : "list.bullet" }
 }
 
@@ -118,7 +118,7 @@ struct GridCard<Content: View>: View {
 
 /// A labeled bar: "CPU ▬▬▬── 34%"
 struct LabeledBar: View {
-  let label: String
+  let label: LocalizedStringKey
   let value: Double?
   var hue: Hue = .blue
   var text: String?
@@ -145,7 +145,7 @@ struct LabeledBar: View {
 
 /// A key and its value in a card: "Hub Network   10.57.0.2"
 struct KeyValueLine: View {
-  let key: String
+  let key: LocalizedStringKey
   let value: String
   var mono = false
   var body: some View {

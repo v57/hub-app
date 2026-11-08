@@ -47,11 +47,11 @@ struct NetDevice: Identifiable, Hashable {
   /// Its status in a few words: "Online", "Asleep · seen yesterday", "Can't reach right now"
   @MainActor var statusLine: String {
     switch status {
-    case .thisDevice: "This \(KitDevice.name)"
-    case .online: "Online"
-    case .asleep: seen.map { "Asleep · seen \($0.formatted(.relative(presentation: .named)))" } ?? "Asleep"
-    case .cantReach: "Can’t reach right now"
-    case .off: "Turn on to reach it"
+    case .thisDevice: String(localized: "This \(KitDevice.name)")
+    case .online: String(localized: "Online")
+    case .asleep: seen.map { String(localized: "Asleep · seen \($0.formatted(.relative(presentation: .named)))") } ?? String(localized: "Asleep")
+    case .cantReach: String(localized: "Can’t reach right now")
+    case .off: String(localized: "Turn on to reach it")
     }
   }
   var hue: Hue {
@@ -63,7 +63,7 @@ struct NetDevice: Identifiable, Hashable {
   }
   /// "2 apps"
   var appsLine: String? {
-    apps.isEmpty ? nil : apps.count == 1 ? "1 app" : "\(apps.count) apps"
+    apps.isEmpty ? nil : apps.count == 1 ? String(localized: "1 app") : String(localized: "\(apps.count) apps")
   }
 }
 
@@ -78,7 +78,7 @@ struct NetApp: Identifiable, Hashable {
 
   /// "Family can use it · port 5432"
   func line(hub: String) -> String {
-    [policy.map { $0.whoCanUse(hub: hub) }, port.map { "port \($0)" }].compactMap { $0 }.joined(separator: " · ")
+    [policy.map { $0.whoCanUse(hub: hub) }, port.map { String(localized: "port \($0)") }].compactMap { $0 }.joined(separator: " · ")
   }
 }
 
@@ -86,20 +86,20 @@ extension HubNetworkPolicy {
   /// Who may use a shared app, in the words of the access menu
   func accessName(hub: String) -> String {
     switch mode {
-    case .hub: "Everyone in \(hub)"
-    case .group: (group ?? "A group").capitalized
-    case .keys: keys?.count == 1 ? "1 person" : "\(keys?.count ?? 0) people"
-    case .private: "Only Me"
-    case .disabled: "No one"
+    case .hub: String(localized: "Everyone in \(hub)")
+    case .group: (group ?? String(localized: "A group")).capitalized
+    case .keys: keys?.count == 1 ? String(localized: "1 person") : String(localized: "\(keys?.count ?? 0) people")
+    case .private: String(localized: "Only Me")
+    case .disabled: String(localized: "No one")
     }
   }
   /// The line under a shared app: "Family can use it", "Everyone in Home"
   func whoCanUse(hub: String) -> String {
     switch mode {
-    case .hub: "Everyone in \(hub)"
-    case .group, .keys: "\(accessName(hub: hub)) can use it"
-    case .private: "Only you"
-    case .disabled: "No one can use it"
+    case .hub: String(localized: "Everyone in \(hub)")
+    case .group, .keys: String(localized: "\(accessName(hub: hub)) can use it")
+    case .private: String(localized: "Only you")
+    case .disabled: String(localized: "No one can use it")
     }
   }
 }
@@ -143,7 +143,7 @@ struct NetworkFacts: DynamicProperty {
   var thisDevice: NetDevice? { devices.first(where: \.isThisDevice) }
 
   /// This device's name on the network: "studio-mac"
-  var thisName: String { thisDevice?.name ?? "This \(KitDevice.name)" }
+  var thisName: String { thisDevice?.name ?? String(localized: "This \(KitDevice.name)") }
 
   /// Devices that offer their internet, the one in use first
   var internetDevices: [NetDevice] {

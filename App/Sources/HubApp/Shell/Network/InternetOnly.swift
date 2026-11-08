@@ -36,10 +36,10 @@ struct BrowseOwnInternetSheet: View {
     KitSheet(title: "Browse Through Your Own Internet", meta: "Like a VPN, but it’s yours", systemImage: "globe", hue: .indigo, width: 540) {
       route
       VStack(alignment: .leading, spacing: 12) {
-        point("lock.shield", "Safe on any Wi-Fi", "Cafés and hotels see only an encrypted connection.")
-        point("house", "As if you were home", "Sites see your home’s address and region.")
-        point("person", "Your own, nobody else’s", "It goes straight to your device. No VPN company in between.")
-        point("desktopcomputer", "You need Hub on that Mac", "Or on a Linux server. On the Mac: Use This Mac’s Internet Anywhere.")
+        point("lock.shield", String(localized: "Safe on any Wi-Fi"), String(localized: "Cafés and hotels see only an encrypted connection."))
+        point("house", String(localized: "As if you were home"), String(localized: "Sites see your home’s address and region."))
+        point("person", String(localized: "Your own, nobody else’s"), String(localized: "It goes straight to your device. No VPN company in between."))
+        point("desktopcomputer", String(localized: "You need Hub on that Mac"), String(localized: "Or on a Linux server. On the Mac: Use This Mac’s Internet Anywhere."))
       }
       .padding(.horizontal, 4)
 #if os(iOS)
@@ -71,11 +71,11 @@ struct BrowseOwnInternetSheet: View {
   /// Your iPhone → Your Mac at home → Internet
   private var route: some View {
     HStack(spacing: 6) {
-      stop(KitDevice.systemImage, "Your \(KitDevice.name)")
+      stop(KitDevice.systemImage, String(localized: "Your \(KitDevice.name)"))
       arrow
-      stop("desktopcomputer", "Your Mac at home")
+      stop("desktopcomputer", String(localized: "Your Mac at home"))
       arrow
-      stop("globe", "Internet")
+      stop("globe", String(localized: "Internet"))
     }
     .frame(maxWidth: .infinity)
     .padding(.vertical, 12)
@@ -114,7 +114,7 @@ struct BrowseOwnInternetSheet: View {
     } catch let invitation as NetworkInvitationError {
       error = invitation.message
     } catch {
-      self.error = "Not a code from Hub"
+      self.error = String(localized: "Not a code from Hub")
     }
   }
 }
@@ -142,10 +142,10 @@ struct InternetSetupSheet: View {
   private var steps: some View {
     KitSheet(title: "Use This Mac’s Internet Anywhere", meta: "Four steps, about a minute", systemImage: "globe", hue: .indigo, status: working ? .working : .idle, width: 540) {
       VStack(alignment: .leading, spacing: 14) {
-        NumberedStep(1, "Start a private hub on this Mac", "Hub sets it up; nothing to configure.", state: state(1))
-        NumberedStep(2, "Share this Mac’s internet", working && step == 2 ? "Choose Allow when your Mac asks to add a VPN." : "Your devices can browse through it.", state: state(2))
-        NumberedStep(3, "Keep this Mac awake while sharing", "So it answers when you’re away. It can sleep with the lid closed only on power.", state: state(3))
-        NumberedStep(4, "Add your phone", "Scan a code with it. It starts browsing through this Mac right away.", state: state(4))
+        NumberedStep(1, String(localized: "Start a private hub on this Mac"), String(localized: "Hub sets it up; nothing to configure."), state: state(1))
+        NumberedStep(2, String(localized: "Share this Mac’s internet"), working && step == 2 ? String(localized: "Choose Allow when your Mac asks to add a VPN.") : String(localized: "Your devices can browse through it."), state: state(2))
+        NumberedStep(3, String(localized: "Keep this Mac awake while sharing"), String(localized: "So it answers when you’re away. It can sleep with the lid closed only on power."), state: state(3))
+        NumberedStep(4, String(localized: "Add your phone"), String(localized: "Scan a code with it. It starts browsing through this Mac right away."), state: state(4))
       }
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(.vertical, 4)

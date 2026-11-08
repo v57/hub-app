@@ -67,9 +67,9 @@ struct LauncherPage: View {
         LauncherInspector(app: app, status: statuses.apps[app.name])
       }
     }
-    .pageToolbar("Launcher", meta: PageMeta.parts(hub, [
-      info.apps.count == 1 ? "1 app" : "\(info.apps.count) apps",
-      updating.map { "Updating \($0)" } ?? "",
+    .pageToolbar(String(localized: "Launcher"), meta: PageMeta.parts(hub, [
+      info.apps.count == 1 ? String(localized: "1 app") : String(localized: "\(info.apps.count) apps"),
+      updating.map { String(localized: "Updating \($0)") } ?? "",
     ]), systemImage: HubPage.launcher.systemImage, hue: .gray) {
       if idiom != .phone {
         ListStyleSwitch(style: $style)
@@ -182,11 +182,11 @@ extension Hub.Launcher.AppInfo {
   /// "bun · 2 instances · 3h"
   func cardLine(_ status: Hub.Launcher.AppStatus?) -> [String] {
     var parts = [String]()
-    if status?.updating == true { return ["Updating"] }
+    if status?.updating == true { return [String(localized: "Updating")] }
     let running = status?.processes?.count ?? 0
-    if running > 1 { parts.append("\(running) instances") }
+    if running > 1 { parts.append(String(localized: "\(running) instances")) }
     if running > 0, let started = status?.started { parts.append(started.shortRelative) }
-    if running == 0 { parts.append(active ? "not running" : "stopped") }
+    if running == 0 { parts.append(active ? String(localized: "not running") : String(localized: "stopped")) }
     return parts
   }
 }
@@ -213,15 +213,15 @@ private struct LauncherInspector: View {
       }
       .titleAccessory { if app.updateAvailable { Chip("Update available", hue: .orange).controlSize(.small) } }
       .padding(.horizontal, 4)
-      KitSection(running > 0 ? "Running" : "Stopped", meta: [running > 1 ? "\(running) instances" : "", status?.totalCpu.map { "\(Int($0))% CPU" } ?? ""], systemImage: running > 0 ? "play.circle" : "pause.circle", hue: running > 0 ? .blue : .gray) {
+      KitSection(running > 0 ? "Running" : "Stopped", meta: [running > 1 ? String(localized: "\(running) instances") : "", status?.totalCpu.map { String(localized: "\(Int($0))% CPU") } ?? ""], systemImage: running > 0 ? "play.circle" : "pause.circle", hue: running > 0 ? .blue : .gray) {
         if !app.isHub {
           InspectorRow("Instances", copyText: nil) {
             KitStepper(value: $instances, in: 1...64)
           }
         }
-        InspectorRow("Restart on crash", value: app.restarts ? "On" : "Off", copyable: false)
+        InspectorRow("Restart on crash", value: app.restarts ? String(localized: "On") : String(localized: "Off"), copyable: false)
       }
-      KitSection("Environment values", meta: [env.filter { !$0.key.isEmpty }.count == 1 ? "1 value" : "\(env.filter { !$0.key.isEmpty }.count) values"], systemImage: "list.bullet.rectangle", hue: .gray) {
+      KitSection("Environment values", meta: [env.filter { !$0.key.isEmpty }.count == 1 ? String(localized: "1 value") : String(localized: "\(env.filter { !$0.key.isEmpty }.count) values")], systemImage: "list.bullet.rectangle", hue: .gray) {
         ForEach($env) { $item in
           HStack(spacing: 6) {
             TextField("KEY", text: $item.key).kitField(mono: true).frame(width: 110)
@@ -232,7 +232,7 @@ private struct LauncherInspector: View {
       } accessory: {
         Button("Add Value", systemImage: "plus") { env.append(.init()) }
       }
-      KitSection("Secret keys", meta: ["Kept by hub-launcher, never shown again"], systemImage: "lock", hue: .orange) {
+      KitSection("Secret keys", meta: [String(localized: "Kept by hub-launcher, never shown again")], systemImage: "lock", hue: .orange) {
         ForEach($secrets) { $item in
           HStack(spacing: 6) {
             TextField("KEY", text: $item.key).kitField(mono: true).frame(width: 110)

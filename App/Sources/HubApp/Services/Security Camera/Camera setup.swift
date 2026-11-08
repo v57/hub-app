@@ -91,7 +91,7 @@ struct CameraRecording: Codable, Hashable, Sendable {
     case always
     case whenAway
 
-    var title: String { self == .always ? "Always" : "When I’m Away" }
+    var title: String { self == .always ? String(localized: "Always") : String(localized: "When I’m Away") }
   }
 
   var when: When = UserPresence.isSupported ? .whenAway : .always
@@ -107,17 +107,17 @@ enum CameraProfile: String, Codable, CaseIterable, Sendable {
 
   var title: String {
     switch self {
-    case .bestPicture: "Best Picture"
-    case .balanced: "Balanced"
-    case .lowPower: "Low Power"
+    case .bestPicture: String(localized: "Best Picture")
+    case .balanced: String(localized: "Balanced")
+    case .lowPower: String(localized: "Low Power")
     }
   }
 
   var help: String {
     switch self {
-    case .bestPicture: "Stabilization on where the camera has it; focus, exposure and colour adjust all the time."
-    case .balanced: "Exposure and colour adjust every 10 s, not every frame."
-    case .lowPower: "No stabilization, focus and colour locked, exposure every 10 s, 24 fps at most."
+    case .bestPicture: String(localized: "Stabilization on where the camera has it; focus, exposure and colour adjust all the time.")
+    case .balanced: String(localized: "Exposure and colour adjust every 10 s, not every frame.")
+    case .lowPower: String(localized: "No stabilization, focus and colour locked, exposure every 10 s, 24 fps at most.")
     }
   }
 

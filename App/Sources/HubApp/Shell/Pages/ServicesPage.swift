@@ -21,10 +21,10 @@ struct APIRow: Identifiable, Hashable {
 
   var isOnline: Bool { (service?.services ?? 0) > 0 }
   var statusWord: String {
-    if needsApproval { return "Needs approval" }
-    if isOnline { return "Online" }
-    if (service?.disabled ?? 0) > 0 { return "Disabled" }
-    return "Offline"
+    if needsApproval { return String(localized: "Needs approval") }
+    if isOnline { return String(localized: "Online") }
+    if (service?.disabled ?? 0) > 0 { return String(localized: "Disabled") }
+    return String(localized: "Offline")
   }
   var statusHue: Hue {
     needsApproval ? .orange : isOnline ? .green : .gray
@@ -35,10 +35,10 @@ enum APIFilter: String, CaseIterable, Hashable {
   case all, online, approval, offline
   var title: String {
     switch self {
-    case .all: "All"
-    case .online: "Online"
-    case .approval: "Needs approval"
-    case .offline: "Offline"
+    case .all: String(localized: "All")
+    case .online: String(localized: "Online")
+    case .approval: String(localized: "Needs approval")
+    case .offline: String(localized: "Offline")
     }
   }
   func matches(_ row: APIRow) -> Bool {
@@ -120,7 +120,7 @@ struct ServicesPage: View {
           ScrollView {
             VStack(spacing: KitMetrics.gutter) {
               ForEach(groups) { group in
-                KitSection(group.name, meta: [group.children?.count == 1 ? "1 API" : "\(group.children?.count ?? 0) APIs"], systemImage: "hexagon", hue: .blue) {
+                KitSection(group.name, meta: [group.children?.count == 1 ? String(localized: "1 API") : String(localized: "\(group.children?.count ?? 0) APIs")], systemImage: "hexagon", hue: .blue) {
                   ForEach(group.children ?? []) { row in
                     SidebarRow("\(row.name)", subtitle: "\(row.service?.requests ?? 0) requests") {
                       EmptyView()
@@ -156,7 +156,7 @@ struct ServicesPage: View {
       }
     }
     .modifier(ConnectionStatusBar(isShown: idiom != .phone))
-    .pageToolbar("Services", meta: meta, systemImage: HubPage.services.systemImage, hue: .blue) {
+    .pageToolbar(String(localized: "Services"), meta: meta, systemImage: HubPage.services.systemImage, hue: .blue) {
       if idiom != .phone {
         KitSearchField(text: $search, prompt: "Path or provider").frame(width: 200)
       }
@@ -185,9 +185,9 @@ struct ServicesPage: View {
     let running = status.services.reduce(0) { $0 + ($1.running ?? 0) }
     let waiting = paths.filter(\.needsApproval).count
     return PageMeta.parts(hub, [
-      paths.count == 1 ? "1 API" : "\(paths.count) APIs",
-      running > 0 ? "\(running) running" : "",
-      waiting > 0 ? "\(waiting) pending" : "",
+      paths.count == 1 ? String(localized: "1 API") : String(localized: "\(paths.count) APIs"),
+      running > 0 ? String(localized: "\(running) running") : "",
+      waiting > 0 ? String(localized: "\(waiting) pending") : "",
     ])
   }
 
@@ -230,7 +230,7 @@ private struct ConnectionStatusBar: ViewModifier {
       content.kitStatusBar {
         HStack(spacing: 6) {
           StatusDot(hue: hub.isConnected ? .green : .gray)
-          Text(MetaLine.join(["Connected to \(hub.settings.address.absoluteString)", "your key …\(hub.key.suffix(8))"]))
+          Text(MetaLine.join([String(localized: "Connected to \(hub.settings.address.absoluteString)"), String(localized: "your key …\(String(hub.key.suffix(8)))")]))
         }
       }
     } else {
@@ -260,13 +260,13 @@ struct APIInspector: View {
       RichHeader(Text(row.name).monospaced(), size: .title) {
         Tile(systemImage: "hexagon", hue: .blue, size: 28)
       } meta: {
-        MetaLine([String(row.name.split(separator: "/").first ?? ""), row.service?.balancerType.title ?? "", (row.service?.running ?? 0) > 0 ? "\(row.service?.running ?? 0) running" : ""])
+        MetaLine([String(row.name.split(separator: "/").first ?? ""), row.service?.balancerType.title ?? "", (row.service?.running ?? 0) > 0 ? String(localized: "\(row.service?.running ?? 0) running") : ""])
       } accessory: {
         EmptyView()
       }
       .titleAccessory { Chip(row.statusWord, hue: row.statusHue).controlSize(.small) }
       .padding(.horizontal, 4)
-      KitSection("Providers", meta: ["\(row.service?.services ?? 0) online", "\(row.service?.disabled ?? 0) disabled"], systemImage: "server.rack", hue: .indigo) {
+      KitSection("Providers", meta: [String(localized: "\(row.service?.services ?? 0) online"), String(localized: "\(row.service?.disabled ?? 0) disabled")], systemImage: "server.rack", hue: .indigo) {
         if providers.isEmpty {
           Text(row.needsApproval ? "Waits for an owner to allow it" : "No provider is connected").kitFont(.caption).padding(8)
         }
@@ -279,7 +279,7 @@ struct APIInspector: View {
         }
       }
       if let service = row.service {
-        KitSection("Load balancer", meta: ["How requests pick a provider"], systemImage: "arrow.triangle.branch", hue: .red) {
+        KitSection("Load balancer", meta: [String(localized: "How requests pick a provider")], systemImage: "arrow.triangle.branch", hue: .red) {
           LazyVGrid(columns: [GridItem(.flexible(), spacing: 6), GridItem(.flexible(), spacing: 6)], spacing: 6) {
             ForEach(Status.BalancerType.all, id: \.rawValue) { type in
               ChoiceCard(type.title, subtitle: type.subtitle, systemImage: type.icon, hue: .red, isOn: Binding {
@@ -294,7 +294,7 @@ struct APIInspector: View {
           .padding(6)
           .disabled(!hub.require(permissions: "hub/balancer/set"))
         }
-        KitSection("Requests", meta: ["Since the hub started"], systemImage: "chart.bar", hue: .green) {
+        KitSection("Requests", meta: [String(localized: "Since the hub started")], systemImage: "chart.bar", hue: .green) {
           InspectorRow("Total", value: service.requests.formatted(), copyable: false)
           InspectorRow("Running", value: "\(service.running ?? 0)", copyable: false)
           InspectorRow("Pending", value: "\(service.pending ?? 0)", copyable: false)
@@ -333,19 +333,19 @@ struct APIInspector: View {
 extension Status.BalancerType {
   var title: String {
     switch self {
-    case .random: "Random"
-    case .counter: "Round-robin"
-    case .first: "Queued"
-    case .available: "Distributed"
-    case .unknown: "Unknown"
+    case .random: String(localized: "Random")
+    case .counter: String(localized: "Round-robin")
+    case .first: String(localized: "Queued")
+    case .available: String(localized: "Distributed")
+    case .unknown: String(localized: "Unknown")
     }
   }
   var subtitle: String {
     switch self {
-    case .random: "Any provider"
-    case .counter: "Each in turn"
-    case .first: "In order"
-    case .available: "First free provider"
+    case .random: String(localized: "Any provider")
+    case .counter: String(localized: "Each in turn")
+    case .first: String(localized: "In order")
+    case .available: String(localized: "First free provider")
     case .unknown: ""
     }
   }

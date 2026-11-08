@@ -52,20 +52,20 @@ struct CameraScreen: View {
     let motion = units.contains { $0.motion.isActive }
     return VStack(alignment: .leading, spacing: 18) {
       HStack(spacing: 8) {
-        VideoChip(title: camera.interruption == nil ? "LIVE" : "PAUSED", tone: camera.interruption == nil ? .live : .plain)
+        VideoChip(title: camera.interruption == nil ? String(localized: "LIVE") : String(localized: "PAUSED"), tone: camera.interruption == nil ? .live : .plain)
         if watching > 0 { Text(watching == 1 ? "1 watching" : "\(watching) watching").kitFont(.callout).foregroundStyle(.white.opacity(0.7)) }
-        if motion { VideoChip(title: "Motion", systemImage: "figure.walk.motion", tone: .motion) }
+        if motion { VideoChip(title: String(localized: "Motion"), systemImage: "figure.walk.motion", tone: .motion) }
       }
       VStack(alignment: .leading, spacing: 2) {
-        Text(units.count == 1 ? String(units[0].shareName.dropFirst(HubCamera.sharePrefix.count)) : "\(units.count) Cameras")
+        Text(units.count == 1 ? String(units[0].shareName.dropFirst(HubCamera.sharePrefix.count)) : String(localized: "\(units.count) Cameras"))
           .font(.system(size: 34, weight: .bold))
-        Text("Camera on for \(camera.hub?.settings.name ?? "the hub")").font(.system(size: 15)).foregroundStyle(.white.opacity(0.6))
+        Text("Camera on for \(camera.hub?.settings.name ?? String(localized: "the hub"))").font(.system(size: 15)).foregroundStyle(.white.opacity(0.6))
       }
       ForEach(units) { unit in
         let threshold = MotionDetector(sensitivity: camera.settings.cameras.first { $0.id == unit.id }?.sensitivity ?? 0.5).areaThreshold
         VStack(alignment: .leading, spacing: 6) {
           HStack {
-            Text(units.count == 1 ? "Motion" : String(unit.shareName.dropFirst(HubCamera.sharePrefix.count)))
+            Text(units.count == 1 ? String(localized: "Motion") : String(unit.shareName.dropFirst(HubCamera.sharePrefix.count)))
             Spacer()
             Text(unit.motion.isActive ? "recording" : "nothing moving")
           }
@@ -80,13 +80,15 @@ struct CameraScreen: View {
           .opacity(0.6)
       }
       VStack(alignment: .leading, spacing: 10) {
-        status("network", "\(camera.hub?.settings.name ?? "Hub") · " + (units.allSatisfy(\.isPublished) ? "Hub Network" : units.compactMap(\.shareProblem).first ?? "not shared yet"))
+        status("network", "\(camera.hub?.settings.name ?? "Hub") · " + (units.allSatisfy(\.isPublished) ? "Hub Network" : units.compactMap(\.shareProblem).first ?? String(localized: "not shared yet")))
         if let battery = Battery.current {
-          status(battery.isCharging ? "battery.100.bolt" : "battery.50", "\(Int((battery.level * 100).rounded()))%" + (battery.isCharging ? " · charging" : " · on battery"))
+          status(battery.isCharging ? "battery.100.bolt" : "battery.50", battery.isCharging
+            ? String(localized: "\(Int((battery.level * 100).rounded()))% · charging")
+            : String(localized: "\(Int((battery.level * 100).rounded()))% · on battery"))
         }
-        status("mic.slash", "Microphone off")
-        status("thermometer.medium", camera.budget.pressure == .nominal ? "Normal temperature" : "\(camera.budget.pressure.title) pressure: iOS may slow the camera")
-        status("externaldrive", camera.settings.storage.target == .hub ? "Clips to \(camera.hub?.settings.name ?? "the hub")’s storage" : "Clips on this \(KitDevice.nameInSentence)")
+        status("mic.slash", String(localized: "Microphone off"))
+        status("thermometer.medium", camera.budget.pressure == .nominal ? String(localized: "Normal temperature") : String(localized: "\(camera.budget.pressure.title) pressure: iOS may slow the camera"))
+        status("externaldrive", camera.settings.storage.target == .hub ? String(localized: "Clips to \(camera.hub?.settings.name ?? String(localized: "the hub"))’s storage") : String(localized: "Clips on this \(KitDevice.nameInSentence)"))
         if let interruption = camera.interruption { status("pause.circle", interruption) }
       }
       Spacer(minLength: 0)

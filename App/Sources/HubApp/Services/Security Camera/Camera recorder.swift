@@ -190,7 +190,7 @@ actor CameraRecorder {
     let clip = "\(id).mp4"
     let url = folder.appending(path: "Clips/\(clip)")
     guard FileManager.default.createFile(atPath: url.path, contents: nil), let file = try? FileHandle(forWritingTo: url) else {
-      lastError = "Couldn’t create a clip file."
+      lastError = String(localized: "Couldn’t create a clip file.")
       return
     }
     if let jpeg = try? await engine.snapshot(maxWidth: 480) {
@@ -266,7 +266,7 @@ actor CameraRecorder {
       lastError = nil
     } catch {
       // Kept on the device: the clip isn't lost when the hub's storage is away
-      lastError = "A clip stayed on this device: the hub’s storage didn’t take it (\(error.localizedDescription))."
+      lastError = String(localized: "A clip stayed on this device: the hub’s storage didn’t take it (\(error.localizedDescription)).")
     }
     changed()
   }

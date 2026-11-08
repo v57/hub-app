@@ -61,7 +61,7 @@ struct FilesPage: View {
                   .fontWeight(index == crumbs.count - 1 ? .semibold : .regular)
               }
               Spacer()
-              Text(MetaLine.join([rows.count == 1 ? "1 item" : "\(rows.count) items", totalSize])).kitFont(.caption)
+              Text(MetaLine.join([rows.count == 1 ? String(localized: "1 item") : String(localized: "\(rows.count) items"), totalSize])).kitFont(.caption)
             }
             .padding(.horizontal, 4)
             if isLoading && rows.isEmpty {
@@ -96,7 +96,7 @@ struct FilesPage: View {
         }
       }
     }
-    .pageToolbar("Files", meta: PageMeta.parts(hub, [places.count > 1 ? "\(places.count) storage places" : ""]), systemImage: HubPage.files.systemImage, hue: .blue) {
+    .pageToolbar(String(localized: "Files"), meta: PageMeta.parts(hub, [places.count > 1 ? String(localized: "\(places.count) storage places") : ""]), systemImage: HubPage.files.systemImage, hue: .blue) {
       if idiom != .phone && hub.hasStorage {
         KitSearchField(text: $search, prompt: "Search Files").frame(width: 180)
       }
@@ -115,7 +115,7 @@ struct FilesPage: View {
       guard hub.hasStorage, !hub.isDemo else { return }
       do {
         for try await providers in hub.client.devices.providers("s3/list") {
-          places = providers.map { Place(id: $0.id, name: $0.name ?? "Storage") }
+          places = providers.map { Place(id: $0.id, name: $0.name ?? String(localized: "Storage")) }
           if place == nil || !places.contains(where: { $0.id == place }) { place = places.first?.id }
         }
       } catch { }
@@ -138,7 +138,7 @@ struct FilesPage: View {
 
   private struct Crumb { let name: String; let path: String }
   private var crumbs: [Crumb] {
-    var result = [Crumb(name: places.first { $0.id == place }?.name ?? "Files", path: "")]
+    var result = [Crumb(name: places.first { $0.id == place }?.name ?? String(localized: "Files"), path: "")]
     var current = ""
     for part in path.split(separator: "/") {
       current += part + "/"

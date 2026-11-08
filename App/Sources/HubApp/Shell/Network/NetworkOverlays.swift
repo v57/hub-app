@@ -32,12 +32,12 @@ struct NetworkDeviceSheet: View {
   var body: some View {
     let device = live
     let isUsing = facts.usingInternet?.id == device.id
-    KitSheet(title: device.name, meta: "\(device.kind) · in \(hub.settings.name)") {
+    KitSheet(title: device.name, meta: String(localized: "\(device.kind) · in \(hub.settings.name)")) {
       Tile(systemImage: device.symbol, hue: .gray, size: 32)
     } content: {
       if device.status == .cantReach {
         FormCard {
-          FormRow("Can’t reach right now", help: "Tried \(device.unreachableSince.map { $0.formatted(.relative(presentation: .named)) } ?? "just now")", systemImage: "exclamationmark.triangle", hue: .orange) {
+          FormRow("Can’t reach right now", help: "Tried \(device.unreachableSince.map { $0.formatted(.relative(presentation: .named)) } ?? String(localized: "just now"))", systemImage: "exclamationmark.triangle", hue: .orange) {
             Button("Why?") { why(device) }.buttonStyle(.kit)
           }
         }
@@ -145,11 +145,11 @@ extension NetDevice {
     case "macos": "Mac"
     case "ios": "iPhone"
     case "ipados": "iPad"
-    case "linux": "Linux server"
-    case "windows": "Windows PC"
-    case "android": "Android device"
+    case "linux": String(localized: "Linux server")
+    case "windows": String(localized: "Windows PC")
+    case "android": String(localized: "Android device")
     case "tvos": "Apple TV"
-    default: "Device"
+    default: String(localized: "Device")
     }
   }
 }
@@ -194,13 +194,13 @@ struct NetworkWhySheet: View {
   private func explanation(_ device: NetDevice) -> String {
     switch device.status {
     case .cantReach:
-      "\(device.name) is online, but the networks you’re both on won’t let Hub connect the two devices. It usually works again once either device changes Wi-Fi."
+      String(localized: "\(device.name) is online, but the networks you’re both on won’t let Hub connect the two devices. It usually works again once either device changes Wi-Fi.")
     case .asleep:
-      "\(device.name) isn’t online. It answers again once it wakes up and Hub runs on it."
+      String(localized: "\(device.name) isn’t online. It answers again once it wakes up and Hub runs on it.")
     case .off:
-      "Hub Network is off on this \(KitDevice.nameInSentence). Turn it on to reach \(device.name)."
+      String(localized: "Hub Network is off on this \(KitDevice.nameInSentence). Turn it on to reach \(device.name).")
     case .online, .thisDevice:
-      "\(device.name) answers again. You can reach it."
+      String(localized: "\(device.name) answers again. You can reach it.")
     }
   }
 
@@ -242,7 +242,7 @@ private struct ConnectManuallySheet: View {
   private func connect() async {
     guard let resource = device.apps.compactMap(\.resource).first,
           let provider = NetworkProviders.main.providers[resource.resourceId]?.first else {
-      error = "\(device.name) shares nothing to connect to."
+      error = String(localized: "\(device.name) shares nothing to connect to.")
       return
     }
     busy = true
@@ -280,7 +280,7 @@ struct UseInternetSheet: View {
       .sorted { ($0.id == using?.id ? 0 : $0.sharesInternet ? 1 : 2, $0.name) < ($1.id == using?.id ? 0 : $1.sharesInternet ? 1 : 2, $1.name) }
     KitSheet(
       title: "Use Internet Through",
-      meta: "\(hub.settings.name) · \(sharing.count == 1 ? "1 device shares its" : "\(sharing.count) devices share theirs")",
+      meta: "\(hub.settings.name) · \(sharing.count == 1 ? String(localized: "1 device shares its") : String(localized: "\(sharing.count) devices share theirs"))",
       systemImage: "globe", hue: .indigo, status: busy != nil ? .working : .idle
     ) {
       if total > 8 {
@@ -335,11 +335,13 @@ struct UseInternetSheet: View {
       }
       let others = total - 1 - sharing.count
       if others > 0 {
-        Text("\(others == 1 ? "1 other device doesn’t" : "\(others) other devices don’t") share their internet. A device shares it from its own Hub Network page.")
+        Text(others == 1
+          ? String(localized: "1 other device doesn’t share their internet. A device shares it from its own Hub Network page.")
+          : String(localized: "\(others) other devices don’t share their internet. A device shares it from its own Hub Network page."))
           .kitFont(.caption).fixedSize(horizontal: false, vertical: true)
       }
     } footer: {
-      SheetStatus(using.map { "Using \($0.name)" } ?? "Using this \(KitDevice.nameInSentence)’s own", systemImage: "globe", hue: .indigo, status: busy != nil ? .working : .idle)
+      SheetStatus(using.map { String(localized: "Using \($0.name)") } ?? String(localized: "Using this \(KitDevice.nameInSentence)’s own"), systemImage: "globe", hue: .indigo, status: busy != nil ? .working : .idle)
       Button("Done") { dismiss() }.buttonStyle(.kitPrimary).keyboardShortcut(.defaultAction)
     }
   }
@@ -349,15 +351,15 @@ struct UseInternetSheet: View {
   private func line(_ device: NetDevice, isUsing: Bool) -> String {
     var parts = [String]()
     if isUsing {
-      parts.append("Using its internet")
+      parts.append(String(localized: "Using its internet"))
     } else if device.sharesInternet && device.status != .asleep {
-      parts.append("Available")
+      parts.append(String(localized: "Available"))
     } else {
-      parts.append(device.seen.map { "Offline · seen \($0.formatted(.relative(presentation: .named)))" } ?? "Offline")
+      parts.append(device.seen.map { String(localized: "Offline · seen \($0.formatted(.relative(presentation: .named)))") } ?? String(localized: "Offline"))
     }
     if let capability = device.gateway?.capability {
-      if !capability.ipv6 { parts.append("IPv4 only") }
-      if capability.metered { parts.append("metered") }
+      if !capability.ipv6 { parts.append(String(localized: "IPv4 only")) }
+      if capability.metered { parts.append(String(localized: "metered")) }
     }
     return parts.joined(separator: " · ")
   }
@@ -483,9 +485,9 @@ struct ShareAppSheet: View {
 
   private var accessHelp: String {
     switch access.policy.mode {
-    case .hub: "Every device and person you’ve let into \(hub.settings.name)"
-    case .group: "People and devices in the \(access.policy.group ?? "") group"
-    case .private: "Only your own devices"
+    case .hub: String(localized: "Every device and person you’ve let into \(hub.settings.name)")
+    case .group: String(localized: "People and devices in the \(access.policy.group ?? "") group")
+    case .private: String(localized: "Only your own devices")
     default: ""
     }
   }

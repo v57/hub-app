@@ -138,10 +138,10 @@ private struct NetworkCardContent: View {
     let isLast = facts.lastInternet?.id == device.id
     let isOffline = device.status == .asleep || !device.sharesInternet
     let line: String =
-      target == device.id ? "Connecting…"
-      : isUsing ? "Using its internet"
-      : isLast ? (target != nil ? "Last used" : isOffline ? "Last used · offline" : "Last used · available")
-      : "Available" + (device.gateway?.capability.metered == true ? " · metered" : "")
+      target == device.id ? String(localized: "Connecting…")
+      : isUsing ? String(localized: "Using its internet")
+      : isLast ? (target != nil ? String(localized: "Last used") : isOffline ? String(localized: "Last used · offline") : String(localized: "Last used · available"))
+      : device.gateway?.capability.metered == true ? String(localized: "Available · metered") : String(localized: "Available")
     return SidebarRow(device.name) {
       RowTile(systemImage: device.symbol)
     } trailing: {
@@ -163,22 +163,22 @@ private struct NetworkCardContent: View {
 
   private var meta: (text: String, hue: Hue) {
     if let target, let device = facts.devices.first(where: { $0.id == target }) {
-      return ("Switching to \(device.name)…", .orange)
+      return (String(localized: "Switching to \(device.name)…"), .orange)
     }
-    if isConnecting { return ("Connecting…", .orange) }
+    if isConnecting { return (String(localized: "Connecting…"), .orange) }
     if facts.isJoined {
-      if let using = facts.usingInternet { return ("On · internet via \(using.name)", .green) }
+      if let using = facts.usingInternet { return (String(localized: "On · internet via \(using.name)"), .green) }
       let count = facts.devices.count
-      return ("On · \(count == 1 ? "1 device" : "\(count) devices")", .green)
+      return (count == 1 ? String(localized: "On · 1 device") : String(localized: "On · \(count) devices"), .green)
     }
-    if facts.hubNetworkOff { return ("Waiting for \(hub.settings.name)", .orange) }
-    return ("Off", .gray)
+    if facts.hubNetworkOff { return (String(localized: "Waiting for \(hub.settings.name)"), .orange) }
+    return (String(localized: "Off"), .gray)
   }
 
   private var offMessage: String {
-    if isConnecting { return "Finding your devices…" }
-    if facts.hubNetworkOff { return "Hub Network turns on when Hub is open on the Mac that runs \(hub.settings.name)." }
-    return "Turn on to reach your devices and use their internet."
+    if isConnecting { return String(localized: "Finding your devices…") }
+    if facts.hubNetworkOff { return String(localized: "Hub Network turns on when Hub is open on the Mac that runs \(hub.settings.name).") }
+    return String(localized: "Turn on to reach your devices and use their internet.")
   }
 
   // MARK: Actions

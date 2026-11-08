@@ -135,7 +135,7 @@ struct CamerasPage: View {
         .padding(KitMetrics.gutter)
       }
     }
-    .pageToolbar("Cameras", meta: PageMeta.parts(hub, meta(cameras, viewers)), systemImage: HubPage.cameras.systemImage, hue: .indigo) {
+    .pageToolbar(String(localized: "Cameras"), meta: PageMeta.parts(hub, meta(cameras, viewers)), systemImage: HubPage.cameras.systemImage, hue: .indigo) {
       if SecurityCamera.isSupported {
         ToolGroup {
           Button(idiom == .phone ? "Camera" : "Add Camera", systemImage: idiom == .phone ? "web.camera" : "plus") {
@@ -154,9 +154,9 @@ struct CamerasPage: View {
 #endif
 
   private func meta(_ cameras: [HubCamera], _ viewers: CameraViewers) -> [String] {
-    var parts = [cameras.count == 1 ? "1 camera" : "\(cameras.count) cameras"]
+    var parts = [cameras.count == 1 ? String(localized: "1 camera") : String(localized: "\(cameras.count) cameras")]
     let moving = cameras.filter { viewers.viewer($0).motion?.isActive == true }.count
-    if moving > 0 { parts.append("\(moving) with motion now") }
+    if moving > 0 { parts.append(String(localized: "\(moving) with motion now")) }
     return parts
   }
 #else
@@ -301,8 +301,10 @@ private struct AddCameraTile: View {
         Image(systemName: camera.isOn ? "web.camera" : "plus").font(.system(size: 20, weight: .medium)).foregroundStyle(.kitSecondary)
         Text(camera.isOn ? "This \(KitDevice.name) as a Camera" : "Add a Camera").kitFont(.headline)
         Text(camera.isOn
-          ? "\(camera.orderedUnits.count == 1 ? "1 camera" : "\(camera.orderedUnits.count) cameras") on · settings, zones and video"
-          : "Use this \(KitDevice.nameInSentence), or an old iPhone or iPad that stays at home.")
+          ? camera.orderedUnits.count == 1
+            ? String(localized: "1 camera on · settings, zones and video")
+            : String(localized: "\(camera.orderedUnits.count) cameras on · settings, zones and video")
+          : String(localized: "Use this \(KitDevice.nameInSentence), or an old iPhone or iPad that stays at home."))
           .kitFont(.caption).multilineTextAlignment(.center).frame(maxWidth: 260)
       }
       .frame(maxWidth: .infinity, minHeight: 140)
@@ -324,8 +326,8 @@ private struct AddCameraPopover: View {
   @State private var camera = SecurityCamera.main
 
   var body: some View {
-    KitSection("Add a Camera", meta: "Any Hub device with a camera", systemImage: "plus", hue: .accent) {
-      SidebarRow("This \(KitDevice.name)", subtitle: thisDevice, systemImage: KitDevice.name == "Mac" ? "laptopcomputer" : "iphone") {
+    KitSection("Add a Camera", meta: String(localized: "Any Hub device with a camera"), systemImage: "plus", hue: .accent) {
+      SidebarRow(String(localized: "This \(KitDevice.name)"), subtitle: thisDevice, systemImage: KitDevice.name == "Mac" ? "laptopcomputer" : "iphone") {
         Button(camera.isOn && camera.hubID == hub.id ? "Settings…" : "Set Up…") { openSettings() }
           .buttonStyle(.kitPrimary).controlSize(.small)
       }
@@ -337,8 +339,8 @@ private struct AddCameraPopover: View {
 
   private var thisDevice: String {
     let names = camera.devices.map(\.name)
-    let lenses = names.isEmpty ? "No camera found" : names.joined(separator: ", ")
-    return lenses + (KitDevice.name == "Mac" ? " · stays on while the Mac is awake" : " · Hub stays open")
+    let lenses = names.isEmpty ? String(localized: "No camera found") : names.joined(separator: ", ")
+    return KitDevice.name == "Mac" ? String(localized: "\(lenses) · stays on while the Mac is awake") : String(localized: "\(lenses) · Hub stays open")
   }
 }
 
@@ -378,7 +380,7 @@ struct CameraLive: View {
         if style == .tile {
           VideoChip(title: viewer.camera.name)
         } else if viewer.state == .live {
-          VideoChip(title: "LIVE", tone: .live)
+          VideoChip(title: String(localized: "LIVE"), tone: .live)
           TimelineView(.periodic(from: .now, by: 1)) { context in
             VideoChip(title: context.date.formatted(date: .omitted, time: .standard))
           }
@@ -386,11 +388,11 @@ struct CameraLive: View {
         Spacer()
         // On a tile, paused clips win over motion: motion records nothing then
         if style == .tile, viewer.state == .live, viewer.info?.clipsPaused != nil {
-          VideoChip(title: "Clips paused", systemImage: "pause.fill")
+          VideoChip(title: String(localized: "Clips paused"), systemImage: "pause.fill")
         } else if isMotion {
-          VideoChip(title: style == .tile ? "Motion" : "Motion now", systemImage: "figure.walk.motion", tone: .motion)
+          VideoChip(title: style == .tile ? String(localized: "Motion") : String(localized: "Motion now"), systemImage: "figure.walk.motion", tone: .motion)
         } else if style == .tile, viewer.state == .live {
-          VideoChip(title: "LIVE", tone: .live)
+          VideoChip(title: String(localized: "LIVE"), tone: .live)
         }
       }
       Spacer()
@@ -400,7 +402,7 @@ struct CameraLive: View {
             VideoChip(title: clipsPaused, systemImage: "pause.fill")
           }
           if let zone = info.zone, zone != CameraBox(x: 0, y: 0, width: 1, height: 1) {
-            VideoChip(title: "Zone", systemImage: "rectangle.dashed")
+            VideoChip(title: String(localized: "Zone"), systemImage: "rectangle.dashed")
           }
           Spacer()
           VideoChip(title: "\(info.width)×\(info.height) · \(info.fps) fps · \(VideoCodec(rawValue: info.codec ?? "h264")?.title ?? "H.264")", systemImage: "network")
@@ -452,15 +454,15 @@ extension CameraViewer {
     var parts = [info?.name ?? ""]
     switch state {
     case .live:
-      if info?.paused != nil { parts.append("paused") }
-      else if info?.clipsPaused != nil { parts.append("clips paused") }
-      else if motion?.isActive == true { parts.append("motion now") }
-      else if let last = events.first { parts.append("last motion \(CameraTime.short(last.start))") }
-      else { parts.append("no motion yet") }
-    case .offline: parts.append("offline")
-    case .needsPassword, .wrongPassword: parts.append("needs its password")
-    case .finding, .connecting: parts.append("connecting…")
-    case .failed: parts.append("not reachable")
+      if info?.paused != nil { parts.append(String(localized: "paused")) }
+      else if info?.clipsPaused != nil { parts.append(String(localized: "clips paused")) }
+      else if motion?.isActive == true { parts.append(String(localized: "motion now")) }
+      else if let last = events.first { parts.append(String(localized: "last motion \(CameraTime.short(last.start))")) }
+      else { parts.append(String(localized: "no motion yet")) }
+    case .offline: parts.append(String(localized: "offline"))
+    case .needsPassword, .wrongPassword: parts.append(String(localized: "needs its password"))
+    case .finding, .connecting: parts.append(String(localized: "connecting…"))
+    case .failed: parts.append(String(localized: "not reachable"))
     }
     return parts.filter { !$0.isEmpty }.joined(separator: " · ")
   }
@@ -489,7 +491,7 @@ enum CameraTime {
   static func short(_ date: Date) -> String {
     let time = date.formatted(date: .omitted, time: .shortened)
     if Calendar.current.isDateInToday(date) { return time }
-    if Calendar.current.isDateInYesterday(date) { return "yesterday \(time)" }
+    if Calendar.current.isDateInYesterday(date) { return String(localized: "yesterday \(time)") }
     return "\(date.formatted(.dateTime.month(.abbreviated).day())) \(time)"
   }
 }
@@ -505,7 +507,7 @@ private struct CameraEventsSection: View {
 
   var body: some View {
     let events = events
-    KitSection("Motion Events", meta: [span == .today ? "Today" : "Last 7 days", events.count == 1 ? "1 event" : "\(events.count) events"], systemImage: "figure.walk.motion", hue: .orange) {
+    KitSection("Motion Events", meta: [span == .today ? String(localized: "Today") : String(localized: "Last 7 days"), events.count == 1 ? String(localized: "1 event") : String(localized: "\(events.count) events")], systemImage: "figure.walk.motion", hue: .orange) {
       if events.isEmpty {
         Text(span == .today ? "Nothing moved today. Clips of motion show up here." : "Nothing moved this week.")
           .kitFont(.caption).padding(8)
@@ -564,7 +566,7 @@ struct CameraEventRow: View {
       parts.append(CameraFormat.duration(event.duration))
       if event.size > 0 { parts.append(CameraFormat.bytes(Double(event.size))) }
     } else {
-      parts.append("now")
+      parts.append(String(localized: "now"))
     }
     return parts.joined(separator: " · ")
   }
@@ -588,7 +590,9 @@ private struct CameraStorageLine: View {
       Text(known == 0 ? "Clips" : onHub == known ? "Clips go to \(hub.settings.name)’s storage" : onHub == 0 ? "Clips stay on each camera" : "Clips on \(hub.settings.name)’s storage and on cameras")
         .kitFont(.callout)
       Spacer()
-      Text("\(events.count == 1 ? "1 clip" : "\(events.count) clips") · \(CameraFormat.bytes(Double(events.reduce(0) { $0 + $1.size })))")
+      Text(events.count == 1
+        ? String(localized: "1 clip · \(CameraFormat.bytes(Double(events.reduce(0) { $0 + $1.size })))")
+        : String(localized: "\(events.count) clips · \(CameraFormat.bytes(Double(events.reduce(0) { $0 + $1.size })))"))
         .kitFont(.caption).monospacedDigit()
     }
     .padding(.horizontal, 12)

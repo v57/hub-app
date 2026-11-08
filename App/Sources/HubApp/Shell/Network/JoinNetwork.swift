@@ -60,7 +60,7 @@ struct JoinNetworkSheet: View {
     }
     return known?.inviter
   }
-  private var possessive: String { hubName.map { "\($0)’s" } ?? "the hub’s" }
+  private var possessive: String { hubName.map { String(localized: "\($0)’s") } ?? String(localized: "the hub’s") }
 
   var body: some View {
     switch stage {
@@ -77,8 +77,8 @@ struct JoinNetworkSheet: View {
 
   private var confirm: some View {
     KitSheet(
-      title: hubName.map { "Join \($0)’s Network?" } ?? "Join This Hub’s Network?",
-      meta: hubName.map { "Someone in \($0) invited this \(KitDevice.nameInSentence)" } ?? "Someone invited this \(KitDevice.nameInSentence) to their hub",
+      title: hubName.map { String(localized: "Join \($0)’s Network?") } ?? String(localized: "Join This Hub’s Network?"),
+      meta: hubName.map { String(localized: "Someone in \($0) invited this \(KitDevice.nameInSentence)") } ?? String(localized: "Someone invited this \(KitDevice.nameInSentence) to their hub"),
       systemImage: "person.badge.plus", hue: .teal, width: 520
     ) {
       FormCard {
@@ -97,10 +97,10 @@ struct JoinNetworkSheet: View {
         }
       }
       VStack(alignment: .leading, spacing: 12) {
-        point("arrow.left.arrow.right", hubName.map { "Reach \($0)’s devices from anywhere" } ?? "Reach the hub’s devices from anywhere",
-              "And they can reach this \(KitDevice.nameInSentence), at home or away.")
-        point("lock", "Private", "Only devices in \(hubName ?? "the hub") can connect. Nothing passes through anyone else.")
-        point("power", "Yours to switch off", "Turn it off any time in Hub Network.")
+        point("arrow.left.arrow.right", hubName.map { String(localized: "Reach \($0)’s devices from anywhere") } ?? String(localized: "Reach the hub’s devices from anywhere"),
+              String(localized: "And they can reach this \(KitDevice.nameInSentence), at home or away."))
+        point("lock", String(localized: "Private"), String(localized: "Only devices in \(hubName ?? String(localized: "the hub")) can connect. Nothing passes through anyone else."))
+        point("power", String(localized: "Yours to switch off"), String(localized: "Turn it off any time in Hub Network."))
       }
       .padding(.horizontal, 4)
     } footer: {
@@ -115,18 +115,18 @@ struct JoinNetworkSheet: View {
   /// Joining to browse through the inviting device
   private var useConfirm: some View {
     KitSheet(
-      title: inviter.map { "Use \($0)’s Internet?" } ?? "Use This Device’s Internet?",
-      meta: "\(inviter ?? "The device that showed the code") invited this \(KitDevice.nameInSentence)",
+      title: inviter.map { String(localized: "Use \($0)’s Internet?") } ?? String(localized: "Use This Device’s Internet?"),
+      meta: String(localized: "\(inviter ?? String(localized: "The device that showed the code")) invited this \(KitDevice.nameInSentence)"),
       systemImage: "globe", hue: .indigo, width: 520
     ) {
       if let inviter {
         FormCard {
-          FormRow("\(inviter)", help: hubName.map { "Shares its internet · in \($0)" } ?? "Shares its internet", systemImage: "desktopcomputer", hue: .indigo)
+          FormRow("\(inviter)", help: hubName.map { String(localized: "Shares its internet · in \($0)") } ?? String(localized: "Shares its internet"), systemImage: "desktopcomputer", hue: .indigo)
         }
       }
       VStack(alignment: .leading, spacing: 12) {
-        point("globe", "Browse through \(inviter ?? "it")", "Starts as soon as this \(KitDevice.nameInSentence) joins.")
-        point("switch.2", "Switch it from the Hub screen", "Use and Stop on the Hub Network card.")
+        point("globe", String(localized: "Browse through \(inviter ?? String(localized: "it"))"), String(localized: "Starts as soon as this \(KitDevice.nameInSentence) joins."))
+        point("switch.2", String(localized: "Switch it from the Hub screen"), String(localized: "Use and Stop on the Hub Network card."))
       }
       .padding(.horizontal, 4)
     } footer: {
@@ -181,12 +181,12 @@ struct JoinNetworkSheet: View {
   // MARK: Joining
 
   private var joining: some View {
-    KitSheet(title: hubName.map { "Joining \($0)" } ?? "Joining", meta: "Hub Network", systemImage: "person.badge.plus", hue: .teal, status: .working, width: 520) {
+    KitSheet(title: hubName.map { String(localized: "Joining \($0)") } ?? String(localized: "Joining"), meta: "Hub Network", systemImage: "person.badge.plus", hue: .teal, status: .working, width: 520) {
       let step = Self.step(nets.joinProgress?.state)
       VStack(alignment: .leading, spacing: 14) {
-        NumberedStep(1, "Checking the invitation", state: step > 1 ? .done : .working)
-        NumberedStep(2, "Setting up a secure connection", state: step > 2 ? .done : step == 2 ? .working : .waiting)
-        NumberedStep(3, hubName.map { "Connecting to \($0)…" } ?? "Connecting to the hub…", state: step == 3 ? .working : .waiting)
+        NumberedStep(1, String(localized: "Checking the invitation"), state: step > 1 ? .done : .working)
+        NumberedStep(2, String(localized: "Setting up a secure connection"), state: step > 2 ? .done : step == 2 ? .working : .waiting)
+        NumberedStep(3, hubName.map { String(localized: "Connecting to \($0)…") } ?? String(localized: "Connecting to the hub…"), state: step == 3 ? .working : .waiting)
       }
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(.vertical, 4)
@@ -208,7 +208,7 @@ struct JoinNetworkSheet: View {
   // MARK: You're in
 
   private var done: some View {
-    KitSheet(title: hubName.map { "Joined \($0)" } ?? "Joined", meta: "Hub Network", systemImage: "checkmark", hue: .green, width: 520) {
+    KitSheet(title: hubName.map { String(localized: "Joined \($0)") } ?? String(localized: "Joined"), meta: "Hub Network", systemImage: "checkmark", hue: .green, width: 520) {
       VStack(spacing: 10) {
         Image(systemName: "checkmark.circle.fill").font(.system(size: 44)).foregroundStyle(.white, Hue.green.fill)
         Text("You’re in").kitFont(.title3)
@@ -227,7 +227,7 @@ struct JoinNetworkSheet: View {
   }
 
   private var reach: String {
-    let start = "This \(KitDevice.name) is on \(possessive) network."
+    let start = String(localized: "This \(KitDevice.name) is on \(possessive) network.")
     let hub = joined ?? known?.hub
     let me = hub?.client.device?.key.id
     var names = hub?.state.networkAgents.value.filter { me == nil || $0.deviceId != me }.compactMap(\.name) ?? []
@@ -235,17 +235,17 @@ struct JoinNetworkSheet: View {
     if hub?.isDemo == true { names.removeAll { $0 == "studio-mac" } }
 #endif
     switch names.count {
-    case 0: return start + " Its devices can reach it too."
-    case 1: return start + " It can reach \(names[0])."
-    case 2: return start + " It can reach \(names[0]) and \(names[1])."
-    default: return start + " It can reach \(names[0]), \(names[1]) and \(names.count - 2) more."
+    case 0: return String(localized: "\(start) Its devices can reach it too.")
+    case 1: return String(localized: "\(start) It can reach \(names[0]).")
+    case 2: return String(localized: "\(start) It can reach \(names[0]) and \(names[1]).")
+    default: return String(localized: "\(start) It can reach \(names[0]), \(names[1]) and \(names.count - 2) more.")
     }
   }
 
   // MARK: Browsing
 
   private var browsing: some View {
-    KitSheet(title: inviter.map { "Using \($0)’s Internet" } ?? "Using Its Internet", meta: "Hub Network", systemImage: "globe", hue: .indigo, width: 520) {
+    KitSheet(title: inviter.map { String(localized: "Using \($0)’s Internet") } ?? String(localized: "Using Its Internet"), meta: "Hub Network", systemImage: "globe", hue: .indigo, width: 520) {
       VStack(spacing: 10) {
         Image(systemName: "checkmark.circle.fill").font(.system(size: 44)).foregroundStyle(.white, Hue.green.fill)
         Text("You’re browsing through \(inviter ?? "it")").kitFont(.title3)
@@ -347,18 +347,18 @@ struct JoinNetworkSheet: View {
           NetworkRecents.main.use(key, hub: hub, internet: true)
           stage = .browsing
         } catch {
-          stage = .failed(JoinFailure(title: "Couldn’t use \(inviter.map { "\($0)’s" } ?? "its") internet",
-                                      detail: "This \(KitDevice.name) joined \(hub.settings.name). Try Use on the Hub Network card in a moment.",
+          stage = .failed(JoinFailure(title: String(localized: "Couldn’t use \(inviter.map { String(localized: "\($0)’s") } ?? String(localized: "its")) internet"),
+                                      detail: String(localized: "This \(KitDevice.name) joined \(hub.settings.name). Try Use on the Hub Network card in a moment."),
                                       raw: NativeJoinPresentation.error(error), canRetry: false))
         }
         return
       }
       try? await Task.sleep(for: .milliseconds(250))
     }
-    let name = inviter ?? "The device that showed the code"
+    let name = inviter ?? String(localized: "The device that showed the code")
     stage = .failed(JoinFailure(
-      title: "\(name) doesn’t share its internet",
-      detail: "This \(KitDevice.name) joined \(hub.settings.name). On \(inviter ?? "that device"), turn on Let your devices use this Mac’s internet, then choose Use on the Hub Network card.",
+      title: String(localized: "\(name) doesn’t share its internet"),
+      detail: String(localized: "This \(KitDevice.name) joined \(hub.settings.name). On \(inviter ?? String(localized: "that device")), turn on Let your devices use this Mac’s internet, then choose Use on the Hub Network card."),
       raw: "No internet gateway from the inviting device", canRetry: false
     ))
   }
@@ -381,39 +381,39 @@ struct JoinFailure: Equatable {
 
   @MainActor init(_ error: Error, hub: String?) {
     let raw = NativeJoinPresentation.error(error)
-    let name = hub ?? "the hub"
+    let name = hub ?? String(localized: "the hub")
     let device = KitDevice.name
     let lowered = raw.lowercased()
     self.raw = raw
     switch error {
     case let error as NetworkInvitationError where error.code == .expired:
-      (title, detail, canRetry) = ("This invitation expired", "Invitations last seven days. Ask someone in \(name) for a new one.", false)
+      (title, detail, canRetry) = (String(localized: "This invitation expired"), String(localized: "Invitations last seven days. Ask someone in \(name) for a new one."), false)
     case NativeJoinError.activeVPNConflict:
       let other = Hubs.main.list.first(where: \.net.isJoined)?.settings.name
       (title, detail, canRetry) = (
-        other.map { "This \(device) is on \($0)’s network" } ?? "This \(device) is on another hub’s network",
-        "A device can be on one hub’s network at a time. Turn off \(other.map { "\($0)’s" } ?? "that one") first.", true
+        other.map { String(localized: "This \(device) is on \($0)’s network") } ?? String(localized: "This \(device) is on another hub’s network"),
+        String(localized: "A device can be on one hub’s network at a time. Turn off \(other.map { String(localized: "\($0)’s") } ?? String(localized: "that one")) first."), true
       )
     case NativeJoinError.refused(.keyRefused):
       (title, detail, canRetry) = (
-        "\(hub ?? "The hub") doesn’t accept this \(device)",
-        "An owner removed it from \(name). If that’s a mistake, check this \(device)’s date and time.", false
+        String(localized: "\(hub ?? String(localized: "The hub")) doesn’t accept this \(device)"),
+        String(localized: "An owner removed it from \(name). If that’s a mistake, check this \(device)’s date and time."), false
       )
     case NativeJoinError.bootstrapTimedOut, NativeJoinError.staged(.rendezvous, _), NativeJoinError.staged(.connection, _):
       (title, detail, canRetry) = (
-        "Couldn’t reach \(name)", "The Mac that runs \(name) may be asleep or offline. Try again once it’s on.", true
+        String(localized: "Couldn’t reach \(name)"), String(localized: "The Mac that runs \(name) may be asleep or offline. Try again once it’s on."), true
       )
     case HubNetDaemon.Failure.notRunning, HubNetDaemon.Failure.notPermitted:
-      (title, detail, canRetry) = ("Hub Network isn’t set up on this \(device)", raw, true)
+      (title, detail, canRetry) = (String(localized: "Hub Network isn’t set up on this \(device)"), raw, true)
     case NativeJoinError.staged(.vpnInstall, _):
-      (title, detail, canRetry) = ("You didn’t allow the VPN", "Hub needs it to connect your devices. Try again and choose Allow.", true)
+      (title, detail, canRetry) = (String(localized: "You didn’t allow the VPN"), String(localized: "Hub needs it to connect your devices. Try again and choose Allow."), true)
     default:
       if lowered.contains("already used") || lowered.contains("replay") {
-        (title, detail, canRetry) = ("This invitation was already used", "Each one works once. Ask someone in \(name) for a new one.", false)
+        (title, detail, canRetry) = (String(localized: "This invitation was already used"), String(localized: "Each one works once. Ask someone in \(name) for a new one."), false)
       } else if lowered.contains("expired") {
-        (title, detail, canRetry) = ("This invitation expired", "Invitations last seven days. Ask someone in \(name) for a new one.", false)
+        (title, detail, canRetry) = (String(localized: "This invitation expired"), String(localized: "Invitations last seven days. Ask someone in \(name) for a new one."), false)
       } else {
-        (title, detail, canRetry) = ("Couldn’t join \(name)", "Try again in a moment. If it keeps failing, ask for a new invitation.", true)
+        (title, detail, canRetry) = (String(localized: "Couldn’t join \(name)"), String(localized: "Try again in a moment. If it keeps failing, ask for a new invitation."), true)
       }
     }
   }

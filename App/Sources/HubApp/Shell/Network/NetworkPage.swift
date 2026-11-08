@@ -149,8 +149,8 @@ struct HubNetworkPage: View {
   private var toolbarMeta: [String] {
     let count = facts.devices.count
     return [
-      facts.isJoined ? "On" : isSwitching ? "Connecting…" : "Off",
-      count == 1 ? "1 device" : "\(count) devices",
+      facts.isJoined ? String(localized: "On") : isSwitching ? String(localized: "Connecting…") : String(localized: "Off"),
+      count == 1 ? String(localized: "1 device") : String(localized: "\(count) devices"),
     ]
   }
 
@@ -180,7 +180,7 @@ struct HubNetworkPage: View {
   // MARK: Devices
 
   private func devicesSection(_ devices: [NetDevice]) -> some View {
-    KitSection("Devices", meta: [idiom.isTouch ? "Tap one to see what you can do with it" : "Click one to see what you can do with it"], systemImage: "laptopcomputer.and.iphone", hue: .blue) {
+    KitSection("Devices", meta: [idiom.isTouch ? String(localized: "Tap one to see what you can do with it") : String(localized: "Click one to see what you can do with it")], systemImage: "laptopcomputer.and.iphone", hue: .blue) {
       LazyVGrid(columns: [GridItem(.adaptive(minimum: idiom == .phone ? 150 : 210), spacing: KitMetrics.gutter, alignment: .top)], spacing: KitMetrics.gutter) {
         ForEach(devices) { device in
           NetworkDeviceTile(device: device, open: { open(device) }, why: { why = device })
@@ -204,7 +204,7 @@ struct HubNetworkPage: View {
   // MARK: Apps you share
 
   private var appsSection: some View {
-    KitSection("Apps you share", meta: ["From this \(KitDevice.nameInSentence)"], systemImage: "square.and.arrow.up", hue: .purple) {
+    KitSection("Apps you share", meta: [String(localized: "From this \(KitDevice.nameInSentence)")], systemImage: "square.and.arrow.up", hue: .purple) {
       ForEach(facts.sharedApps) { app in
         SharedAppRow(app: app)
       }
@@ -270,7 +270,7 @@ struct HubNetworkPage: View {
   // MARK: Advanced
 
   private var advanced: some View {
-    KitSection("Advanced", meta: ["Addresses and the connection helper, for apps and terminals"], systemImage: "slider.horizontal.3", hue: .gray, isExpanded: $advancedOpen) {
+    KitSection("Advanced", meta: [String(localized: "Addresses and the connection helper, for apps and terminals")], systemImage: "slider.horizontal.3", hue: .gray, isExpanded: $advancedOpen) {
       NetworkAdvanced(facts: facts)
     }
   }
@@ -358,46 +358,44 @@ struct NetworkHero: View {
 
   private var line: (text: String, hue: Hue) {
     switch state {
-    case .on: ("On", .green)
-    case .off: ("Off", .gray)
-    case .connecting: ("Connecting…", .orange)
-    case .turningOff: ("Turning off…", .gray)
-    case .hubOff: ("Waiting for \(name)", .orange)
+    case .on: (String(localized: "On"), .green)
+    case .off: (String(localized: "Off"), .gray)
+    case .connecting: (String(localized: "Connecting…"), .orange)
+    case .turningOff: (String(localized: "Turning off…"), .gray)
+    case .hubOff: (String(localized: "Waiting for \(name)"), .orange)
     }
   }
 
   private var title: String {
     switch state {
-    case .on, .turningOff: "Your devices are connected"
-    case .off: isPhone ? "Hub Network is off" : "Hub Network is off on this \(KitDevice.nameInSentence)"
-    case .connecting: "Connecting to \(name)…"
-    case .hubOff: "\(name)’s network is off"
+    case .on, .turningOff: String(localized: "Your devices are connected")
+    case .off: isPhone ? String(localized: "Hub Network is off") : String(localized: "Hub Network is off on this \(KitDevice.nameInSentence)")
+    case .connecting: String(localized: "Connecting to \(name)…")
+    case .hubOff: String(localized: "\(name)’s network is off")
     }
   }
 
   private var message: String {
     let others = devices.filter { !$0.isThisDevice }
-    let reach = others.count == 1 ? "1 device" : "\(others.count) devices"
+    let reach = others.count == 1 ? String(localized: "1 device") : String(localized: "\(others.count) devices")
     switch state {
     case .on, .turningOff:
-      if isPhone { return "Reach \(name) and \(reach) from this \(KitDevice.nameInSentence), wherever you are." }
-      var text = "From this \(KitDevice.nameInSentence) you can reach \(name) and \(reach), wherever you are."
+      if isPhone { return String(localized: "Reach \(name) and \(reach) from this \(KitDevice.nameInSentence), wherever you are.") }
       if others.count > NetworkMap.namedLimit {
-        text += " \(others.filter { $0.status == .online }.count) are online now."
-      } else {
-        text += " They can reach this \(KitDevice.nameInSentence) too."
+        let online = others.filter { $0.status == .online }.count
+        return String(localized: "From this \(KitDevice.nameInSentence) you can reach \(name) and \(reach), wherever you are. \(online) are online now.")
       }
-      return text
+      return String(localized: "From this \(KitDevice.nameInSentence) you can reach \(name) and \(reach), wherever you are. They can reach this \(KitDevice.nameInSentence) too.")
     case .off:
       return isPhone
-        ? "Turn it on to reach your other devices from anywhere."
-        : "Turn it on to reach your other devices from anywhere, and to let them reach this one."
+        ? String(localized: "Turn it on to reach your other devices from anywhere.")
+        : String(localized: "Turn it on to reach your other devices from anywhere, and to let them reach this one.")
     case .connecting:
-      return "Finding your devices. This takes a few seconds."
+      return String(localized: "Finding your devices. This takes a few seconds.")
     case .hubOff(let runsOnMac):
       return runsOnMac
-        ? "It’s on whenever Hub is open on the Mac that runs \(name). Open Hub there, or wake that Mac."
-        : "Ask \(name)’s owner to set up Hub Network on it."
+        ? String(localized: "It’s on whenever Hub is open on the Mac that runs \(name). Open Hub there, or wake that Mac.")
+        : String(localized: "Ask \(name)’s owner to set up Hub Network on it.")
     }
   }
 }
@@ -429,7 +427,7 @@ struct NetworkDeviceTile: View {
   @ViewBuilder
   private var chips: some View {
     let shares = device.isThisDevice
-      ? device.apps.isEmpty ? nil : "Shares \(device.appsLine ?? "")"
+      ? device.apps.isEmpty ? nil : String(localized: "Shares \(device.appsLine ?? "")")
       : device.appsLine
     if shares != nil || device.sharesInternet {
       HStack(spacing: 4) {
@@ -474,7 +472,7 @@ struct NetworkRecentTiles: View {
   @Environment(\.kitIdiom) private var idiom
 
   var body: some View {
-    KitSection("Recent", meta: ["The ones you used last"], systemImage: "clock", hue: .blue) {
+    KitSection("Recent", meta: [String(localized: "The ones you used last")], systemImage: "clock", hue: .blue) {
       LazyVGrid(columns: [GridItem(.adaptive(minimum: idiom == .phone ? 150 : 210), spacing: KitMetrics.gutter, alignment: .top)], spacing: KitMetrics.gutter) {
         ForEach(devices) { device in
           NetworkDeviceTile(device: device, open: { open(device) }, why: { open(device) })
@@ -711,12 +709,12 @@ struct NetworkAdvanced: View {
   /// The agent's session for this hub, as `hub-net list` shows it: "Connected · home"
   private func agentLine(_ membership: HubNetDaemon.Membership) -> String {
     let state = switch membership.status {
-    case .connected: "Connected"
-    case .starting: "Connecting…"
-    case .disconnected: "Can’t reach the hub"
-    case .error: membership.error.map { "Error: \($0)" } ?? "Error"
-    case .stopping: "Stopping…"
-    case .paused: "Off"
+    case .connected: String(localized: "Connected")
+    case .starting: String(localized: "Connecting…")
+    case .disconnected: String(localized: "Can’t reach the hub")
+    case .error: membership.error.map { String(localized: "Error: \($0)") } ?? String(localized: "Error")
+    case .stopping: String(localized: "Stopping…")
+    case .paused: String(localized: "Off")
     }
     return "\(state) · \(membership.alias)"
   }

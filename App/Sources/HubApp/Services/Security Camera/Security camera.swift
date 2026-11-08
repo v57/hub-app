@@ -95,8 +95,8 @@ final class SecurityCamera {
   private(set) var recordsUntil: [String: Date] = [:]
   private var presenceObservation: UserPresenceObservation?
 
-  static let clipsPausedReason = "Clips paused · you’re using this \(deviceKind)"
-  static let liveOffReason = "Live view is off while you’re using this \(deviceKind)."
+  static let clipsPausedReason = String(localized: "Clips paused · you’re using this \(deviceKind)")
+  static let liveOffReason = String(localized: "Live view is off while you’re using this \(deviceKind).")
   /// Why a camera couldn't start, while it can't
   private(set) var problem: String?
   /// What the cameras cost now, and before the last change (the budget's ticks)
@@ -199,9 +199,11 @@ final class SecurityCamera {
     guard !on.contains(device.id) else { return nil }
     if on.count >= CameraRig.maximumCameras {
       let count = CameraRig.maximumCameras
-      return "This \(Self.deviceKind) runs \(count == 1 ? "one camera" : "\(count) cameras") at once."
+      return count == 1
+        ? String(localized: "This \(Self.deviceKind) runs one camera at once.")
+        : String(localized: "This \(Self.deviceKind) runs \(count) cameras at once.")
     }
-    if !CameraRig.canRun(together: on + [device.id]) { return "Doesn’t run together with the cameras that are on." }
+    if !CameraRig.canRun(together: on + [device.id]) { return String(localized: "Doesn’t run together with the cameras that are on.") }
     return nil
   }
 
@@ -377,7 +379,7 @@ final class SecurityCamera {
     if before != budget, before.hardwareCost != nil || budget.hardwareCost != nil { previousBudget = before }
     problem = failures.isEmpty ? nil : failures.joined(separator: "\n")
     if phase == .on, wanted.isEmpty == false, units.isEmpty {
-      phase = .failed(problem ?? "No camera started.")
+      phase = .failed(problem ?? String(localized: "No camera started."))
     }
     if let hub, phase == .on {
       for unit in units.values where !unit.isPublished { await publish(unit, on: hub) }
@@ -513,7 +515,8 @@ final class SecurityCamera {
     let zone = setup.zone.map { CameraBox(x: $0.x, y: $0.y, width: $0.width, height: $0.height) }
     var power: String?
     if let battery = Battery.current {
-      power = (battery.isCharging ? "Charging · " : "On battery · ") + "\(Int((battery.level * 100).rounded()))%"
+      let level = Int((battery.level * 100).rounded())
+      power = battery.isCharging ? String(localized: "Charging · \(level)%") : String(localized: "On battery · \(level)%")
     }
     return CameraInfo(
       name: SystemInfo.deviceName, camera: engine.device.name, width: format.width, height: format.height, fps: format.fps,
@@ -563,7 +566,7 @@ final class SecurityCamera {
   /// membership is registered with the key it connects with.
   private func publish(_ unit: Unit, on hub: Hub) async {
     guard hub.net.isJoined else {
-      setPublished(unit, false, problem: "Turn on Hub Network on this \(Self.deviceKind) so your other devices can reach the camera.")
+      setPublished(unit, false, problem: String(localized: "Turn on Hub Network on this \(Self.deviceKind) so your other devices can reach the camera."))
       return
     }
     let identity = hub.identity
@@ -586,7 +589,7 @@ final class SecurityCamera {
       unit.resourceId = hub.service.network.publication(forShare: unit.shareName)?.resourceId
       setPublished(unit, unit.resourceId.map { id in publications.contains { $0.resourceId == id } } ?? false, problem: nil)
     } catch {
-      setPublished(unit, false, problem: "Hub Network didn’t take the camera’s share: \(error.localizedDescription)")
+      setPublished(unit, false, problem: String(localized: "Hub Network didn’t take the camera’s share: \(error.localizedDescription)"))
     }
   }
 

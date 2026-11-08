@@ -67,13 +67,13 @@ struct ConnectSheet: View {
       title: "Connect to a Hub", systemImage: "hexagon", hue: .accent, status: isWorking ? .working : .idle
     ) {
       QRScanCard(
-        title: "Scan Code", scanning: $scanning, error: scanError
+        title: String(localized: "Scan Code"), scanning: $scanning, error: scanError
       ) { text in
         if scanned(text) {
           scanning = false
           scanError = nil
         } else {
-          scanError = "Not a pairing code or an invitation"
+          scanError = String(localized: "Not a pairing code or an invitation")
         }
       }
       FormCard(footer: isInvitation ? "Invitations work once, for seven days." : nil) {
@@ -121,8 +121,8 @@ struct ConnectSheet: View {
   }
 
   private var action: String {
-    if isInvitation { return "Join" }
-    return code.isEmpty ? "Connect" : "Pair"
+    if isInvitation { return String(localized: "Join") }
+    return code.isEmpty ? String(localized: "Connect") : String(localized: "Pair")
   }
 
   private var canGo: Bool {

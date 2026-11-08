@@ -89,7 +89,7 @@ struct DevicesPage: View {
         DeviceInspector(device: device)
       }
     }
-    .pageToolbar("Devices", meta: meta, systemImage: HubPage.devices.systemImage, hue: .blue) {
+    .pageToolbar(String(localized: "Devices"), meta: meta, systemImage: HubPage.devices.systemImage, hue: .blue) {
       if idiom != .phone {
         ListStyleSwitch(style: $style)
         KitSearchField(text: $search, prompt: "Name or kind").frame(width: 200)
@@ -124,9 +124,9 @@ struct DevicesPage: View {
 
   private var meta: [String] {
     PageMeta.parts(hub, [
-      approved.count == 1 ? "1 device" : "\(approved.count) devices",
-      "\(approved.filter(\.online).count) online",
-      pending.isEmpty ? "" : "\(pending.count) waiting",
+      approved.count == 1 ? String(localized: "1 device") : String(localized: "\(approved.count) devices"),
+      String(localized: "\(approved.filter(\.online).count) online"),
+      pending.isEmpty ? "" : String(localized: "\(pending.count) waiting"),
     ])
   }
 
@@ -149,11 +149,11 @@ enum DeviceFilter: String, CaseIterable, Hashable {
   case all, phones, computers, other, offline
   var title: String {
     switch self {
-    case .all: "All"
-    case .phones: "Phones"
-    case .computers: "Computers"
-    case .other: "Other"
-    case .offline: "Offline"
+    case .all: String(localized: "All")
+    case .phones: String(localized: "Phones")
+    case .computers: String(localized: "Computers")
+    case .other: String(localized: "Other")
+    case .offline: String(localized: "Offline")
     }
   }
   func matches(_ device: Device) -> Bool {
@@ -362,7 +362,7 @@ private struct DeviceTable: View {
       KitGridColumn("Services", width: 80, alignment: .trailing, value: { "\($0.services.count)" }),
       KitGridColumn("Hub Network", width: 130, mono: true, value: { $0.overlay?.address ?? "–" }),
       KitGridColumn("Seen", width: 110, value: { device in
-        device.online ? "now" : device.lastSeen?.formatted(.relative(presentation: .named)) ?? "–"
+        device.online ? String(localized: "now") : device.lastSeen?.formatted(.relative(presentation: .named)) ?? "–"
       }),
     ]
   }
@@ -390,7 +390,7 @@ struct DeviceInspector: View {
   var body: some View {
     let isThisDevice = device.key == hub.client.device?.key.publicKey
     VStack(alignment: .leading, spacing: KitMetrics.gutter) {
-      KitSection(device.name, meta: [device.statusText, isThisDevice ? "this \(KitDevice.nameInSentence)" : ""], systemImage: Device.symbol(platform: device.platform), hue: .blue) {
+      KitSection(device.name, meta: [device.statusText, isThisDevice ? String(localized: "this \(KitDevice.nameInSentence)") : ""], systemImage: Device.symbol(platform: device.platform), hue: .blue) {
         if let os = device.os {
           InspectorRow("System", value: [device.platform.map(Device.systemName), os, device.arch].compactMap { $0 }.joined(separator: " "), copyable: false)
         }
@@ -421,7 +421,7 @@ struct DeviceInspector: View {
         }
       }
       if device.online, let data {
-        KitSection("Resources", meta: ["live"], systemImage: "chart.bar", hue: .purple) {
+        KitSection("Resources", meta: [String(localized: "live")], systemImage: "chart.bar", hue: .purple) {
           VStack(spacing: 8) {
             LabeledBar(label: "CPU", value: data.cpu, hue: .blue)
             LabeledBar(label: "Memory", value: device.memoryShare(data), hue: .purple)
@@ -435,7 +435,7 @@ struct DeviceInspector: View {
           .padding(.horizontal, 8).padding(.vertical, 4)
         }
       }
-      KitSection("Services", meta: [device.services.isEmpty ? "none" : "\(device.services.filter(\.online).count) running"], systemImage: "hexagon", hue: .accent) {
+      KitSection("Services", meta: [device.services.isEmpty ? String(localized: "none") : String(localized: "\(device.services.filter(\.online).count) running")], systemImage: "hexagon", hue: .accent) {
         ForEach(device.services) { service in
           SidebarRow(service.name ?? service.instance, subtitle: service.paths.prefix(3).joined(separator: " · ")) {
             Tile(systemImage: "hexagon", hue: service.online ? .blue : .gray, size: 18)
@@ -468,7 +468,7 @@ struct DeviceInspector: View {
       Task { try? await hub.client.devices.revoke(device.id) }
     }
     .kitSheet(isPresented: $isRenaming) {
-      NameSheet(title: "Rename \(device.name)", systemImage: Device.symbol(platform: device.platform), hue: .blue, confirm: "Rename", name: device.name) { name in
+      NameSheet(title: String(localized: "Rename \(device.name)"), systemImage: Device.symbol(platform: device.platform), hue: .blue, confirm: String(localized: "Rename"), name: device.name) { name in
         Task { _ = try? await hub.client.devices.rename(device.id, to: name) }
       }
     }
@@ -504,11 +504,11 @@ private struct DeviceLinksSection: View {
   var body: some View {
     if hub.require(permissions: "hub/grants") {
       if device.attachedTo != nil {
-        KitSection("Link to parent", meta: [device.linked == true ? "gets what you link" : "gets nothing"], systemImage: "link", hue: .blue) {
+        KitSection("Link to parent", meta: [device.linked == true ? String(localized: "gets what you link") : String(localized: "gets nothing")], systemImage: "link", hue: .blue) {
           HStack {
             Text("Gets linked grants").kitFont(.body)
             Spacer()
-            linkToggle(device, title: "Gets linked grants")
+            linkToggle(device, title: String(localized: "Gets linked grants"))
           }
           .padding(.horizontal, 8).padding(.vertical, 2)
           Button("Detach from Parent", role: .destructive) { isDetaching = true }
@@ -518,15 +518,15 @@ private struct DeviceLinksSection: View {
       if !children.isEmpty {
         KitSection("Attached", meta: ["\(children.count)"], systemImage: "point.3.connected.trianglepath.dotted", hue: .blue) {
           ForEach(children) { child in
-            SidebarRow("\(child.name)", subtitle: child.linked == true ? "gets what you link" : "gets nothing") {
+            SidebarRow("\(child.name)", subtitle: child.linked == true ? String(localized: "gets what you link") : String(localized: "gets nothing")) {
               Tile(systemImage: Device.symbol(platform: child.platform), hue: child.online ? .blue : .gray, size: 18)
             } trailing: {
-              linkToggle(child, title: "Linked")
+              linkToggle(child, title: String(localized: "Linked"))
             }
           }
         }
       }
-      KitSection("Access", meta: [held.isEmpty ? "nothing granted" : "\(held.count)"], systemImage: "key", hue: .orange) {
+      KitSection("Access", meta: [held.isEmpty ? String(localized: "nothing granted") : "\(held.count)"], systemImage: "key", hue: .orange) {
         ForEach(held) { grant in
           SidebarRow(grant.object.title, subtitle: subtitle(of: grant)) {
             Tile(systemImage: grant.copyOf == nil ? "key" : "link", hue: grant.copyOf == nil ? .orange : .blue, size: 18)
@@ -571,9 +571,9 @@ private struct DeviceLinksSection: View {
   }
 
   private func subtitle(of grant: Grant) -> String {
-    guard let source = grant.copyOf else { return grant.linked == true ? "passes down" : "only this device" }
-    guard case .device(let parent)? = grants.first(where: { $0.id == source })?.subject else { return "from its parent" }
-    return "from \(devices.first { $0.id == parent }?.name ?? "its parent")"
+    guard let source = grant.copyOf else { return grant.linked == true ? String(localized: "passes down") : String(localized: "only this device") }
+    guard case .device(let parent)? = grants.first(where: { $0.id == source })?.subject else { return String(localized: "from its parent") }
+    return String(localized: "from \(devices.first { $0.id == parent }?.name ?? String(localized: "its parent"))")
   }
 }
 
@@ -613,7 +613,7 @@ extension Grant.Object {
     switch self {
     case .path(let path): path
     case .prefix(let prefix): prefix + "*"
-    case .share(let share): "Share " + share.prefix(8)
+    case .share(let share): String(localized: "Share \(String(share.prefix(8)))")
     }
   }
 }
@@ -638,13 +638,13 @@ extension Device {
   @MainActor func cardLine(isThisDevice: Bool, compact: Bool, parent: String? = nil) -> [String] {
     var parts = [String]()
     if !compact, let platform { parts.append(Device.systemName(platform)) }
-    if isThisDevice { parts.append("this \(KitDevice.nameInSentence)") }
-    if let parent { parts.append("under \(parent)") }
+    if isThisDevice { parts.append(String(localized: "this \(KitDevice.nameInSentence)")) }
+    if let parent { parts.append(String(localized: "under \(parent)")) }
     if online || compact {
-      parts.append(services.count == 1 ? "1 service" : "\(services.count) services")
+      parts.append(services.count == 1 ? String(localized: "1 service") : String(localized: "\(services.count) services"))
     }
     if !online, let lastSeen {
-      parts.append("seen \(lastSeen.formatted(.relative(presentation: .named)))")
+      parts.append(String(localized: "seen \(lastSeen.formatted(.relative(presentation: .named)))"))
     }
     return parts
   }

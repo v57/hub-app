@@ -46,11 +46,11 @@ struct CameraSettingsPage: View {
               VideoCard(setup: selected)
               MotionCard(setup: selected) { zone = selected.zone ?? CameraPreviewCard.suggested }
               KitSection("More", systemImage: "ellipsis", hue: .gray) {
-                SidebarRow("Picture and Power", subtitle: [selected.profile?.title ?? "Custom", "budget"].joined(separator: " · "), systemImage: "bolt") {
+                SidebarRow(String(localized: "Picture and Power"), subtitle: [selected.profile?.title ?? String(localized: "Custom"), String(localized: "budget")].joined(separator: " · "), systemImage: "bolt") {
                   KitPushChevron()
                 }
                 .action { pushed = .picture }
-                SidebarRow("Expected Usage", subtitle: usageLine(selected), systemImage: "chart.bar") {
+                SidebarRow(String(localized: "Expected Usage"), subtitle: usageLine(selected), systemImage: "chart.bar") {
                   KitPushChevron()
                 }
                 .action { pushed = .usage }
@@ -94,7 +94,7 @@ struct CameraSettingsPage: View {
       .padding(.bottom, 24)
     }
     .kitPane(.content)
-    .cameraToolbar("This \(KitDevice.name) as a Camera", meta: meta, systemImage: KitDevice.name == "Mac" ? "laptopcomputer" : "iphone", hue: .indigo, back: back) {
+    .cameraToolbar(String(localized: "This \(KitDevice.name) as a Camera"), meta: meta, systemImage: KitDevice.name == "Mac" ? "laptopcomputer" : "iphone", hue: .indigo, back: back) {
       ToolGroup {
         if isOnHere {
           Button("Turn Off", systemImage: "stop.fill") { Task { await camera.turnOff() } }
@@ -121,7 +121,7 @@ struct CameraSettingsPage: View {
           .padding(KitMetrics.gutter)
         }
         .kitPane(.content)
-        .pageToolbar(push == .picture ? "Picture and Power" : "Expected Usage", meta: [selected.place], systemImage: push == .picture ? "bolt" : "chart.bar", hue: .indigo) {}
+        .pageToolbar(push == .picture ? String(localized: "Picture and Power") : String(localized: "Expected Usage"), meta: [selected.place], systemImage: push == .picture ? "bolt" : "chart.bar", hue: .indigo) {}
         .hub(hub)
       }
     }
@@ -135,11 +135,11 @@ struct CameraSettingsPage: View {
   }
 
   private var meta: [String] {
-    guard isOnHere else { return [camera.isOn ? "on for \(camera.hub?.settings.name ?? "another hub")" : "Off"] }
+    guard isOnHere else { return [camera.isOn ? String(localized: "on for \(camera.hub?.settings.name ?? String(localized: "another hub"))") : String(localized: "Off")] }
     let on = camera.orderedUnits.count
-    var parts = [on == 1 ? "1 camera on" : "\(on) cameras on", "for \(hub.settings.name)"]
+    var parts = [on == 1 ? String(localized: "1 camera on") : String(localized: "\(on) cameras on"), String(localized: "for \(hub.settings.name)")]
     let watching = camera.orderedUnits.reduce(0) { $0 + $1.viewers }
-    if watching > 0 { parts.append("\(watching) watching") }
+    if watching > 0 { parts.append(String(localized: "\(watching) watching")) }
     return parts
   }
 
@@ -152,13 +152,13 @@ struct CameraSettingsPage: View {
 
   private func usageLine(_ setup: CameraSetup) -> String {
     let rate = Double(setup.video.effectiveBitrate) / 8
-    return "\(CameraFormat.rate(rate)) per viewer · \(CameraFormat.bytes(rate * camera.clipSecondsPerDay(setup.id))) of clips a day"
+    return String(localized: "\(CameraFormat.rate(rate)) per viewer · \(CameraFormat.bytes(rate * camera.clipSecondsPerDay(setup.id))) of clips a day")
   }
 
   /// On or off for this hub, and why it can't be
   @ViewBuilder private var master: some View {
     KitSection("Camera", meta: masterMeta, systemImage: "web.camera", hue: isOnHere ? .green : .gray, status: camera.phase == .starting ? .working : .idle) {
-      SidebarRow("Use as a Security Camera", subtitle: masterLine, systemImage: "video", hue: isOnHere ? .green : .gray) {
+      SidebarRow(String(localized: "Use as a Security Camera"), subtitle: masterLine, systemImage: "video", hue: isOnHere ? .green : .gray) {
         Toggle("Use as a Security Camera", isOn: Binding { isOnHere } set: { on in
           Task { on ? await turnOn() : await camera.turnOff() }
         })
@@ -175,18 +175,19 @@ struct CameraSettingsPage: View {
   }
 
   private var masterMeta: [String] {
-    if isOnHere { return ["On", "for \(hub.settings.name)"] }
-    if camera.isOn, let other = camera.hub { return ["On for \(other.settings.name)"] }
-    return ["Off"]
+    if isOnHere { return [String(localized: "On"), String(localized: "for \(hub.settings.name)")] }
+    if camera.isOn, let other = camera.hub { return [String(localized: "On for \(other.settings.name)")] }
+    return [String(localized: "Off")]
   }
 
   private var masterLine: String {
     if camera.isOn, camera.hubID != hub.id, let other = camera.hub {
-      return "On for \(other.settings.name). Turning it on here moves it."
+      return String(localized: "On for \(other.settings.name). Turning it on here moves it.")
     }
-    var line = "Watches for motion and records clips. Only \(hub.settings.name)’s devices on Hub Network with the password can watch."
-    if KitDevice.name != "Mac" { line += " Hub has to stay open." }
-    return line
+    if KitDevice.name != "Mac" {
+      return String(localized: "Watches for motion and records clips. Only \(hub.settings.name)’s devices on Hub Network with the password can watch. Hub has to stay open.")
+    }
+    return String(localized: "Watches for motion and records clips. Only \(hub.settings.name)’s devices on Hub Network with the password can watch.")
   }
 }
 
@@ -225,15 +226,15 @@ private struct CameraPreviewCard: View {
       }
       VStack {
         HStack(spacing: 6) {
-          if unit != nil { VideoChip(title: "LIVE", tone: .live) }
+          if unit != nil { VideoChip(title: String(localized: "LIVE"), tone: .live) }
           VideoChip(title: setup.place)
           Spacer()
-          if editing != nil || setup.zone != nil { VideoChip(title: "Zone", systemImage: "rectangle.dashed") }
-          if unit?.motion.isActive == true { VideoChip(title: "Motion", systemImage: "figure.walk.motion", tone: .motion) }
+          if editing != nil || setup.zone != nil { VideoChip(title: String(localized: "Zone"), systemImage: "rectangle.dashed") }
+          if unit?.motion.isActive == true { VideoChip(title: String(localized: "Motion"), systemImage: "figure.walk.motion", tone: .motion) }
         }
         Spacer()
         HStack(spacing: 6) {
-          VideoChip(title: camera.devices.first { $0.id == setup.device }?.name ?? "Camera", systemImage: "camera")
+          VideoChip(title: camera.devices.first { $0.id == setup.device }?.name ?? String(localized: "Camera"), systemImage: "camera")
           Spacer()
           VideoChip(title: setup.video.title)
         }
@@ -291,7 +292,7 @@ private struct MotionCard: View {
     let unit = camera.units[setup.id]
     let threshold = MotionDetector(sensitivity: setup.sensitivity).areaThreshold
     let level = unit?.motion.level ?? 0
-    KitSection("Motion", meta: [setup.place, unit == nil ? "off" : unit?.motion.isActive == true ? "motion now" : "nothing moving"], systemImage: "figure.walk.motion", hue: .orange) {
+    KitSection("Motion", meta: [setup.place, unit == nil ? String(localized: "off") : unit?.motion.isActive == true ? String(localized: "motion now") : String(localized: "nothing moving")], systemImage: "figure.walk.motion", hue: .orange) {
       VStack(alignment: .leading, spacing: 10) {
         HStack(spacing: 10) {
           Text("Live level").kitFont(.caption).frame(width: 84, alignment: .leading)
@@ -307,7 +308,9 @@ private struct MotionCard: View {
           }, in: 0...1, step: 0.05)
           Text("\(Int((setup.sensitivity * 100).rounded()))%").kitFont(.caption).monospacedDigit().frame(width: 52, alignment: .trailing)
         }
-        Text("Motion past the line records a clip: \(String(format: "%.1f%%", threshold * 100)) of \(setup.zone == nil ? "the picture" : "the zone") changing. \(setup.zone == nil ? "All of the picture counts." : "Only motion inside the zone counts.")")
+        Text(setup.zone == nil
+          ? String(localized: "Motion past the line records a clip: \(String(format: "%.1f%%", threshold * 100)) of the picture changing. All of the picture counts.")
+          : String(localized: "Motion past the line records a clip: \(String(format: "%.1f%%", threshold * 100)) of the zone changing. Only motion inside the zone counts."))
           .kitFont(.caption)
       }
       .padding(.horizontal, 12)
@@ -331,7 +334,7 @@ private struct CamerasCard: View {
 
   var body: some View {
     let on = setups.filter(\.isOn).count
-    KitSection("Cameras", meta: ["\(on) of \(setups.count) on", "each is its own camera"], systemImage: "camera", hue: .indigo) {
+    KitSection("Cameras", meta: [String(localized: "\(on) of \(setups.count) on"), String(localized: "each is its own camera")], systemImage: "camera", hue: .indigo) {
       ForEach(setups) { setup in
         let device = camera.devices.first { $0.id == setup.device }
         let reason = device.flatMap { camera.reasonCantTurnOn($0) }
@@ -352,12 +355,12 @@ private struct CamerasCard: View {
   }
 
   private func subtitle(_ setup: CameraSetup, device: CameraDevice?, reason: String?) -> String {
-    let lens = device?.name ?? "Camera"
+    let lens = device?.name ?? String(localized: "Camera")
     if setup.isOn { return "\(lens) · \(setup.video.title)" }
     if let reason { return "\(lens) · \(reason)" }
     let caps = CameraCapabilitiesCache.get(setup.device, together: 1)
-    let top = caps.sizes.last.map { "up to \($0.height)p, \($0.maxFPS) fps" } ?? "off"
-    return "\(lens) · off · \(top)"
+    let top = caps.sizes.last.map { String(localized: "up to \($0.height)p, \($0.maxFPS) fps") } ?? String(localized: "off")
+    return String(localized: "\(lens) · off · \(top)")
   }
 
   private func symbol(_ device: CameraDevice?) -> String {
@@ -370,8 +373,8 @@ private struct CamerasCard: View {
 
   private var footer: String {
     let count = CameraRig.maximumCameras
-    let most = count <= 1 ? "one camera at a time" : "\(count) cameras at once"
-    return "This \(KitDevice.nameInSentence) runs \(most). Each camera has its own name, video, motion and clips; more of them on means more heat and more data."
+    let most = count <= 1 ? String(localized: "one camera at a time") : String(localized: "\(count) cameras at once")
+    return String(localized: "This \(KitDevice.nameInSentence) runs \(most). Each camera has its own name, video, motion and clips; more of them on means more heat and more data.")
   }
 }
 
@@ -391,19 +394,19 @@ private struct VideoCard: View {
     let top = caps.sizes.last
     KitSection("Video", meta: [setup.place, camera.devices.first { $0.id == setup.device }?.name ?? ""], systemImage: "camera.aperture", hue: .blue) {
       FormCard {
-        FormRow("Name", help: "The place it watches: its name on \(camera.hub?.settings.name ?? "the hub")", systemImage: "mappin") {
+        FormRow("Name", help: "The place it watches: its name on \(camera.hub?.settings.name ?? String(localized: "the hub"))", systemImage: "mappin") {
           TextField("Front Door", text: $place)
             .kitField().frame(maxWidth: 200)
             .onSubmit { rename() }
         }
-        FormRow("Resolution", help: top.map { "Up to \($0.height)p" + (together > 1 ? " with \(together) cameras on" : " on this camera") }, systemImage: "rectangle.expand.vertical") {
+        FormRow(String(localized: "Resolution"), help: top.map { together > 1 ? String(localized: "Up to \($0.height)p with \(together) cameras on") : String(localized: "Up to \($0.height)p on this camera") }, systemImage: "rectangle.expand.vertical") {
           KitPicker("Resolution", selection: binding(\.video.height), segments: CameraVideo.heights.map { height in
             let reason = sizeReason(height, caps: caps, alone: alone)
             return KitSegment(reason.map { "\(height)p — \($0)" } ?? "\(height)p", value: height, isEnabled: reason == nil)
           })
           .fixedSize()
         }
-        FormRow("Frame Rate", help: caps.maxFPS(height: setup.video.height).map { "Up to \($0) fps at \(setup.video.height)p" }, systemImage: "speedometer") {
+        FormRow(String(localized: "Frame Rate"), help: caps.maxFPS(height: setup.video.height).map { String(localized: "Up to \($0) fps at \(setup.video.height)p") }, systemImage: "speedometer") {
           KitSegmented(selection: binding(\.video.fps), segments: CameraVideo.frameRates.map { fps in
             KitSegment("\(fps)", value: fps, isEnabled: fpsReason(fps, caps: caps) == nil)
           })
@@ -441,22 +444,22 @@ private struct VideoCard: View {
   }
 
   private var bitrates: [(String, Int?)] {
-    var options: [(String, Int?)] = [("Auto · \(CameraFormat.bitrate(setup.video.suggestedBitrate))", nil)]
+    var options: [(String, Int?)] = [(String(localized: "Auto · \(CameraFormat.bitrate(setup.video.suggestedBitrate))"), nil)]
     options += [500_000, 1_000_000, 2_000_000, 3_000_000, 4_000_000, 6_000_000, 8_000_000, 12_000_000, 16_000_000].map { (CameraFormat.bitrate($0), Optional($0)) }
     return options
   }
 
   private func sizeReason(_ height: Int, caps: CameraCapabilities, alone: CameraCapabilities) -> String? {
     if caps.maxFPS(height: height) == nil {
-      return alone.maxFPS(height: height) != nil ? "only with 1 camera on" : "not on this camera"
+      return alone.maxFPS(height: height) != nil ? String(localized: "only with 1 camera on") : String(localized: "not on this camera")
     }
-    if let cost = costs["h\(height)"], cost > 1 { return "over the budget with these cameras on" }
+    if let cost = costs["h\(height)"], cost > 1 { return String(localized: "over the budget with these cameras on") }
     return nil
   }
 
   private func fpsReason(_ fps: Int, caps: CameraCapabilities) -> String? {
     guard let most = caps.maxFPS(height: setup.video.height) else { return nil }
-    return fps > most ? "up to \(most) fps" : nil
+    return fps > most ? String(localized: "up to \(most) fps") : nil
   }
 
   private func binding<Value>(_ path: WritableKeyPath<CameraSetup, Value>) -> Binding<Value> {
@@ -508,7 +511,7 @@ private struct UsageCard: View {
     let days = Double(storage.days == 0 ? 30 : storage.days)
     let kept = camera.settings.cameras.filter(\.isOn).reduce(0.0) { $0 + Double($1.video.effectiveBitrate) / 8 * camera.clipSecondsPerDay($1.id) } * days
     let motion = setups.reduce(0.0) { $0 + camera.clipSecondsPerDay($1.id) }
-    KitSection("Expected Usage", meta: [scope == .this ? setup.place : "All cameras", "estimate"], systemImage: "chart.bar", hue: .teal) {
+    KitSection("Expected Usage", meta: [scope == .this ? setup.place : String(localized: "All cameras"), String(localized: "estimate")], systemImage: "chart.bar", hue: .teal) {
       VStack(alignment: .leading, spacing: 8) {
         UsageTable(rows: rows(live: live, clips: clips, storage: storage))
         if storage.gigabytes > 0 {
@@ -525,17 +528,17 @@ private struct UsageCard: View {
           .padding(.bottom, 8)
       }
     } accessory: {
-      KitSegmented(selection: $scope, options: [(setup.place, Scope.this), ("All Cameras", Scope.all)])
+      KitSegmented(selection: $scope, options: [(setup.place, Scope.this), (String(localized: "All Cameras"), Scope.all)])
         .controlSize(.small)
     }
   }
 
   private func rows(live: Double, clips: Double, storage: CameraStoragePolicy) -> [UsageTable.Row] {
-    var rows = [UsageTable.Row(name: "Live view", detail: "network · per viewer", second: CameraFormat.rate(live), day: CameraFormat.bytes(live * 86_400), month: CameraFormat.bytes(live * 86_400 * 30))]
+    var rows = [UsageTable.Row(name: String(localized: "Live view"), detail: String(localized: "network · per viewer"), second: CameraFormat.rate(live), day: CameraFormat.bytes(live * 86_400), month: CameraFormat.bytes(live * 86_400 * 30))]
     if storage.target == .hub {
-      rows.append(UsageTable.Row(name: "Clips upload", detail: "network · to the hub", second: "–", day: CameraFormat.bytes(clips), month: CameraFormat.bytes(clips * 30)))
+      rows.append(UsageTable.Row(name: String(localized: "Clips upload"), detail: String(localized: "network · to the hub"), second: "–", day: CameraFormat.bytes(clips), month: CameraFormat.bytes(clips * 30)))
     }
-    rows.append(UsageTable.Row(name: "Clips kept", detail: storage.target == .hub ? "the hub’s storage" : "storage · this \(KitDevice.nameInSentence)", second: "–", day: CameraFormat.bytes(clips), month: CameraFormat.bytes(clips * 30)))
+    rows.append(UsageTable.Row(name: String(localized: "Clips kept"), detail: storage.target == .hub ? String(localized: "the hub’s storage") : String(localized: "storage · this \(KitDevice.nameInSentence)"), second: "–", day: CameraFormat.bytes(clips), month: CameraFormat.bytes(clips * 30)))
     return rows
   }
 }
@@ -549,7 +552,7 @@ private struct PictureCard: View {
 
   var body: some View {
     let caps = CameraCapabilitiesCache.get(setup.device, together: 1)
-    KitSection("Picture and Power", meta: [setup.place, setup.profile?.title ?? "Custom"], systemImage: "bolt", hue: .green) {
+    KitSection("Picture and Power", meta: [setup.place, setup.profile?.title ?? String(localized: "Custom")], systemImage: "bolt", hue: .green) {
       VStack(alignment: .leading, spacing: 0) {
         KitSegmented(selection: Binding { setup.profile } set: { profile in
           guard let profile else { return }
@@ -559,7 +562,7 @@ private struct PictureCard: View {
         }, segments: CameraProfile.allCases.map { KitSegment($0.title, value: Optional($0)) })
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
-        Text(setup.profile?.help ?? "Your own mix of the settings below.").kitFont(.caption).padding(.horizontal, 12).padding(.bottom, 6)
+        Text(setup.profile?.help ?? String(localized: "Your own mix of the settings below.")).kitFont(.caption).padding(.horizontal, 12).padding(.bottom, 6)
         budget
         FormCard {
           FormRow("Stabilization", help: caps.stabilization ? "Steadier picture, more processing" : "Not on this camera", systemImage: "hand.raised") {
@@ -567,16 +570,16 @@ private struct PictureCard: View {
               .toggleStyle(.kitSwitch).labelsHidden().controlSize(.small)
               .disabled(!caps.stabilization)
           }
-          FormRow("Focus", help: help(setup.picture.focus, locked: "nothing hunts when the light changes"), systemImage: "scope") {
+          FormRow(String(localized: "Focus"), help: help(setup.picture.focus, locked: String(localized: "nothing hunts when the light changes")), systemImage: "scope") {
             adjustment(\.picture.focus, slow: false).disabled(!caps.focus)
           }
-          FormRow("Exposure", help: help(setup.picture.exposure, locked: "the picture keeps its brightness"), systemImage: "sun.max") {
+          FormRow(String(localized: "Exposure"), help: help(setup.picture.exposure, locked: String(localized: "the picture keeps its brightness")), systemImage: "sun.max") {
             adjustment(\.picture.exposure, slow: true).disabled(!caps.exposure)
           }
-          FormRow("White Balance", help: help(setup.picture.whiteBalance, locked: "colours stay as they are"), systemImage: "thermometer.sun") {
+          FormRow(String(localized: "White Balance"), help: help(setup.picture.whiteBalance, locked: String(localized: "colours stay as they are")), systemImage: "thermometer.sun") {
             adjustment(\.picture.whiteBalance, slow: true).disabled(!caps.whiteBalance)
           }
-          FormRow("Locked Values", help: lockedLine, systemImage: "lock") {
+          FormRow(String(localized: "Locked Values"), help: lockedLine, systemImage: "lock") {
             Button("Lock Now") {
               locking = true
               Task {
@@ -605,24 +608,32 @@ private struct PictureCard: View {
     .padding(.top, 6)
     if budget.hardwareCost != nil || budget.systemPressureCost != nil {
       BudgetMeter(
-        title: "Camera hardware", detail: camera.previousBudget?.hardwareCost.map { String(format: "was %.2f", $0) },
+        title: String(localized: "Camera hardware"), detail: camera.previousBudget?.hardwareCost.map { String(localized: "was \(String(format: "%.2f", $0))") },
         value: budget.hardwareCost, previous: camera.previousBudget?.hardwareCost)
       BudgetMeter(
-        title: "Heat and power", detail: camera.previousBudget?.systemPressureCost.map { String(format: "was %.2f", $0) },
+        title: String(localized: "Heat and power"), detail: camera.previousBudget?.systemPressureCost.map { String(localized: "was \(String(format: "%.2f", $0))") },
         value: budget.systemPressureCost, previous: camera.previousBudget?.systemPressureCost)
       Text("iOS’s own numbers for the cameras together; the full bar is the limit. Past it iOS slows the cameras, then stops them.")
         .kitFont(.caption).padding(.horizontal, 12)
     } else {
       BudgetMeter(
-        title: "Hub’s share of the CPU",
-        detail: "Capture, motion and \(camera.orderedUnits.count == 1 ? "1 encoder" : "\(camera.orderedUnits.count) encoders")" + (camera.previousCPUShare.map { " · was \(Int(($0 * 100).rounded()))%" } ?? ""),
+        title: String(localized: "Hub’s share of the CPU"),
+        detail: camera.previousCPUShare.map { String(localized: "Capture, motion and \(encoders) · was \(Int(($0 * 100).rounded()))%") }
+          ?? String(localized: "Capture, motion and \(encoders)"),
         value: camera.cpuShare, previous: camera.previousCPUShare,
         text: camera.cpuShare.map { "\(Int(($0 * 100).rounded()))%" })
       Text(budget.factors.isEmpty
-        ? "\(SecurityCamera.deviceKind == "Mac" ? "macOS" : "The system") reports only its pressure for the camera, not what it costs."
-        : "Pressure from \(budget.factors.joined(separator: ", ")).")
+        ? SecurityCamera.deviceKind == "Mac"
+          ? String(localized: "macOS reports only its pressure for the camera, not what it costs.")
+          : String(localized: "The system reports only its pressure for the camera, not what it costs.")
+        : String(localized: "Pressure from \(budget.factors.joined(separator: ", "))."))
         .kitFont(.caption).padding(.horizontal, 12)
     }
+  }
+
+  /// "1 encoder", "3 encoders": one for each camera on
+  private var encoders: String {
+    camera.orderedUnits.count == 1 ? String(localized: "1 encoder") : String(localized: "\(camera.orderedUnits.count) encoders")
   }
 
   private func pressureHue(_ pressure: CameraBudget.Pressure) -> Hue {
@@ -643,28 +654,28 @@ private struct PictureCard: View {
 
   private func title(_ adjustment: CameraPicture.Adjustment) -> String {
     switch adjustment {
-    case .auto: "Auto"
-    case .slow: "Slow"
-    case .locked: "Locked"
+    case .auto: String(localized: "Auto")
+    case .slow: String(localized: "Slow")
+    case .locked: String(localized: "Locked")
     }
   }
 
   private func help(_ adjustment: CameraPicture.Adjustment, locked: String) -> String {
     switch adjustment {
-    case .auto: "Adjusts all the time"
-    case .slow: "Adjusts every \(Int(CameraPicture.slowInterval)) s, not every frame"
-    case .locked: "Locked: \(locked)"
+    case .auto: String(localized: "Adjusts all the time")
+    case .slow: String(localized: "Adjusts every \(Int(CameraPicture.slowInterval)) s, not every frame")
+    case .locked: String(localized: "Locked: \(locked)")
     }
   }
 
   private var lockedLine: String {
-    guard let locked = setup.locked else { return "Locks focus, exposure and colour where they are now" }
+    guard let locked = setup.locked else { return String(localized: "Locks focus, exposure and colour where they are now") }
     var parts = [String]()
     if let iso = locked.iso { parts.append("ISO \(Int(iso.rounded()))") }
     if let shutter = locked.shutter, shutter > 0 { parts.append("1/\(Int((1 / shutter).rounded())) s") }
     if let temperature = locked.temperature { parts.append("\(Int(temperature.rounded())) K") }
     if let lens = locked.lensPosition { parts.append(String(format: "focus %.2f", lens)) }
-    parts.append("taken \(CameraTime.short(locked.date))")
+    parts.append(String(localized: "taken \(CameraTime.short(locked.date))"))
     return parts.joined(separator: " · ")
   }
 
@@ -697,14 +708,14 @@ private struct WhenToRecordCard: View {
         }
         if recording.when == .whenAway {
           FormRow("Away After", help: "No keyboard or mouse for this long. Locked or asleep counts at once.", systemImage: "hourglass") {
-            KitPicker("Away After", selection: binding(\.recording.awayMinutes), options: CameraRecording.minuteChoices.map { ($0 == 1 ? "1 minute" : "\($0) minutes", $0) })
+            KitPicker("Away After", selection: binding(\.recording.awayMinutes), options: CameraRecording.minuteChoices.map { ($0 == 1 ? String(localized: "1 minute") : String(localized: "\($0) minutes"), $0) })
               .fixedSize()
           }
           FormRow("Live View While Paused", help: recording.liveWhilePaused ? "Viewers still see the picture; nothing is recorded" : "The camera stops while you use the \(KitDevice.nameInSentence)", systemImage: "eye") {
             Toggle("Live View While Paused", isOn: binding(\.recording.liveWhilePaused))
               .toggleStyle(.kitSwitch).labelsHidden().controlSize(.small)
           }
-          FormRow("Record for 1 Hour", help: until.map { "Recording until \($0.formatted(date: .omitted, time: .shortened)), even while you use it" } ?? "Records even while you use the \(KitDevice.nameInSentence)", systemImage: "record.circle.fill") {
+          FormRow(String(localized: "Record for 1 Hour"), help: until.map { String(localized: "Recording until \($0.formatted(date: .omitted, time: .shortened)), even while you use it") } ?? String(localized: "Records even while you use the \(KitDevice.nameInSentence)"), systemImage: "record.circle.fill") {
             if until != nil {
               Button("Stop") { camera.recordForAnHour(setup.id, false) }.buttonStyle(.kit).controlSize(.small)
             } else {
@@ -725,12 +736,12 @@ private struct WhenToRecordCard: View {
 
   /// What the Mac's use looks like now: "you typed 4 s ago", "locked"
   private var statusLine: String {
-    guard setup.recording.when == .whenAway else { return "every motion" }
-    guard let presence = camera.presence else { return "while you’re away" }
-    if presence.isLocked { return "locked" }
-    if presence.isAsleep { return "asleep" }
-    guard let idle = presence.idle else { return "while you’re away" }
-    return idle < 60 ? "you typed \(Int(idle)) s ago" : "no input for \(Int(idle / 60)) min"
+    guard setup.recording.when == .whenAway else { return String(localized: "every motion") }
+    guard let presence = camera.presence else { return String(localized: "while you’re away") }
+    if presence.isLocked { return String(localized: "locked") }
+    if presence.isAsleep { return String(localized: "asleep") }
+    guard let idle = presence.idle else { return String(localized: "while you’re away") }
+    return idle < 60 ? String(localized: "you typed \(Int(idle)) s ago") : String(localized: "no input for \(Int(idle / 60)) min")
   }
 
   private func binding<Value>(_ path: WritableKeyPath<CameraSetup, Value>) -> Binding<Value> {
@@ -750,7 +761,7 @@ private struct ClipsCard: View {
 
   var body: some View {
     let storage = camera.settings.storage
-    KitSection("Clips", meta: [storage.target == .hub ? "\(hub.settings.name)’s storage" : "this \(KitDevice.nameInSentence)", size], systemImage: "externaldrive", hue: .orange) {
+    KitSection("Clips", meta: [storage.target == .hub ? String(localized: "\(hub.settings.name)’s storage") : String(localized: "this \(KitDevice.nameInSentence)"), size], systemImage: "externaldrive", hue: .orange) {
       FormCard(footer: footer) {
         FormRow("Keep Clips On", systemImage: "externaldrive") {
           KitPicker("Keep Clips On", selection: $camera.settings.storage.target, options: [
@@ -761,11 +772,11 @@ private struct ClipsCard: View {
           .disabled(!hub.hasStorage && storage.target == .device)
         }
         FormRow("Delete After", systemImage: "calendar") {
-          KitPicker("Delete After", selection: $camera.settings.storage.days, options: [1, 3, 7, 14, 30, 90].map { ($0 == 1 ? "1 day" : "\($0) days", $0) } + [("Never", 0)])
+          KitPicker("Delete After", selection: $camera.settings.storage.days, options: [1, 3, 7, 14, 30, 90].map { ($0 == 1 ? String(localized: "1 day") : String(localized: "\($0) days"), $0) } + [(String(localized: "Never"), 0)])
             .fixedSize()
         }
         FormRow("Size Limit", help: "The oldest clips go first", systemImage: "internaldrive") {
-          KitPicker("Size Limit", selection: $camera.settings.storage.gigabytes, options: [1.0, 2, 5, 10, 20, 50].map { ("\(Int($0)) GB", $0) } + [("None", 0.0)])
+          KitPicker("Size Limit", selection: $camera.settings.storage.gigabytes, options: [1.0, 2, 5, 10, 20, 50].map { ("\(Int($0)) GB", $0) } + [(String(localized: "None"), 0.0)])
             .fixedSize()
         }
       }
@@ -780,9 +791,9 @@ private struct ClipsCard: View {
   private var footer: String {
     let storage = camera.settings.storage
     let base = storage.target == .hub
-      ? "Each clip goes to the hub’s storage when it ends; this \(KitDevice.nameInSentence) keeps a thumbnail."
-      : "Clips stay on this \(KitDevice.nameInSentence)."
-    return base + " A clip starts \(Int(storage.preRoll)) seconds before the motion and ends \(Int(storage.postRoll)) seconds after it."
+      ? String(localized: "Each clip goes to the hub’s storage when it ends; this \(KitDevice.nameInSentence) keeps a thumbnail.")
+      : String(localized: "Clips stay on this \(KitDevice.nameInSentence).")
+    return String(localized: "\(base) A clip starts \(Int(storage.preRoll)) seconds before the motion and ends \(Int(storage.postRoll)) seconds after it.")
   }
 }
 
@@ -796,7 +807,7 @@ private struct AccessCard: View {
 
   var body: some View {
     let password = camera.password(setup.id)
-    KitSection("Access", meta: [setup.place, "\(hub.settings.name)’s devices on Hub Network"], systemImage: "key", hue: .gray) {
+    KitSection("Access", meta: [setup.place, String(localized: "\(hub.settings.name)’s devices on Hub Network")], systemImage: "key", hue: .gray) {
       FormCard {
         FormRow("Password", help: "Other devices ask for it once to watch \(setup.place). This device’s own pages don’t.", systemImage: "key") {
           let text = Text(showsPassword ? password : "••••-••••-••••").monospaced().kitFont(.body)
@@ -819,7 +830,7 @@ private struct AccessCard: View {
           }
         }
         if let unit = camera.units[setup.id] {
-          FormRow("Shared", help: unit.isPublished ? "As “\(unit.shareName)” on Hub Network · \(unit.viewers == 1 ? "1 watching" : "\(unit.viewers) watching")" : unit.shareProblem ?? "Not shared yet", systemImage: "network", hue: unit.isPublished ? .green : .orange)
+          FormRow(String(localized: "Shared"), help: unit.isPublished ? (unit.viewers == 1 ? String(localized: "As “\(unit.shareName)” on Hub Network · 1 watching") : String(localized: "As “\(unit.shareName)” on Hub Network · \(unit.viewers) watching")) : unit.shareProblem ?? String(localized: "Not shared yet"), systemImage: "network", hue: unit.isPublished ? .green : .orange)
         }
       }
     }
@@ -850,7 +861,7 @@ private struct AccessCard: View {
 
 private struct AppleHomeCard: View {
   var body: some View {
-    KitSection("Apple Home", meta: "later", systemImage: "house", hue: .orange) {
+    KitSection("Apple Home", meta: String(localized: "later"), systemImage: "house", hue: .orange) {
       Text("Adding the cameras to the Home app as cameras with motion sensors comes later.")
         .kitFont(.caption).padding(8)
     } accessory: {

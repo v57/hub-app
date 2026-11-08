@@ -5,20 +5,20 @@ import Observation
 enum NativeJoinPresentation {
   static func progress(_ state: NativeJoinProgressState?) -> String {
     switch state {
-    case .validating: "Validating invitation…"
-    case .staging: "Preparing secure identity…"
-    case .awaitingVPNConsent: "Waiting for VPN approval…"
-    case .startingTunnel: "Starting secure tunnel…"
-    case .rendezvous: "Finding direct connection…"
-    case .connected, .binding: "Enrolling this device…"
-    case .activating: "Activating Hub Network…"
-    case .recovering: "Recovering previous join…"
-    case nil: "Joining…"
+    case .validating: String(localized: "Validating invitation…")
+    case .staging: String(localized: "Preparing secure identity…")
+    case .awaitingVPNConsent: String(localized: "Waiting for VPN approval…")
+    case .startingTunnel: String(localized: "Starting secure tunnel…")
+    case .rendezvous: String(localized: "Finding direct connection…")
+    case .connected, .binding: String(localized: "Enrolling this device…")
+    case .activating: String(localized: "Activating Hub Network…")
+    case .recovering: String(localized: "Recovering previous join…")
+    case nil: String(localized: "Joining…")
     }
   }
 
   static func error(_ error: Error, limit: Int = 240) -> String {
-    let fallback = "Hub Network join failed. Try the invitation again."
+    let fallback = String(localized: "Hub Network join failed. Try the invitation again.")
     let raw: String
     if let invitation = error as? NetworkInvitationError {
       raw = invitation.message

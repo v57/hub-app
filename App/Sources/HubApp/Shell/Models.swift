@@ -96,8 +96,8 @@ extension Date {
   /// How long ago, short: now, 12m, 3h
   var shortRelative: String {
     let offset = -Int(timeIntervalSinceNow) / 60
-    guard offset > -1 else { return "future" }
-    guard offset > 1 else { return "now" }
+    guard offset > -1 else { return String(localized: "future") }
+    guard offset > 1 else { return String(localized: "now") }
     guard offset > 60 else { return "\(offset)m" }
     return "\(offset / 60)h"
   }

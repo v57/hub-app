@@ -21,18 +21,18 @@ enum HubPage: String, Hashable, CaseIterable, Sendable {
 
   var title: String {
     switch self {
-    case .overview: "Overview"
-    case .services: "Services"
-    case .apps: "Apps"
-    case .files: "Files"
-    case .cameras: "Cameras"
-    case .launcher: "Launcher"
-    case .devices: "Devices"
-    case .requests: "Requests"
-    case .connections: "Connections"
-    case .permissions: "Permissions"
-    case .lockdown: "Lockdown"
-    case .network: "Network"
+    case .overview: String(localized: "Overview")
+    case .services: String(localized: "Services")
+    case .apps: String(localized: "Apps")
+    case .files: String(localized: "Files")
+    case .cameras: String(localized: "Cameras")
+    case .launcher: String(localized: "Launcher")
+    case .devices: String(localized: "Devices")
+    case .requests: String(localized: "Requests")
+    case .connections: String(localized: "Connections")
+    case .permissions: String(localized: "Permissions")
+    case .lockdown: String(localized: "Lockdown")
+    case .network: String(localized: "Network")
     }
   }
   var systemImage: String {
@@ -205,8 +205,8 @@ enum HubSort: String, CaseIterable, Hashable, Sendable {
   case recent, name
   var title: String {
     switch self {
-    case .recent: "Recent"
-    case .name: "Name"
+    case .recent: String(localized: "Recent")
+    case .name: String(localized: "Name")
     }
   }
 }

@@ -120,7 +120,7 @@ private struct TVAllHubs: View {
     let listed = navigator.sorted(hubs.list).filter { !$0.reach.isHidden }
     VStack(alignment: .leading, spacing: 32) {
       Text(MetaLine.join([
-        listed.count == 1 ? "1 hub" : "\(hubs.list.count) hubs", "\(hubs.list.filter(\.isConnected).count) online",
+        listed.count == 1 ? String(localized: "1 hub") : String(localized: "\(hubs.list.count) hubs"), String(localized: "\(hubs.list.filter(\.isConnected).count) online"),
       ]))
       .kitFont(.caption)
       ScrollView {
@@ -260,7 +260,10 @@ private struct TVHubTab: View {
 
   /// The tabs a TV shows; Access opens Connections, where the hub's keys and groups are
   private var tabs: [(String, HubPage)] {
-    [("Overview", .overview), ("Services", .services), ("Apps", .apps), ("Devices", .devices), ("Access", .connections), ("Network", .network)]
+    [
+      (String(localized: "Overview"), .overview), (String(localized: "Services"), .services), (String(localized: "Apps"), .apps),
+      (String(localized: "Devices"), .devices), (String(localized: "Access"), .connections), (String(localized: "Network"), .network),
+    ]
       .filter { hub.canOpen($0.1) }
   }
 

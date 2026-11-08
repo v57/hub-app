@@ -21,7 +21,7 @@ struct DevicePageView: View {
     case .localHub:
 #if canImport(HubServer)
       NavigationStack { LocalHubView() }.kitPane(.content)
-        .pageToolbar("Run a Hub", meta: ["on this \(KitDevice.nameInSentence)"], systemImage: "server.rack", hue: .gray) { }
+        .pageToolbar(String(localized: "Run a Hub"), meta: [String(localized: "on this \(KitDevice.nameInSentence)")], systemImage: "server.rack", hue: .gray) { }
 #else
       EmptyState(systemImage: "server.rack", title: "Not on This Device")
 #endif
@@ -30,7 +30,7 @@ struct DevicePageView: View {
     case .farm:
 #if !os(tvOS) && !os(visionOS)
       NavigationStack { FarmView() }.kitPane(.content)
-        .pageToolbar("Farm", meta: [Farm.main.isRunning ? "Farming" : "Off"], systemImage: "tree", hue: .green) { }
+        .pageToolbar(String(localized: "Farm"), meta: [Farm.main.isRunning ? String(localized: "Farming") : String(localized: "Off")], systemImage: "tree", hue: .green) { }
 #else
       EmptyState(systemImage: "tree", title: "Not on This Device")
 #endif
@@ -56,7 +56,7 @@ struct DeviceSettingsPage: View {
           HubKeysSection(hub: hub)
         }
         DevicePortsSection()
-        KitSection("Shared Keys", meta: ["kept by Reset Data"], systemImage: "key", hue: .gray) {
+        KitSection("Shared Keys", meta: [String(localized: "kept by Reset Data")], systemImage: "key", hue: .gray) {
           VStack(spacing: 8) {
             Text("Hubs from before each hub got keys of its own stay on these, and so does the hub this \(KitDevice.nameInSentence) runs.")
               .kitFont(.caption).fixedSize(horizontal: false, vertical: true)
@@ -64,7 +64,7 @@ struct DeviceSettingsPage: View {
             KeyValueLine(key: "Device Key", value: DeviceIdentity.app?.key.publicKey ?? "–", mono: true)
           }.padding(8)
         }
-        KitSection("Reset Data", meta: ["everything but the keys"], systemImage: "trash", hue: .red) {
+        KitSection("Reset Data", meta: [String(localized: "everything but the keys")], systemImage: "trash", hue: .red) {
           Text("Removes your hubs, settings and caches, Hub Network membership and its VPN profile, and the hub this \(KitDevice.nameInSentence) runs with its data. Your keys stay, so hubs that know this \(KitDevice.nameInSentence) still recognize it.")
             .kitFont(.caption).fixedSize(horizontal: false, vertical: true).padding(8)
         } accessory: {
@@ -78,7 +78,7 @@ struct DeviceSettingsPage: View {
       .padding(.bottom, 24)
     }
     .kitPane(.content)
-    .pageToolbar("Settings", meta: ["this \(KitDevice.nameInSentence)"], systemImage: "gearshape", hue: .gray) { }
+    .pageToolbar(String(localized: "Settings"), meta: [String(localized: "this \(KitDevice.nameInSentence)")], systemImage: "gearshape", hue: .gray) { }
 #if DEBUG
     // For checks that Reset Data kept them: compare with its `[HubReset] KEPT` lines after a relaunch
     .onAppear { print("[HubSettings] keys \(KeyChain.main.publicKey()) \(DeviceIdentity.app?.key.publicKey ?? "-")") }
@@ -107,7 +107,7 @@ private struct DevicePortsSection: View {
   @State private var newPort = ""
 
   var body: some View {
-    KitSection("Open Ports", meta: ["besides what you share"], systemImage: "lock.open", hue: .orange) {
+    KitSection("Open Ports", meta: [String(localized: "besides what you share")], systemImage: "lock.open", hue: .orange) {
       VStack(spacing: 8) {
         Text("A hub can only open a port on this \(KitDevice.nameInSentence) that's shared from it or listed here, whatever the hub signs.")
           .kitFont(.caption).fixedSize(horizontal: false, vertical: true)
@@ -147,7 +147,7 @@ private struct HubKeysSection: View {
   @State private var request: DeviceRequest?
 
   var body: some View {
-    KitSection(hub.settings.name, meta: [hub.usesSharedKeys ? "shared keys" : "keys of its own"], systemImage: "key", hue: .blue) {
+    KitSection(hub.settings.name, meta: [hub.usesSharedKeys ? String(localized: "shared keys") : String(localized: "keys of its own")], systemImage: "key", hue: .blue) {
       VStack(spacing: 8) {
         KeyValueLine(key: "Your Key", value: hub.key, mono: true)
         KeyValueLine(key: "Device Key", value: deviceKey ?? "–", mono: true)
@@ -180,10 +180,10 @@ private struct HubKeysSection: View {
 
   private var waiting: String? {
     switch request?.status {
-    case .waiting: "Waiting for its turn with this hub. The code comes once the hub has this \(KitDevice.nameInSentence)’s request."
-    case .pending: "An owner compares this code and approves this \(KitDevice.nameInSentence)."
+    case .waiting: String(localized: "Waiting for its turn with this hub. The code comes once the hub has this \(KitDevice.nameInSentence)’s request.")
+    case .pending: String(localized: "An owner compares this code and approves this \(KitDevice.nameInSentence).")
     case .approved: nil
-    case nil: hub.isConnected ? "This hub gives no safety code to compare." : nil
+    case nil: hub.isConnected ? String(localized: "This hub gives no safety code to compare.") : nil
     }
   }
 }
@@ -230,14 +230,14 @@ struct SharedServicesPage: View {
       .padding(.bottom, 24)
     }
     .kitPane(.content)
-    .pageToolbar("Shared Services", meta: ["what this \(KitDevice.nameInSentence) runs for its hubs", "\(AppServices.Service.sharedCount) shared"], systemImage: "square.and.arrow.up", hue: .purple) { }
+    .pageToolbar(String(localized: "Shared Services"), meta: [String(localized: "what this \(KitDevice.nameInSentence) runs for its hubs"), String(localized: "\(AppServices.Service.sharedCount) shared")], systemImage: "square.and.arrow.up", hue: .purple) { }
     .navigationDestination(item: idiom == .phone ? $trying : .constant(nil)) { service in
       AppServices.Page(service: service)
         .kitPane(.content)
-        .pageToolbar(service.name, meta: ["on this \(KitDevice.nameInSentence)"], systemImage: service.image, hue: .purple) { }
+        .pageToolbar(service.name, meta: [String(localized: "on this \(KitDevice.nameInSentence)")], systemImage: service.image, hue: .purple) { }
     }
     .kitSheet(item: idiom == .phone ? .constant(nil) : $trying) { service in
-      KitSheet(title: service.name, meta: "On this \(KitDevice.nameInSentence)", systemImage: service.image, hue: .purple, width: 720) {
+      KitSheet(title: service.name, meta: String(localized: "On this \(KitDevice.nameInSentence)"), systemImage: service.image, hue: .purple, width: 720) {
         AppServices.Page(service: service).frame(minHeight: 460)
       } footer: {
         Button("Done") { trying = nil }.buttonStyle(.kitPrimary).keyboardShortcut(.defaultAction)
@@ -249,9 +249,9 @@ struct SharedServicesPage: View {
 extension AppServices.Service: Identifiable {
   var name: String {
     switch self {
-    case .imageEncoder: "Image encoder"
-    case .videoEncoder: "Video encoder"
-    case .sensitiveContent: "Detect sensitive content"
+    case .imageEncoder: String(localized: "Image encoder")
+    case .videoEncoder: String(localized: "Video encoder")
+    case .sensitiveContent: String(localized: "Detect sensitive content")
     case .translate: "Apple Intelligence Translate"
     case .chat: "Apple Intelligence Chat"
     }

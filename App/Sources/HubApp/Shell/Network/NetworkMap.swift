@@ -275,7 +275,7 @@ struct NetworkMap: View {
 
   private var accessibilityText: String {
     let others = devices.count
-    return "\(hubName) and \(others == 1 ? "1 device" : "\(others) devices")"
+    return others == 1 ? String(localized: "\(hubName) and 1 device") : String(localized: "\(hubName) and \(others) devices")
   }
 }
 

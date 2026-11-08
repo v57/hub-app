@@ -57,8 +57,8 @@ struct AllHubsView: View {
     let online = hubs.list.filter(\.isConnected).count
     let requests = hubs.list.reduce(0) { $0 + ($1.state.statusBadges.value.security ?? 0) + $1.state.pendingDevices.value.count }
     return [
-      hubs.list.count == 1 ? "1 hub" : "\(hubs.list.count) hubs", "\(online) online",
-      requests == 0 ? "" : requests == 1 ? "1 request" : "\(requests) requests",
+      hubs.list.count == 1 ? String(localized: "1 hub") : String(localized: "\(hubs.list.count) hubs"), String(localized: "\(online) online"),
+      requests == 0 ? "" : requests == 1 ? String(localized: "1 request") : String(localized: "\(requests) requests"),
     ]
   }
 }
@@ -280,7 +280,7 @@ private struct TileGrid: View {
           AppTileIcon(app: app, size: 36)
         }
       }
-      .labelStyle(HubTileLabelStyle(badge: app.isOnline ? nil : "Offline"))
+      .labelStyle(HubTileLabelStyle(badge: app.isOnline ? nil : String(localized: "Offline")))
     }
   }
 
@@ -429,9 +429,9 @@ extension Hub.Launcher.AppInfo {
   var isHub: Bool { id == "Hub" || id == "Hub Pro" || id == "Hub Lite" }
   /// "4% · 143 MB · 23h", "Stopped", "Updating"
   func statusLine(_ status: Hub.Launcher.AppStatus?) -> String {
-    if status?.updating == true { return "Updating" }
+    if status?.updating == true { return String(localized: "Updating") }
     guard let status, let processes = status.processes, !processes.isEmpty else {
-      return active ? "Not running" : "Stopped"
+      return active ? String(localized: "Not running") : String(localized: "Stopped")
     }
     var parts = [String]()
     if let cpu = status.totalCpu ?? processes.compactMap(\.cpu).reduce(nil, { ($0 ?? 0) + $1 }) {
@@ -440,7 +440,7 @@ extension Hub.Launcher.AppInfo {
     if let memory = status.totalMemory ?? processes.compactMap(\.memory).reduce(nil, { ($0 ?? 0) + $1 }) {
       parts.append(memory >= 1024 ? String(format: "%.1f GB", memory / 1024) : "\(Int(memory)) MB")
     }
-    if processes.count > 1 { parts.append("\(processes.count) instances") }
+    if processes.count > 1 { parts.append(String(localized: "\(processes.count) instances")) }
     if let started = status.started { parts.append(started.shortRelative) }
     return parts.joined(separator: " · ")
   }

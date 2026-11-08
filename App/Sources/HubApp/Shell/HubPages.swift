@@ -116,7 +116,7 @@ struct AppsPage: View {
         } else {
           AppsCard(apps: apps.filter { !homeApps.isHidden($0, in: hub.id) })
           if !hidden.isEmpty {
-            KitSection("Hidden", meta: ["not on All Hubs or Overview"], systemImage: "eye.slash", hue: .gray) {
+            KitSection("Hidden", meta: [String(localized: "not on All Hubs or Overview")], systemImage: "eye.slash", hue: .gray) {
               ForEach(hidden) { app in
                 SidebarRow(app.name) {
                   AppTileIcon(app: app, size: 20)
@@ -132,7 +132,7 @@ struct AppsPage: View {
       .padding(KitMetrics.gutter)
     }
     .kitPane(.content)
-    .pageToolbar("Apps", meta: PageMeta.parts(hub, [apps.count == 1 ? "1 app" : "\(apps.count) apps"]), systemImage: HubPage.apps.systemImage, hue: .purple) { }
+    .pageToolbar(String(localized: "Apps"), meta: PageMeta.parts(hub, [apps.count == 1 ? String(localized: "1 app") : String(localized: "\(apps.count) apps")]), systemImage: HubPage.apps.systemImage, hue: .purple) { }
   }
 }
 
@@ -163,7 +163,7 @@ struct ServiceAppPage: View {
       }
       .hubCardStyle { $0.kitSurface(.card) }
       .kitPane(.content)
-      .pageToolbar(app.name, meta: PageMeta.parts(hub, [app.isOnline ? "" : "Offline"]), systemImage: app.icon ?? "app", hue: StableHue.pick(app.name)) { }
+      .pageToolbar(app.name, meta: PageMeta.parts(hub, [app.isOnline ? "" : String(localized: "Offline")]), systemImage: app.icon ?? "app", hue: StableHue.pick(app.name)) { }
     } else {
       EmptyState(systemImage: "app.dashed", title: "Loading the App…", status: .working)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

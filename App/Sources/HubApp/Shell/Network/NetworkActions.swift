@@ -141,7 +141,7 @@ extension Hub {
 extension Error {
   /// One readable line for a caption: what went wrong in Hub Network
   var networkLine: String {
-    if self is CancellationError { return "This took too long. Try again." }
+    if self is CancellationError { return String(localized: "This took too long. Try again.") }
     let message = localizedDescription.split(whereSeparator: \.isNewline).joined(separator: " ")
       .trimmingCharacters(in: .whitespaces)
     return String(message.prefix(240))

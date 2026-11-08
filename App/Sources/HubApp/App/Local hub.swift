@@ -105,7 +105,7 @@ final class LocalHub {
     } catch {
       // Never a new key instead: that would change the hub's identity for every device that pinned it
       self.server = nil
-      self.error = "Couldn't read the hub's key: \(error)"
+      self.error = String(localized: "Couldn't read the hub's key: \(String(describing: error))")
       return
     }
     self.server = server
@@ -230,7 +230,7 @@ final class LocalHub {
   private static func describe(_ error: Error, port: UInt16) -> String {
     let text = "\(error)"
     if text.contains("rawValue: 48") || text.localizedCaseInsensitiveContains("address already in use") {
-      return "Port \(port) is in use by another app or hub. Pick another port."
+      return String(localized: "Port \(port) is in use by another app or hub. Pick another port.")
     }
     return text
   }

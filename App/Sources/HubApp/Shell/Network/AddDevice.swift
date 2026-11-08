@@ -71,7 +71,7 @@ struct AddDeviceSheet: View {
       .padding(.vertical, 12)
     } footer: {
       let count = facts.devices.count
-      SheetStatus("\(hub.settings.name) has \(count == 1 ? "1 device" : "\(count) devices")", systemImage: "checkmark", hue: .green)
+      SheetStatus(count == 1 ? String(localized: "\(hub.settings.name) has 1 device") : String(localized: "\(hub.settings.name) has \(count) devices"), systemImage: "checkmark", hue: .green)
       Button("Add Another") {
         known = nil
         attempt += 1
@@ -152,9 +152,9 @@ struct AddDeviceSheet: View {
     VStack(alignment: .leading, spacing: 14) {
       if purpose == .internet {
         // The invitation doesn't say what it's for yet, so the phone is told where to scan it
-        NumberedStep(1, "Install Hub on your phone")
-        NumberedStep(2, "Open it and choose Browse Through My Own Internet", "Then Scan Its Code, and point it here.")
-        NumberedStep(3, "It browses through \(facts.thisName)", "Joining and the switch to this Mac’s internet happen together.")
+        NumberedStep(1, String(localized: "Install Hub on your phone"))
+        NumberedStep(2, String(localized: "Open it and choose Browse Through My Own Internet"), String(localized: "Then Scan Its Code, and point it here."))
+        NumberedStep(3, String(localized: "It browses through \(facts.thisName)"), String(localized: "Joining and the switch to this Mac’s internet happen together."))
         if !hub.net.isSharing {
           HStack(spacing: 8) {
             Text("This Mac doesn’t share its internet yet.").kitFont(.caption).foregroundStyle(Hue.orange.text)
@@ -169,9 +169,9 @@ struct AddDeviceSheet: View {
           }
         }
       } else {
-        NumberedStep(1, "Open Hub on the other device", "A Mac, iPhone or iPad. Install Hub first if it isn’t there.")
-        NumberedStep(2, "Choose Add a Hub, then Scan Code", "Point it at this code.")
-        NumberedStep(3, "That’s it", "It joins on its own. You don’t need to approve anything here.")
+        NumberedStep(1, String(localized: "Open Hub on the other device"), String(localized: "A Mac, iPhone or iPad. Install Hub first if it isn’t there."))
+        NumberedStep(2, String(localized: "Choose Add a Hub, then Scan Code"), String(localized: "Point it at this code."))
+        NumberedStep(3, String(localized: "That’s it"), String(localized: "It joins on its own. You don’t need to approve anything here."))
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -195,7 +195,7 @@ struct AddDeviceSheet: View {
       link = try await hub.net.createInviteCode()
       known = Set(facts.devices.map(\.id))
     } catch is CancellationError {
-      error = "The connection helper didn’t confirm this \(KitDevice.nameInSentence) in time. Try again in a moment."
+      error = String(localized: "The connection helper didn’t confirm this \(KitDevice.nameInSentence) in time. Try again in a moment.")
     } catch {
       self.error = error.networkLine
     }

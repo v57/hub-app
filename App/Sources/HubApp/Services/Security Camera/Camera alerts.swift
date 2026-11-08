@@ -92,7 +92,7 @@ final class CameraAlerts {
   func setFollowing(_ on: Bool, _ camera: HubCamera, on hub: Hub) async {
     if on {
       guard await UserNotifications.requestPermission() else {
-        problem = "Notifications are off for Hub. Turn them on in Settings, then try again."
+        problem = String(localized: "Notifications are off for Hub. Turn them on in Settings, then try again.")
         return
       }
       problem = nil
@@ -260,7 +260,7 @@ final class CameraAlerts {
     var info = ["hub": subscription.hub, "camera": subscription.id]
     if let event = alert.event { info["event"] = event }
     return UserNotification(
-      id: "camera-\(subscription.id)-\(alert.event ?? UUID().uuidString)", title: "Motion at \(place)",
+      id: "camera-\(subscription.id)-\(alert.event ?? UUID().uuidString)", title: String(localized: "Motion at \(place)"),
       body: body(place: place, device: alert.device, hub: subscription.hubName), thread: "camera-\(subscription.id)",
       image: image, info: info)
   }

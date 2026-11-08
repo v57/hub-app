@@ -145,7 +145,9 @@ struct CameraPage: View {
     let recorded = events.reduce(0) { $0 + $1.duration }
     let title = HStack(alignment: .firstTextBaseline, spacing: 10) {
       Text(dayTitle(day)).kitFont(.headline)
-      Text("\(events.count == 1 ? "1 event" : "\(events.count) events") · \(CameraFormat.duration(recorded)) recorded")
+      Text(events.count == 1
+        ? String(localized: "1 event · \(CameraFormat.duration(recorded)) recorded")
+        : String(localized: "\(events.count) events · \(CameraFormat.duration(recorded)) recorded"))
         .kitFont(.caption)
         .lineLimit(1)
     }
@@ -173,11 +175,11 @@ struct CameraPage: View {
       if let event {
         KitSection("Clip", meta: [CameraFormat.duration(event.duration), CameraFormat.bytes(Double(event.size))], systemImage: "record.circle", hue: .red) {
           CameraDetailRows(rows: [
-            ("Camera", [camera.name, viewer.info?.name].compactMap { $0 }.joined(separator: " · ")),
-            ("Motion", "\(event.start.formatted(date: .omitted, time: .standard)) – \((event.end ?? Date()).formatted(date: .omitted, time: .standard))"),
-            ("Includes", "a few seconds before and after"),
-            ("Size", [CameraFormat.bytes(Double(event.size)), viewer.info.map { "\($0.width)×\($0.height)" }].compactMap { $0 }.joined(separator: " · ")),
-            ("Stored on", event.storage == CameraStoragePolicy.Target.hub.rawValue ? "\(hub.settings.name)’s storage" : "the camera’s device"),
+            (String(localized: "Camera"), [camera.name, viewer.info?.name].compactMap { $0 }.joined(separator: " · ")),
+            (String(localized: "Motion"), "\(event.start.formatted(date: .omitted, time: .standard)) – \((event.end ?? Date()).formatted(date: .omitted, time: .standard))"),
+            (String(localized: "Includes"), String(localized: "a few seconds before and after")),
+            (String(localized: "Size"), [CameraFormat.bytes(Double(event.size)), viewer.info.map { "\($0.width)×\($0.height)" }].compactMap { $0 }.joined(separator: " · ")),
+            (String(localized: "Stored on"), event.storage == CameraStoragePolicy.Target.hub.rawValue ? String(localized: "\(hub.settings.name)’s storage") : String(localized: "the camera’s device")),
           ])
           if let error = clip.error {
             Text(error).kitFont(.caption).foregroundStyle(Hue.red.text).padding(8)
@@ -185,9 +187,9 @@ struct CameraPage: View {
         }
       }
       let events = viewer.events.filter { Calendar.current.isDate($0.start, inSameDayAs: day) }
-      KitSection("Motion Events", meta: [dayTitle(day), events.count == 1 ? "1 event" : "\(events.count) events"], systemImage: "figure.walk.motion", hue: .orange) {
+      KitSection("Motion Events", meta: [dayTitle(day), events.count == 1 ? String(localized: "1 event") : String(localized: "\(events.count) events")], systemImage: "figure.walk.motion", hue: .orange) {
         if events.isEmpty {
-          Text(viewer.state == .live ? "Nothing moved. Clips of motion show up here." : viewer.tileLine)
+          Text(viewer.state == .live ? String(localized: "Nothing moved. Clips of motion show up here.") : viewer.tileLine)
             .kitFont(.caption).padding(8)
         }
         ForEach(events) { item in
@@ -210,15 +212,15 @@ struct CameraPage: View {
 
   private func details(_ info: CameraInfo, viewer: CameraViewer) -> [(String, String)] {
     var rows = [(String, String)]()
-    if let device = info.device { rows.append(("Device", device)) }
-    rows.append(("Lens", info.camera))
-    if let power = info.power { rows.append(("Power", power)) }
+    if let device = info.device { rows.append((String(localized: "Device"), device)) }
+    rows.append((String(localized: "Lens"), info.camera))
+    if let power = info.power { rows.append((String(localized: "Power"), power)) }
     let codec = VideoCodec(rawValue: info.codec ?? "h264")?.title ?? "H.264"
-    rows.append(("Stream", ["\(info.width)×\(info.height) · \(info.fps) fps", codec, info.bitrate.map(CameraFormat.bitrate)].compactMap { $0 }.joined(separator: " · ")))
-    rows.append(("Network", "Hub Network" + (viewer.behind > 0.5 ? String(format: " · %.1f s behind", viewer.behind) : "")))
-    rows.append(("Clips", info.storage == CameraStoragePolicy.Target.hub.rawValue ? "\(hub.settings.name)’s storage" : "on the camera’s device"))
-    rows.append(("Sensitivity", "\(Int((info.sensitivity * 100).rounded()))%"))
-    if let viewers = info.viewers { rows.append(("Watching", viewers == 1 ? "1 device" : "\(viewers) devices")) }
+    rows.append((String(localized: "Stream"), ["\(info.width)×\(info.height) · \(info.fps) fps", codec, info.bitrate.map(CameraFormat.bitrate)].compactMap { $0 }.joined(separator: " · ")))
+    rows.append((String(localized: "Network"), viewer.behind > 0.5 ? String(localized: "Hub Network · \(String(format: "%.1f", viewer.behind)) s behind") : "Hub Network"))
+    rows.append((String(localized: "Clips"), info.storage == CameraStoragePolicy.Target.hub.rawValue ? String(localized: "\(hub.settings.name)’s storage") : String(localized: "on the camera’s device")))
+    rows.append((String(localized: "Sensitivity"), "\(Int((info.sensitivity * 100).rounded()))%"))
+    if let viewers = info.viewers { rows.append((String(localized: "Watching"), viewers == 1 ? String(localized: "1 device") : String(localized: "\(viewers) devices"))) }
     return rows
   }
 
@@ -226,11 +228,11 @@ struct CameraPage: View {
     if let event {
       let events = viewer.events.filter { Calendar.current.isDate($0.start, inSameDayAs: event.start) }.reversed()
       let index = (events.firstIndex { $0.id == event.id }.map { events.distance(from: events.startIndex, to: $0) + 1 }) ?? 0
-      return ["Motion at \(event.start.formatted(date: .omitted, time: .shortened))", CameraFormat.duration(event.duration), "event \(index) of \(events.count)"]
+      return [String(localized: "Motion at \(event.start.formatted(date: .omitted, time: .shortened))"), CameraFormat.duration(event.duration), String(localized: "event \(index) of \(events.count)")]
     }
     var parts = [viewer.info?.name ?? viewer.tileLine]
-    if let info = viewer.info { parts.append("\(info.width)×\(info.height) · \(info.fps) fps") }
-    if let watching = viewer.info?.viewers, watching > 0 { parts.append("\(watching) watching") }
+    if let info = viewer.info { parts.append(String(localized: "\(info.width)×\(info.height) · \(info.fps) fps")) }
+    if let watching = viewer.info?.viewers, watching > 0 { parts.append(String(localized: "\(watching) watching")) }
     return parts
   }
 
@@ -254,8 +256,8 @@ struct CameraPage: View {
   }
 
   private func dayTitle(_ day: Date) -> String {
-    if Calendar.current.isDateInToday(day) { return "Today" }
-    if Calendar.current.isDateInYesterday(day) { return "Yesterday" }
+    if Calendar.current.isDateInToday(day) { return String(localized: "Today") }
+    if Calendar.current.isDateInYesterday(day) { return String(localized: "Yesterday") }
     return day.formatted(.dateTime.month(.abbreviated).day())
   }
 
@@ -416,7 +418,7 @@ private struct ClipView: View {
       }
       VStack {
         HStack {
-          VideoChip(title: "Recorded · \(event.start.formatted(date: .omitted, time: .standard))", systemImage: "record.circle")
+          VideoChip(title: String(localized: "Recorded · \(event.start.formatted(date: .omitted, time: .standard))"), systemImage: "record.circle")
           Spacer()
         }
         Spacer()

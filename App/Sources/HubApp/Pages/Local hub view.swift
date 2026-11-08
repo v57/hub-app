@@ -150,8 +150,8 @@ struct LocalHubView: View {
         HStack(alignment: .firstTextBaseline) {
           Image(systemName: peer.services > 0 ? "server.rack" : "iphone")
           VStack(alignment: .leading) {
-            Text(peer.device ?? peer.name ?? peer.key.map { "Key \($0.dropFirst(16).prefix(8))…" } ?? "Anonymous")
-            Text([peer.device != nil ? peer.name : nil, peer.address, peer.services > 0 ? "\(peer.services) services" : nil]
+            Text(peer.device ?? peer.name ?? peer.key.map { String(localized: "Key \(String($0.dropFirst(16).prefix(8)))…") } ?? String(localized: "Anonymous"))
+            Text([peer.device != nil ? peer.name : nil, peer.address, peer.services > 0 ? String(localized: "\(peer.services) services") : nil]
               .compactMap { $0 }.joined(separator: " · ")).secondary()
           }
         }
@@ -215,11 +215,11 @@ struct LocalHubCard: View {
   var subtitle: String {
     if hub.isRunning {
       let count = hub.status.connections
-      return "Hub on port \(hub.status.port ?? hub.port) · \(count) connected"
+      return String(localized: "Hub on port \(hub.status.port ?? hub.port) · \(count) connected")
     }
-    if hub.isStarting { return "Starting the hub…" }
-    if hub.isEnabled, hub.error != nil { return "The hub couldn't start" }
-    return "Run a Hub on this device"
+    if hub.isStarting { return String(localized: "Starting the hub…") }
+    if hub.isEnabled, hub.error != nil { return String(localized: "The hub couldn't start") }
+    return String(localized: "Run a Hub on this device")
   }
 }
 #endif

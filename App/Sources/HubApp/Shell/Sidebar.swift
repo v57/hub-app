@@ -96,7 +96,7 @@ private struct HubsSection: View {
     let shown = sorted.filter { !$0.reach.isHidden || showsAll || !search.isEmpty }
     let hidden = sorted.count - sorted.filter { !$0.reach.isHidden }.count
     KitSection(
-      "Hubs", meta: hubs.list.isEmpty ? ["None yet"] : ["\(shown.count) of \(hubs.list.count)", navigator.sort.title], systemImage: "hexagon"
+      "Hubs", meta: hubs.list.isEmpty ? [String(localized: "None yet")] : [String(localized: "\(shown.count) of \(hubs.list.count)"), navigator.sort.title], systemImage: "hexagon"
     ) {
       SidebarRow(value: Route.allHubs, "All Hubs") {
         Tile(systemImage: "square.grid.2x2.fill", hue: .accent, style: .solid)
@@ -191,8 +191,8 @@ struct HubMenu: View {
   private var trustSentence: String {
     let name = hub.settings.name
     let movesKeys = hub.settings.keys == Hub.Settings.sharedKeys && hub.settings.identityTag == nil
-    let approval = movesKeys ? " \(name) then sees this \(KitDevice.nameInSentence) as a new device, and an owner approves it again." : ""
-    return "Accepts the key \(name) now shows.\(approval) Do this only if you know why it changed."
+    let approval = movesKeys ? String(localized: " \(name) then sees this \(KitDevice.nameInSentence) as a new device, and an owner approves it again.") : ""
+    return String(localized: "Accepts the key \(name) now shows.\(approval) Do this only if you know why it changed.")
   }
 }
 
@@ -318,10 +318,10 @@ enum AccessMeta {
   static func parts(facts: HubFacts, hub: Hub, lockdown: Bool) -> [String] {
     var parts = [String]()
     let waiting = facts.pendingDevices.count
-    if waiting > 0 { parts.append("\(waiting) waiting") }
+    if waiting > 0 { parts.append(String(localized: "\(waiting) waiting")) }
     let requests = facts.badges.security ?? 0
-    if requests > 0 { parts.append(requests == 1 ? "1 request" : "\(requests) requests") }
-    if hub.canLockdown { parts.append(lockdown ? "Lockdown on" : "Lockdown off") }
+    if requests > 0 { parts.append(requests == 1 ? String(localized: "1 request") : String(localized: "\(requests) requests")) }
+    if hub.canLockdown { parts.append(lockdown ? String(localized: "Lockdown on") : String(localized: "Lockdown off")) }
     return parts
   }
 }
@@ -428,7 +428,7 @@ private struct NetworkSection: View {
 private struct ThisDeviceSection: View {
 #if !os(tvOS) && !os(visionOS)
   @State private var farm = Farm.main
-  private var meta: [String] { [farm.isRunning ? "Farming" : "Farm off"] }
+  private var meta: [String] { [farm.isRunning ? String(localized: "Farming") : String(localized: "Farm off")] }
 #else
   private var meta: [String] { [] }
 #endif
