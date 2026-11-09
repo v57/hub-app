@@ -260,7 +260,7 @@ class AppServices {
       hub.service.group(enabled: $0).imageService()
     } update: { $0.isEnabled = $1 }
 #endif
-#if os(macOS) || os(iOS) || os(visionOS)
+#if os(iOS) || os(visionOS)
     sensitiveContent = Status(services: self, service: .sensitiveContent) {
       hub.service.group(enabled: $0).sensitiveContentService()
     } update: { $0.isEnabled = $1 }

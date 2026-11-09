@@ -93,6 +93,15 @@ extension AppServices {
   }
   enum Service: Int, CaseIterable {
     case imageEncoder, videoEncoder, translate, chat, sensitiveContent
+    /// The services this device offers. The Mac has no sensitive content detection: Sensitive Content Analysis needs an
+    /// entitlement Developer ID can't carry, and without it every file would come back as not sensitive.
+    static var available: [Service] {
+#if os(macOS)
+      allCases.filter { $0 != .sensitiveContent }
+#else
+      allCases
+#endif
+    }
     var id: String {
       switch self {
       case .imageEncoder: return "image/encode"

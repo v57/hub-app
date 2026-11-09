@@ -49,6 +49,7 @@ and chat with an on-device model. **Shared Services** shows a card per service:
 - **Image encoder**: compresses images by converting them to HEIC.
 - **Video encoder**: compresses videos by converting them to HEVC.
 - **Detect sensitive content**: checks whether an image or video contains sensitive content, to help with moderation.
+  iPhone and iPad only.
 - **Apple Intelligence Translate**: translates text on this device. Needs iOS 18 or macOS 15 or later.
 - **Apple Intelligence Chat**: chats with Apple Intelligence’s on-device model. Needs iOS 26 or macOS 26 or later, on
   a device with Apple Intelligence.
@@ -66,7 +67,7 @@ Choose **Try It** on a card. On iPhone it opens as a page; on iPad and the Mac, 
 - **Image encoder**: pick a format under **Convert to**, choose **including metadata** or **removing metadata**, and
   set the quality. Pick photos (or drop images), and see each result’s size. **Export** shares the results.
 - **Video encoder**: set the quality, pick videos, and **Export** the results.
-- **Detect sensitive content**: pick images, or drop files on iPad and the Mac. Each one is marked.
+- **Detect sensitive content**: pick images, or drop files on iPad. Each one is marked.
 - **Translate**: pick the two languages, type in **Text to translate**. **Switch** swaps them, **Refresh** checks the
   languages again. A language downloads the first time you use it.
 - **Chat**: type a message and choose **Send**. There’s no chat history.

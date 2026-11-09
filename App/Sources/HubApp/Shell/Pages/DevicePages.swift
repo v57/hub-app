@@ -202,7 +202,7 @@ struct SharedServicesPage: View {
     let connected = hubs.list.filter(\.isConnected)
     ScrollView {
       LazyVGrid(columns: [GridItem(.adaptive(minimum: idiom == .phone ? 280 : 320), spacing: KitMetrics.gutter, alignment: .top)], spacing: KitMetrics.gutter) {
-        ForEach(AppServices.Service.allCases, id: \.self) { service in
+        ForEach(AppServices.Service.available, id: \.self) { service in
           KitSection(Text(service.title)) {
             ForEach(connected) { hub in
               if let isOn = service.isEnabled(hub: hub) {
@@ -258,7 +258,7 @@ extension AppServices.Service: Identifiable {
   }
   /// Services shared with at least one hub
   @MainActor static var sharedCount: Int {
-    allCases.filter { service in Hubs.main.list.contains { service.isEnabled(hub: $0) == true } }.count
+    available.filter { service in Hubs.main.list.contains { service.isEnabled(hub: $0) == true } }.count
   }
 }
 #endif
