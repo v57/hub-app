@@ -80,7 +80,12 @@ public struct HubApp: App {
       .task { await LocalHub.main.resume() }
       .onChange(of: scenePhase) {
         switch scenePhase {
-        case .active: Task { await LocalHub.main.resume() }
+        case .active:
+          Task {
+            // This device's hub first, so its own client finds it listening again
+            await LocalHub.main.resume()
+            Hubs.main.reconnectNow()
+          }
         case .background: LocalHub.main.enteredBackground()
         default: break
         }

@@ -243,6 +243,13 @@ class Hubs {
   func select(_ hub: Hub.ID?) {
     selected = hub
   }
+  /// Back in front: every hub tries at once instead of waiting out its backoff, or an attempt iOS suspended
+  /// mid-way (this device's own hub restarting under it) left the hub Offline until Hub was relaunched
+  func reconnectNow() {
+    for hub in list where !hub.isDemo {
+      hub.client.reconnectNow()
+    }
+  }
   @discardableResult
   func insert(with settings: Hub.Settings) -> Hub {
     var settings = settings

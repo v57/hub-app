@@ -42,6 +42,8 @@ final class LocalHub {
 
   @ObservationIgnored private var server: HubServer?
   @ObservationIgnored private var statusTask: Task<Void, Never>?
+  /// Hub has left the screen (iOS suspends it soon after)
+  @ObservationIgnored private var isInBackground = false
 #if os(iOS) || os(tvOS) || os(visionOS)
   @ObservationIgnored private var backgroundTask: UIBackgroundTaskIdentifier = .invalid
 #endif
@@ -87,6 +89,7 @@ final class LocalHub {
 
   /// At launch and when the app comes back: starts the hub if it should run and doesn't
   func resume() async {
+    isInBackground = false
     endBackgroundTask()
     refreshAddresses()
     guard isEnabled, !isRunning, !isStarting else { return }
@@ -118,7 +121,11 @@ final class LocalHub {
           let shown = self.status.pairingCode, shown.expires > Date() {
           self.didPair = true
         }
+        let restarts = Self.restarts(from: self.status.state, to: status.state, isEnabled: self.isEnabled, isInBackground: self.isInBackground)
         self.status = status
+        if restarts {
+          Task { await self.start() }
+        }
       }
     }
     do {
@@ -217,7 +224,8 @@ final class LocalHub {
     let url = localURL
     HubKeyPins.beside(.main).pin(hubKey, for: url)
     if let hub = Hubs.main.list.first(where: { $0.settings.address == url }) {
-      if hub.client.hubKey != hubKey { hub.client.forgetHubKey() }
+      // A restarted hub: its client tries at once, also when it was mid-way through an attempt iOS suspended
+      if hub.client.hubKey != hubKey { hub.client.forgetHubKey() } else { hub.client.reconnectNow() }
       return
     }
     let selected = Hubs.main.selected
@@ -240,6 +248,7 @@ final class LocalHub {
   /// iOS suspends the app soon after it leaves the screen, and the hub with it. This asks for the few minutes iOS
   /// grants to finish what's in flight; Farm keeps the app on screen to serve for longer.
   func enteredBackground() {
+    isInBackground = true
 #if os(iOS) || os(tvOS) || os(visionOS)
     guard isRunning, backgroundTask == .invalid else { return }
     backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "Hub Server") { [weak self] in
@@ -254,6 +263,16 @@ final class LocalHub {
     UIApplication.shared.endBackgroundTask(backgroundTask)
     backgroundTask = .invalid
 #endif
+  }
+
+  /// Whether the hub starts again by itself: it was running and stopped listening (iOS takes the listener while the
+  /// app is suspended, and may say so only once the app is back, after `resume()` found it still running), it should
+  /// run, and Hub is in front. In the background `resume()` starts it on the way back.
+  nonisolated static func restarts(
+    from old: HubServer.State, to new: HubServer.State, isEnabled: Bool, isInBackground: Bool
+  ) -> Bool {
+    guard case .failed = new, old == .running else { return false }
+    return isEnabled && !isInBackground
   }
 
   // MARK: Addresses
