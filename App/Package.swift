@@ -7,9 +7,9 @@ import PackageDescription
 //
 //     cd App && V57_LOCAL=1 swift build --product Hub
 //
-// Hub's own packages (HubService, HubServer, ChannelSwift) and the v57 packages (Component, Vault, Platform, SwiftUI)
-// come from GitHub's main branch, or with `V57_LOCAL=1` from the checkouts next to this one: ~/Developer/Hub/… and
-// ~/Developer/v57/… (in Xcode, open Hub-Local.xcworkspace instead).
+// Hub's own packages (HubService, HubServer, ChannelSwift, and s3 for S3ServerSwift) and the v57 packages (Component,
+// Vault, Platform, SwiftUI) come from GitHub's main branch, or with `V57_LOCAL=1` from the checkouts next to this one:
+// ~/Developer/Hub/… and ~/Developer/v57/… (in Xcode, open Hub-Local.xcworkspace instead).
 
 let local = Context.environment["V57_LOCAL"] != nil
 /// A Hub package: GitHub's main branch, or its checkout at `path` in ~/Developer/Hub.
@@ -27,6 +27,8 @@ let vault = TargetDependencyCondition.when(platforms: [.macOS, .iOS, .linux, .wi
 let iCloud = TargetDependencyCondition.when(platforms: [.macOS, .iOS])
 /// The security camera, on the devices that have cameras (the code checks `canImport(PlatformCamera)`).
 let camera = TargetDependencyCondition.when(platforms: [.macOS, .iOS])
+/// This Device's Storage, an S3 server on iPhone, iPad and the Mac (the code checks `canImport(S3ServerSwift)`).
+let storage = TargetDependencyCondition.when(platforms: [.macOS, .iOS])
 
 let package = Package(
   name: "HubApp",
@@ -34,7 +36,7 @@ let package = Package(
   products: [.library(name: "HubApp", targets: ["HubApp"])],
   dependencies: [
     hub("HubService", "HubService/HubService"), hub("ChannelSwift", "Channel/ChannelSwift"),
-    hub("HubServer", "Core/HubServer"), v57("Component"), v57("Vault"), v57("Platform"),
+    hub("HubServer", "Core/HubServer"), hub("s3", "Services/s3"), v57("Component"), v57("Vault"), v57("Platform"),
   ],
   targets: [
     .target(
@@ -55,6 +57,7 @@ let package = Package(
         .product(name: "PlatformCamera", package: "Platform", condition: camera),
         .product(name: "PlatformMedia", package: "Platform", condition: camera),
         .product(name: "ChannelServer", package: "HubServer"),
+        .product(name: "S3ServerSwift", package: "s3", condition: storage),
       ],
       // As the Xcode target had it: Swift 6 with the project's upcoming features that Swift 6 doesn't turn on itself.
       swiftSettings: [

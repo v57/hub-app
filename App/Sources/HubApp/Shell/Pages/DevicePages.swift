@@ -36,6 +36,12 @@ struct DevicePageView: View {
 #endif
     case .settings:
       DeviceSettingsPage()
+    case .storage:
+#if canImport(S3ServerSwift)
+      StoragePage()
+#else
+      EmptyState(systemImage: "externaldrive", title: "Not on This Device")
+#endif
     }
   }
 }

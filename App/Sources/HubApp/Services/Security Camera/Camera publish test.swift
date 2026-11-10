@@ -71,7 +71,7 @@ enum CameraPublishTest {
 
       let identity = KeyChain.main
       network.setAttestationProvider { share, serviceKey, _ in
-        try CameraShareAttestation.attest(share, serviceKey: serviceKey, identity: identity)
+        try AppShareAttestation.attest(share, serviceKey: serviceKey, identity: identity)
       }
       let shareName = HubCamera.sharePrefix + "Test"
       let share = NetworkShare(name: shareName, protocol: .tcp, target: LocalTarget(port: 45_678), policy: .hub)

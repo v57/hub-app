@@ -27,7 +27,7 @@ Hub doesn’t run on Windows or Android yet.
 - [Devices and Access](Devices-and-Access.md): approve devices, grant access, permission groups and Lockdown.
 - [Hub Network](Hub-Network.md): a private network between your devices, invitations, sharing apps and internet.
 - [Security Camera](Security-Camera.md): use a device as a camera, watch it live, motion clips and alerts.
-- [This Device](This-Device.md): Run a Hub, Shared Services, Farm and Settings.
+- [This Device](This-Device.md): Run a Hub, Shared Services, Storage, Farm and Settings.
 - [Privacy and Security](Privacy-and-Security.md): what Hub sends over the network, keys, approval codes and Reset Data.
 
 Hub has no menu commands of its own. In a sheet, Return confirms and Escape cancels. On a camera’s page, ⌘[ goes back

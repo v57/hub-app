@@ -458,6 +458,11 @@ private struct ThisDeviceSection: View {
         let shared = AppServices.Service.sharedCount
         if shared > 0 { Count(shared) }
       }
+#if canImport(S3ServerSwift)
+      SidebarRow(value: Route.device(.storage), "Storage", systemImage: "externaldrive") {
+        StorageTrailing()
+      }
+#endif
 #if !os(tvOS) && !os(visionOS)
       SidebarRow(value: Route.device(.farm), "Farm", systemImage: "tree") {
         Text(farm.isRunning ? "On" : "Off").kitFont(.caption)
@@ -467,6 +472,15 @@ private struct ThisDeviceSection: View {
     }
   }
 }
+
+#if canImport(S3ServerSwift)
+private struct StorageTrailing: View {
+  @State private var storage = DeviceStorage.main
+  var body: some View {
+    Text(storage.phase == .on ? "On" : storage.phase == .starting ? "Starting" : "Off").kitFont(.caption)
+  }
+}
+#endif
 
 #if canImport(HubServer)
 private struct LocalHubTrailing: View {

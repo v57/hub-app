@@ -114,6 +114,12 @@ struct RootView: View {
     .task {
       if CameraDriver.isRequested { await CameraDriver.run() }
     }
+#if canImport(S3ServerSwift)
+    // `--storage-on`: shares this device's storage with a hub (StorageDriver)
+    .task {
+      if StorageDriver.isRequested { await StorageDriver.run() }
+    }
+#endif
     // `--connect ws://127.0.0.1:2097 --code ABC-123`: pairs with a hub at launch, for checks against a real hub
     .task {
       let arguments = CommandLine.arguments

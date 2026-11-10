@@ -75,6 +75,10 @@ public struct HubApp: App {
       // Motion alerts of the cameras this device follows
       .task { CameraAlerts.main.start() }
 #endif
+#if canImport(S3ServerSwift)
+      // Storage shared with a hub comes back on where the user left it on, once the hubs are loaded
+      .task { DeviceStorage.main.restore() }
+#endif
 #if canImport(HubServer)
       // The hub this device runs: started at launch when it's on, again after iOS suspended it
       .task { await LocalHub.main.resume() }
@@ -85,6 +89,9 @@ public struct HubApp: App {
             // This device's hub first, so its own client finds it listening again
             await LocalHub.main.resume()
             Hubs.main.reconnectNow()
+#if canImport(S3ServerSwift)
+            await DeviceStorage.main.resume()
+#endif
           }
         case .background: LocalHub.main.enteredBackground()
         default: break

@@ -1,7 +1,7 @@
 # This Device
 
 The sidebar’s **This iPhone** card (or iPad, Mac; on Linux, this computer) holds what this device does without a hub:
-**Run a Hub**, **Shared Services**, **Farm** and **Settings**.
+**Run a Hub**, **Shared Services**, **Storage** (iPhone, iPad and the Mac), **Farm** and **Settings**.
 
 ## Run a Hub
 
@@ -73,6 +73,41 @@ Choose **Try It** on a card. On iPhone it opens as a page; on iPad and the Mac, 
 - **Chat**: type a message and choose **Send**. There’s no chat history.
 
 On a system that’s too old for a service, its page says **Service not available**.
+
+## Storage
+
+This device can lend part of its storage to one of your hubs. The hub’s devices then keep files on it as on any other
+storage: it’s a place on the hub’s [Files](Files.md) page, and apps and services that store files on the hub can use it.
+It’s off until you turn it on.
+
+1. Open **Storage**. If you’re connected to several hubs, pick one under **Hub**.
+2. Turn on **Share Storage**. The hub lists this device as a storage provider.
+3. Set the **Limit** under **Space**. Hub starts with a quarter of the free space, between 1 GB and 100 GB.
+
+**Space** shows what’s used of the limit and what’s free on this device. Hub refuses an upload that would go past the
+limit, or leave this device with less than 1 GB free. Lowering the limit keeps what’s stored.
+
+The files are in a folder of Hub’s own on this device, left out of backups. Turning **Share Storage** off stops sharing
+and keeps the files; turn it on again to share them again. To share with another hub, turn it off, pick the hub and turn
+it on.
+
+**Open Files** opens the hub’s Files page.
+
+### Who can reach it
+
+Your other devices reach this storage over [Hub Network](Hub-Network.md), so turn Hub Network on here too. Until it’s
+on, the page says **Turn on Hub Network on this iPhone so your other devices can reach its storage.**; once it is, it
+says **Shared on Hub Network** and the port. Nothing else on your Wi-Fi or the internet can connect, and every request
+needs a link the hub signed for one file, which expires after 7 days.
+
+Like the hub’s other storage, it allows only the hub’s owners until you give others the storage permissions (see
+[Files](Files.md#who-can-use-storage)).
+
+### How long it runs
+
+As with **Run a Hub**: on iPhone and iPad, iOS stops the storage shortly after Hub leaves the screen, and it starts
+again when you come back. To keep serving, leave Hub open; **Open Farm** keeps the screen awake, for example on an old
+iPhone or iPad on a charger. On the Mac, it runs while Hub is open.
 
 ## Farm
 

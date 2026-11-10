@@ -67,4 +67,5 @@ Hubs** and the Overview.
 ## Services this device runs
 
 This device can be a provider too: it can compress images and videos, translate text and more for your hubs. See
-[Shared Services](This-Device.md#shared-services).
+[Shared Services](This-Device.md#shared-services). An iPhone, iPad or Mac can also lend the hub part of its storage
+(the `s3/*` APIs, like the hub’s other storage): see [Storage](This-Device.md#storage).

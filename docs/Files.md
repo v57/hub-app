@@ -16,6 +16,12 @@ If a hub runs the launcher but has no storage yet, **Files** opens **Connect Sto
 - **Connect**: your own S3-compatible storage. Fill in **Endpoint**, **Region (optional)**, **Bucket name**,
   **Access Key** and **Secret Key**, then **Create**, **Allow Access** and **Test**. Later, **Update** changes them.
 
+### Storage on your devices
+
+An iPhone, iPad or Mac running Hub can share part of its own storage with the hub: on that device, open **This
+Device** → **Storage** and turn on **Share Storage** (see [This Device](This-Device.md#storage)). It shows up here as a
+place named after the device, while Hub is open there and the device is on Hub Network.
+
 Installing storage needs permission to install apps on the hub. Without it, Hub says **You don't have permissions to
 install services**. If you can install but not allow, ask the hub’s owner to give access to the storage service.
 

@@ -66,7 +66,7 @@ enum HubPage: String, Hashable, CaseIterable, Sendable {
 
 /// What this device offers without a hub (the sidebar's This Mac card)
 enum DevicePage: String, Hashable, Sendable {
-  case localHub, sharedServices, farm, settings
+  case localHub, sharedServices, farm, settings, storage
 }
 
 /// The window's selection: the sidebar selects it, and pages open each other through it.
@@ -147,7 +147,7 @@ final class Navigator {
     return ScreenshotPage.current?.open
   }()
   /// `notifyutil -s dev.v57.hub.debug.open <n> -p dev.v57.hub.debug.open` opens a page without clicks or accessibility
-  /// lookups, for performance runs (the app's sandbox reads no file from outside): 0 All Hubs, 1–4 this device's
+  /// lookups, for performance runs (the app's sandbox reads no file from outside): 0 All Hubs, 1–5 this device's
   /// pages (`DevicePage` in order), 100 × (hub index + 1) + `HubPage` index a hub's page (101 the first hub's
   /// Services).
   private static func listenForOpenRequests() {
@@ -159,7 +159,7 @@ final class Navigator {
     }
   }
   private static func route(state: Int) -> Route {
-    let devicePages: [DevicePage] = [.localHub, .sharedServices, .farm, .settings]
+    let devicePages: [DevicePage] = [.localHub, .sharedServices, .farm, .settings, .storage]
     if state == 0 { return .allHubs }
     if state < 100 { return state <= devicePages.count ? .device(devicePages[state - 1]) : .allHubs }
     let hubs = Hubs.main.list, index = state / 100 - 1, page = state % 100
