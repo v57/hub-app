@@ -18,7 +18,7 @@ struct PermissionList: Decodable {
     let names = try decoder.singleValueContainer()
       .decode([String: String].self)
     var data = [String: Set<String>]()
-    var paths = [String: [String: String]]()
+    var paths = [String: [String: [String]]]()
     names.forEach { path, name in
       let split = name.components(separatedBy: ": ")
       let parent: String
@@ -33,18 +33,19 @@ struct PermissionList: Decodable {
       var array = data[parent] ?? []
       array.insert(permission)
       data[parent] = array
-      paths[parent, default: [:]][permission] = path
+      // A name may stand for several APIs ("Manage Permissions"): ticking it grants them all
+      paths[parent, default: [:]][permission, default: []].append(path)
     }
     sections = data.map { name, permissions in
-      Section(name: name, permissions: permissions.sorted(), pathsByName: paths[name] ?? [:])
+      Section(name: name, permissions: permissions.sorted(), pathsByName: (paths[name] ?? [:]).mapValues { $0.sorted() })
     }.sorted(by: { $0.name < $1.name })
   }
   struct Section: Identifiable {
     var id: String { name }
     var name: String
     var permissions: [String]
-    /// The API path of each permission, by its name
-    var pathsByName: [String: String] = [:]
+    /// The API paths each permission stands for, by its name
+    var pathsByName: [String: [String]] = [:]
   }
 }
 

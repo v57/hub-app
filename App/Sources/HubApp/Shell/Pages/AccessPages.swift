@@ -603,7 +603,10 @@ struct PermissionsPage: View {
 
   @ViewBuilder
   private func sectionRows(_ section: PermissionList.Section) -> some View {
-    let shown = section.permissions.filter { search.isEmpty || $0.localizedCaseInsensitiveContains(search) || section.name.localizedCaseInsensitiveContains(search) }
+    let shown = section.permissions.filter { permission in
+      search.isEmpty || permission.localizedCaseInsensitiveContains(search) || section.name.localizedCaseInsensitiveContains(search)
+        || section.paths(of: permission).contains { $0.localizedCaseInsensitiveContains(search) }
+    }
     if !shown.isEmpty {
       sectionHeader(section)
       if !collapsed.contains(section.name) {
@@ -639,14 +642,20 @@ struct PermissionsPage: View {
   }
 
   private func permissionRow(_ section: PermissionList.Section, _ permission: String) -> some View {
-    let path = section.path(of: permission)
+    let paths = section.paths(of: permission)
     return GridRow {
       Text(permission).padding(.leading, 22).frame(width: 200, alignment: .leading).lineLimit(1)
-      Text(path).kitFont(.monoSmall).foregroundStyle(.kitTertiary).frame(width: 220, alignment: .leading).lineLimit(1)
+      // Every API the permission grants, one per line
+      VStack(alignment: .leading, spacing: 2) {
+        ForEach(paths, id: \.self) { path in
+          Text(path).lineLimit(1)
+        }
+      }
+      .kitFont(.monoSmall).foregroundStyle(.kitTertiary).frame(width: 220, alignment: .leading)
       ForEach(groups.groups) { group in
-        let isOn = granted(group).contains(path)
-        check(isOn ? .on : .off) {
-          toggle(group, [path], on: !isOn)
+        let count = paths.filter(granted(group).contains).count
+        check(count == paths.count ? .on : count == 0 ? .off : .mixed(count, paths.count)) {
+          toggle(group, paths, on: count != paths.count)
         }
       }
     }
@@ -758,11 +767,12 @@ extension Hub {
 }
 
 extension PermissionList.Section {
-  /// The API path a permission's name stands for (`hub/group/names` maps paths to "Section: Name")
-  func path(of permission: String) -> String {
-    pathsByName[permission] ?? permission
+  /// The API paths a permission's name stands for (`hub/group/names` maps paths to "Section: Name", several to
+  /// one name at times: hub/proxy/add and hub/proxy/remove are Manage Proxy Hubs)
+  func paths(of permission: String) -> [String] {
+    pathsByName[permission] ?? [permission]
   }
-  var paths: [String] { permissions.map(path(of:)) }
+  var paths: [String] { permissions.flatMap(paths(of:)) }
 }
 
 /// `hub/group/update`: the group's permissions, all of them
