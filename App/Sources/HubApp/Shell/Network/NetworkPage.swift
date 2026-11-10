@@ -142,7 +142,10 @@ struct HubNetworkPage: View {
   private var heroState: NetworkHero.State {
     if isSwitching { return facts.isJoined ? .turningOff : .connecting }
     if facts.isJoined { return .on }
-    if facts.hubNetworkOff { return .hubOff(runsOnMac: hubHost == "app" || hub.isDemo) }
+    if facts.hubNetworkOff {
+      let machine = facts.hubMachine
+      return .hubOff(NetworkHero.HubPlace(isApp: hubHost == "app" || hub.isDemo, platform: machine?.platform, deviceName: machine?.name))
+    }
     return .off
   }
 
@@ -282,8 +285,16 @@ struct HubNetworkPage: View {
 struct NetworkHero: View {
   enum State: Equatable {
     case on, off, connecting, turningOff
-    /// The hub's machine runs no network now; `runsOnMac` when the Hub app runs the hub there
-    case hubOff(runsOnMac: Bool)
+    /// The hub's machine runs no network now
+    case hubOff(HubPlace)
+  }
+  /// Where the hub runs, for saying where to open Hub
+  struct HubPlace: Equatable {
+    /// The Hub app runs the hub (`hub/info`'s `host` is `app`)
+    var isApp: Bool
+    /// The hub's own device as the hub lists it: `macos`, `ios`, `ipados`
+    var platform: String?
+    var deviceName: String?
   }
   let state: State
   let devices: [NetDevice]
@@ -392,10 +403,17 @@ struct NetworkHero: View {
         : String(localized: "Turn it on to reach your other devices from anywhere, and to let them reach this one.")
     case .connecting:
       return String(localized: "Finding your devices. This takes a few seconds.")
-    case .hubOff(let runsOnMac):
-      return runsOnMac
-        ? String(localized: "It’s on whenever Hub is open on the Mac that runs \(name). Open Hub there, or wake that Mac.")
-        : String(localized: "Ask \(name)’s owner to set up Hub Network on it.")
+    case .hubOff(let place):
+      // An iPhone or iPad runs only the Hub app's hub, and only while Hub is open there
+      let device = place.deviceName ?? name
+      switch place.platform {
+      case "ios": return String(localized: "It’s on while Hub is open on \(device). Open Hub there: an iPhone pauses its hub soon after Hub leaves the screen.")
+      case "ipados": return String(localized: "It’s on while Hub is open on \(device). Open Hub there: an iPad pauses its hub soon after Hub leaves the screen.")
+      default:
+        return place.isApp
+          ? String(localized: "It’s on whenever Hub is open on the Mac that runs \(name). Open Hub there, or wake that Mac.")
+          : String(localized: "Ask \(name)’s owner to set up Hub Network on it.")
+      }
     }
   }
 }

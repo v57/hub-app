@@ -129,6 +129,12 @@ struct NetworkFacts: DynamicProperty {
     return localAgent.state != .available
   }
 
+  /// The device the hub runs on, as the hub lists it: the one with the hub's key among its services
+  var hubMachine: Device? {
+    guard let key = hub.client.hubKey else { return nil }
+    return hubDevices.first { $0.services.contains { $0.key == key } }
+  }
+
   /// Every device on the network, this one first, then by name
   var devices: [NetDevice] {
     let keys = Set(agents.map(\.key) + statuses.map(\.key))

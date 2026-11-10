@@ -177,7 +177,13 @@ private struct NetworkCardContent: View {
 
   private var offMessage: String {
     if isConnecting { return String(localized: "Finding your devices…") }
-    if facts.hubNetworkOff { return String(localized: "Hub Network turns on when Hub is open on the Mac that runs \(hub.settings.name).") }
+    if facts.hubNetworkOff {
+      // An iPhone or iPad runs only the Hub app's hub
+      if let machine = facts.hubMachine, machine.platform == "ios" || machine.platform == "ipados" {
+        return String(localized: "Hub Network turns on when Hub is open on \(machine.name).")
+      }
+      return String(localized: "Hub Network turns on when Hub is open on the Mac that runs \(hub.settings.name).")
+    }
     return String(localized: "Turn on to reach your devices and use their internet.")
   }
 
