@@ -34,7 +34,9 @@ struct HubPageView: View {
     }
     .overlay {
       if hub.reach != .online {
+        // Its own title bar over the page's, which it covers: Back (iPhone) and the page's name stay reachable
         HubUnreachable()
+          .pageToolbar(page.title, meta: PageMeta.parts(hub, []), systemImage: page.systemImage, hue: .gray) { }
       }
     }
   }
@@ -49,7 +51,9 @@ struct HubUnreachable: View {
     Group {
       switch hub.reach {
       case .connecting:
-        EmptyState(systemImage: "hexagon", title: "Connecting to \(hub.settings.name)…", message: "\(hub.settings.address.absoluteString)", status: .working)
+        EmptyState(systemImage: "hexagon", title: "Connecting to \(hub.settings.name)…", message: "\(hub.settings.address.absoluteString)", status: .working) {
+          Button("Remove…") { shell.removing = hub }.buttonStyle(.kit)
+        }
       case .refused where hub.refusal == .hubNeedsUpdate:
         // A Hub from before auth v2 can't prove its key, so it gets nothing from this device until it's updated
         EmptyState(
