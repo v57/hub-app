@@ -48,9 +48,23 @@ struct HubSidebar: View {
     }
     .status {
       let online = hubs.list.filter(\.isConnected).count
-      HStack(spacing: 6) {
-        StatusDot(hue: online > 0 ? .green : .gray)
-        Text("\(online) of \(hubs.list.count) online")
+      let total = hubs.list.count
+      // The iPad's bar holds the search, this, Copy My Key, Connect and the sidebar toggle: the longest that fits
+      // ("0 of 0…" and then "• …" before)
+      ViewThatFits(in: .horizontal) {
+        HStack(spacing: 6) {
+          StatusDot(hue: online > 0 ? .green : .gray)
+          Text("\(online) of \(total) online")
+        }
+        HStack(spacing: 6) {
+          StatusDot(hue: online > 0 ? .green : .gray)
+          Text("\(online)/\(total) online")
+        }
+        HStack(spacing: 4) {
+          StatusDot(hue: online > 0 ? .green : .gray)
+          Text("\(online)/\(total)")
+        }
+        .accessibilityLabel(Text("\(online) of \(total) online"))
       }
     }
     .navigationTitle("Hub")

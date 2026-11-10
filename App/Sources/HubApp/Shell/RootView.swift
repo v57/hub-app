@@ -39,7 +39,11 @@ struct RootView: View {
     NavigationSplitView(columnVisibility: $columnVisibility, preferredCompactColumn: $compactColumn) {
       HubSidebar(columnVisibility: $columnVisibility)
         .toolbar(removing: .sidebarToggle)
-        .navigationSplitViewColumnWidth(min: 240, ideal: 264, max: 360)
+        // iPad: the kit's width (300), where the bottom bar's status keeps its count beside the search, Copy My Key,
+        // Connect and the sidebar toggle; at 264 it was only "• …"
+        .navigationSplitViewColumnWidth(
+          min: idiom == .pad ? KitMetrics.sidebarMinWidth(idiom) : 240, ideal: idiom == .pad ? KitMetrics.sidebarWidth : 264,
+          max: 360)
     } detail: {
       Group {
         if idiom == .phone {
