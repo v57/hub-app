@@ -389,7 +389,9 @@ struct LockdownPage: View {
         if !whitelist.enabled && !untrusted.isEmpty {
           Banner(
             untrusted.count == 1 ? "1 connection would be refused" : "\(untrusted.count) connections would be refused",
-            message: "\(untrusted.prefix(3).map { $0.name.isEmpty ? "an unknown device" : $0.name }.formatted(.list(type: .and))) aren’t trusted. Trust them first, or turn Lockdown on and they’ll be disconnected.",
+            message: untrusted.count == 1
+              ? "\(untrustedNames(untrusted)) isn’t trusted. Trust it first, or turn Lockdown on and it’ll be disconnected."
+              : "\(untrustedNames(untrusted)) aren’t trusted. Trust them first, or turn Lockdown on and they’ll be disconnected.",
             systemImage: "clock", hue: .orange
           ) {
             let keys = untrusted.compactMap(\.key)
@@ -416,6 +418,13 @@ struct LockdownPage: View {
         KitSearchField(text: $search, prompt: "Name or key").frame(width: 180)
       }
     }
+  }
+
+  /// "iPad", "iPad and Mac", "iPad, Mac and 3 more"
+  private func untrustedNames(_ users: [Hub.User]) -> String {
+    let names = users.map { $0.name.isEmpty ? String(localized: "an unknown device") : $0.name }
+    let shown = names.count > 3 ? Array(names.prefix(2)) + [String(localized: "\(names.count - 2) more")] : names
+    return shown.formatted(.list(type: .and))
   }
 
   @ViewBuilder
