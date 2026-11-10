@@ -328,7 +328,7 @@ struct NewAppSheet: View {
         }
         switch kind {
         case .bun:
-          FormRow("Repository", help: "Cloned into ~/Hub/apps", systemImage: "shippingbox") {
+          FormRow("Repository", help: "Cloned into ~/Hub/Launcher/apps", systemImage: "shippingbox") {
             TextField("github.com/v57/hub-weather", text: $repo).kitField(mono: true).frame(maxWidth: 260)
           }
         case .shell:
