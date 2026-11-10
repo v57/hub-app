@@ -4,9 +4,10 @@
 //
 //  What This Device's Storage answers its hub with, off the main actor: the paths of hub-s3-local (`s3/read` and
 //  `s3/write` presign, `s3/read/directory`, `s3/size`, `s3/list` and its stream, `s3/delete`, `s3/updated`,
-//  `s3/update/status`, `s3/status`) over the folder S3ServerSwift serves as the bucket `hub`. Links are presigned
-//  against the Hub Network share's authority (`*.hub.invalid`) and fail closed until the share is published, as
-//  hub-s3-local's do; they carry no ACL. The size limit is kept here: uploads past it are refused before their body.
+//  `s3/update/status`, `s3/status`), and `s3/space` for hub-s3-raid, over the folder S3ServerSwift serves as the
+//  bucket `hub`. Links are presigned against the Hub Network share's authority (`*.hub.invalid`) and fail closed until
+//  the share is published, as hub-s3-local's do; they carry no ACL. The size limit is kept here: uploads past it are
+//  refused before their body, and uploads on their way hold their room until they end.
 //
 
 #if canImport(S3ServerSwift)
@@ -26,6 +27,12 @@ struct StorageFileInfo: Codable, Equatable, Sendable {
   var size: Int64
   /// ISO 8601 with milliseconds, as S3 listings have it
   var lastModified: String?
+}
+
+/// `s3/space`: what the hub may fill in all, and what's left
+struct StorageSpace: Codable, Equatable, Sendable {
+  var total: Int64
+  var free: Int64
 }
 
 /// An upload's state that `s3/update/status` sets and `s3/status` streams
@@ -72,6 +79,8 @@ final class StorageBackend: @unchecked Sendable {
   private var endpoint: URL?
   private var publication: NetworkSharePublication?
   private var used: Int64 = 0
+  /// Uploads let in and not ended yet, each holding its room until it ends
+  private var uploading: [S3Upload] = []
   private var limit: Int64
   private var statuses: [String: StorageFileStatus] = [:]
   private var folderWatchers: [UUID: (folder: String, changed: @Sendable () -> Void)] = [:]
@@ -103,7 +112,8 @@ final class StorageBackend: @unchecked Sendable {
     S3ServerHooks(
       acceptsConnection: { StorageBackend.isAllowed($0) },
       admitUpload: { [weak self] upload in self?.admit(upload) },
-      changed: { [weak self] change in self?.changed(change) })
+      changed: { [weak self] change in self?.changed(change) },
+      uploadEnded: { [weak self] upload in self?.ended(upload) })
   }
 
   // MARK: State
@@ -132,17 +142,42 @@ final class StorageBackend: @unchecked Sendable {
 
   // MARK: Limit
 
-  /// Refuses an upload that would take the folder past the limit, or leave the device with less than the reserve
+  /// Refuses an upload that would take the folder past the limit, or leave the device with less than the reserve,
+  /// counting the uploads still on their way; one it lets in holds its room until it ends
   func admit(_ upload: S3Upload) -> S3Error? {
-    let (used, limit) = lock.withLock { (self.used, self.limit) }
-    let growth = upload.length - upload.replacedSize
-    if growth > 0, used + growth > limit {
-      return .storageFull("The storage this device shares is full (\(Self.format(used)) of \(Self.format(limit)))")
+    let free = freeSpace()
+    return lock.withLock {
+      let growth = upload.length - upload.replacedSize
+      let held = uploading.reduce(Int64(0)) { $0 + max(0, $1.length - $1.replacedSize) }
+      if growth > 0, used + held + growth > limit {
+        return .storageFull("The storage this device shares is full (\(Self.format(used + held)) of \(Self.format(limit)))")
+      }
+      let writing = uploading.reduce(Int64(0)) { $0 + $1.length }
+      if let free, free - writing - upload.length < Self.reserve {
+        return .storageFull("This device is almost out of space (\(Self.format(max(0, free - writing))) free)")
+      }
+      uploading.append(upload)
+      return nil
     }
-    if let free = freeSpace(), free - upload.length < Self.reserve {
-      return .storageFull("This device is almost out of space (\(Self.format(free)) free)")
+  }
+
+  /// `s3/space`: the limit, and the room under it that `admit` would let in
+  func space() -> StorageSpace {
+    let free = freeSpace()
+    return lock.withLock {
+      let held = uploading.reduce(Int64(0)) { $0 + max(0, $1.length - $1.replacedSize) }
+      let writing = uploading.reduce(Int64(0)) { $0 + $1.length }
+      var room = limit - used - held
+      if let free { room = min(room, free - writing - Self.reserve) }
+      return StorageSpace(total: limit, free: max(0, room))
     }
-    return nil
+  }
+
+  /// An upload ended, stored or not: its room is free again (a stored one is in `used` by now)
+  func ended(_ upload: S3Upload) {
+    lock.withLock {
+      if let index = uploading.firstIndex(of: upload) { uploading.remove(at: index) }
+    }
   }
 
   private func changed(_ change: S3Change) {

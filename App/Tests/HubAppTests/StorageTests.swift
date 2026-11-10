@@ -104,22 +104,60 @@ final class StorageTests: XCTestCase {
 
   // MARK: Limit
 
+  /// Admits an upload and ends it at once, as one that never ran beside another
+  func admitAlone(_ backend: StorageBackend, length: Int64, replaced: Int64 = 0) -> S3Error? {
+    let upload = S3Upload(bucket: "hub", key: "a", length: length, replacedSize: replaced)
+    defer { backend.ended(upload) }
+    return backend.admit(upload)
+  }
+
   func testUploadsPastTheLimitAreRefused() throws {
     let backend = try backend(limit: 100)
     backend.set(used: 60)
-    XCTAssertNil(backend.admit(S3Upload(bucket: "hub", key: "a", length: 40, replacedSize: 0)))
-    XCTAssertEqual(backend.admit(S3Upload(bucket: "hub", key: "a", length: 41, replacedSize: 0))?.status, 507)
+    XCTAssertNil(admitAlone(backend, length: 40))
+    XCTAssertEqual(admitAlone(backend, length: 41)?.status, 507)
     // Replacing a file counts only what it adds
-    XCTAssertNil(backend.admit(S3Upload(bucket: "hub", key: "a", length: 50, replacedSize: 30)))
+    XCTAssertNil(admitAlone(backend, length: 50, replaced: 30))
     // Over the limit already (a lower limit keeps what's stored): a smaller replacement still goes in
     backend.set(limit: 10)
-    XCTAssertNil(backend.admit(S3Upload(bucket: "hub", key: "a", length: 5, replacedSize: 20)))
+    XCTAssertNil(admitAlone(backend, length: 5, replaced: 20))
+  }
+
+  func testUploadsOnTheirWayHoldTheirRoom() throws {
+    let backend = try backend(limit: 100, free: StorageBackend.reserve + 1000)
+    backend.set(used: 40)
+    let first = S3Upload(bucket: "hub", key: "a", length: 30, replacedSize: 0)
+    let second = S3Upload(bucket: "hub", key: "b", length: 31, replacedSize: 0)
+    XCTAssertNil(backend.admit(first))
+    // 40 stored + 30 coming + 31 > 100
+    XCTAssertEqual(backend.admit(second)?.code, "StorageFull")
+    backend.ended(first)
+    XCTAssertNil(backend.admit(second))
+    // The device's free space counts what's being written too: 1000 - 31 left above the reserve
+    backend.set(limit: 10_000)
+    XCTAssertEqual(backend.admit(S3Upload(bucket: "hub", key: "c", length: 970, replacedSize: 0))?.code, "StorageFull")
+    XCTAssertNil(backend.admit(S3Upload(bucket: "hub", key: "c", length: 969, replacedSize: 0)))
+  }
+
+  func testSpaceIsTheRoomUnderTheLimit() throws {
+    let backend = try backend(limit: 1000, free: StorageBackend.reserve + 10_000)
+    backend.set(used: 300)
+    XCTAssertEqual(backend.space(), StorageSpace(total: 1000, free: 700))
+    let upload = S3Upload(bucket: "hub", key: "a", length: 200, replacedSize: 0)
+    XCTAssertNil(backend.admit(upload))
+    XCTAssertEqual(backend.space().free, 500)
+    backend.ended(upload)
+    // The device's own free space wins when it's smaller
+    backend.freeSpace = { StorageBackend.reserve + 100 }
+    XCTAssertEqual(backend.space(), StorageSpace(total: 1000, free: 100))
+    backend.freeSpace = { 0 }
+    XCTAssertEqual(backend.space().free, 0)
   }
 
   func testUploadsThatWouldFillTheDeviceAreRefused() throws {
     let backend = try backend(limit: 100 << 30, free: StorageBackend.reserve + 1000)
-    XCTAssertNil(backend.admit(S3Upload(bucket: "hub", key: "a", length: 1000, replacedSize: 0)))
-    let error = backend.admit(S3Upload(bucket: "hub", key: "a", length: 1001, replacedSize: 0))
+    XCTAssertNil(admitAlone(backend, length: 1000))
+    let error = admitAlone(backend, length: 1001)
     XCTAssertEqual(error?.code, "StorageFull")
   }
 

@@ -376,6 +376,11 @@ extension HubService.Group {
     ) { (path: String?) in
       try box.get().notify(folder: path)
     }
+    .post("s3/space", options: options("s3/space", "Read files", "Space",
+      "The bytes this device lets the hub fill (its Storage limit) and what's left of them, after what's stored, uploads on their way and the 1 GB the device keeps free: { total, free }. hub-s3-raid sizes the device by it. Owners and callers granted s3/space may call it.")
+    ) { (_: String?) -> StorageSpace in
+      try box.get().space()
+    }
     .post("s3/update/status", options: options("s3/update/status", "Upload files", "Set upload status",
       "Sets or clears the status of one file in the s3/status stream, like upload progress; leave out status to clear it. Kept in memory until the storage stops. Owners and callers granted s3/update/status may call it.")
     ) { (update: StorageStatusUpdate) in
