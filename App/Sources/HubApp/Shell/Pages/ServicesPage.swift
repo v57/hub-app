@@ -253,7 +253,13 @@ struct APIInspector: View {
   let row: APIRow
   @Environment(Hub.self) private var hub
   @State private var providers: [Provider] = []
-  @State private var balancer: Status.BalancerType = .counter
+  /// A load balancer picked here that the hub's status doesn't name yet
+  @State private var picked: Status.BalancerType?
+  /// The hub kept another load balancer than the one picked
+  @State private var keptNote: String?
+
+  /// The hub's choice, as its status says it, or a pick on its way
+  private var balancer: Status.BalancerType { picked ?? row.service?.balancerType ?? .counter }
 
   var body: some View {
     VStack(alignment: .leading, spacing: KitMetrics.gutter) {
@@ -289,13 +295,15 @@ struct APIInspector: View {
                 balancer == type
               } set: { isOn in
                 guard isOn else { return }
-                balancer = type
-                Task { try? await hub.client.send("hub/balancer/set", BalancerUpdate(path: service.name, type: type.rawValue)) }
+                pick(type, path: service.name)
               })
             }
           }
           .padding(6)
           .disabled(!hub.require(permissions: "hub/balancer/set"))
+          if let keptNote {
+            Text(keptNote).kitFont(.caption).foregroundStyle(Hue.orange.text).padding([.horizontal, .bottom], 8)
+          }
         }
         KitSection("Requests", meta: [String(localized: "Since the hub started")], systemImage: "chart.bar", hue: .green) {
           InspectorRow("Total", value: service.requests.formatted(), copyable: false)
@@ -311,9 +319,13 @@ struct APIInspector: View {
       }
       .controlSize(.small)
     }
-    // The hub's choice, as its status says it; a pick shows at once and stays once the hub's status has it
-    .onChange(of: row.service?.balancerType ?? .counter, initial: true) { _, type in balancer = type }
+    // The pick is the hub's once its status names it
+    .onChange(of: row.service?.balancerType ?? .counter) { _, type in
+      if type == picked { picked = nil }
+    }
     .task(id: row.id) {
+      picked = nil
+      keptNote = nil
       providers = []
       guard !row.needsApproval, !hub.isDemo, hub.require(permissions: "hub/devices") else { return }
       do {
@@ -321,6 +333,33 @@ struct APIInspector: View {
           providers = list.map { Provider(id: $0.id, name: $0.name) }
         }
       } catch { }
+    }
+  }
+
+  /// Shows the pick at once, and the hub's own choice again when its status doesn't take the pick: a hub keeps
+  /// Round-robin for an API whose providers limit how many calls each takes (the iPhone's image/encode), where
+  /// Random can't respect the limits, and said nothing
+  private func pick(_ type: Status.BalancerType, path: String) {
+    // The hub's own choice again: nothing to wait for
+    let isCurrent = row.service?.balancerType == type
+    picked = isCurrent ? nil : type
+    keptNote = nil
+    Task {
+      do {
+        try await hub.client.send("hub/balancer/set", BalancerUpdate(path: path, type: type.rawValue))
+        guard !isCurrent else { return }
+        try? await Task.sleep(for: .seconds(3))
+      } catch {
+        guard picked == type else { return }
+        picked = nil
+        keptNote = String(localized: "\(hub.settings.name) didn’t change the load balancer: \(error.localizedDescription)")
+        return
+      }
+      guard picked == type else { return }
+      picked = nil
+      keptNote = type == .random
+        ? String(localized: "\(hub.settings.name) kept its load balancer: Random can’t be used while this API’s providers limit how many calls each takes.")
+        : String(localized: "\(hub.settings.name) kept its load balancer.")
     }
   }
 
