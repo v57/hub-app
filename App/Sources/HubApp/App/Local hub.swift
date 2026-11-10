@@ -277,18 +277,27 @@ final class LocalHub {
       var host = [CChar](repeating: 0, count: Int(NI_MAXHOST))
       let length = socklen_t(MemoryLayout<sockaddr_in>.size)
       guard getnameinfo(address, length, &host, socklen_t(host.count), nil, 0, NI_NUMERICHOST) == 0 else { continue }
-      let text = String(cString: host)
-      // Link-local addresses aren't reachable from other devices
-      guard !text.hasPrefix("169.254.") else { continue }
-      result.append((String(cString: interface.ifa_name), text))
+      result.append((String(cString: interface.ifa_name), String(cString: host)))
     }
+    return reachableAddresses(result)
+  }
+
+  /// The addresses other devices can dial, each once, Wi-Fi and Ethernet first. An address two interfaces share
+  /// (cellular's 192.0.0.x on an iPhone) was listed twice.
+  nonisolated static func reachableAddresses(_ interfaces: [(name: String, address: String)]) -> [String] {
     func rank(_ name: String) -> Int {
       // Wi-Fi and Ethernet: en* on Apple platforms, en*, eth* and wl* on Linux
       if name.hasPrefix("en") || name.hasPrefix("eth") || name.hasPrefix("wl") { return 0 }
       if name.hasPrefix("bridge") { return 1 }
       return 2
     }
-    return result.sorted { rank($0.name) < rank($1.name) }.map(\.address)
+    var seen = Set<String>()
+    return interfaces
+      // Link-local addresses aren't reachable from other devices
+      .filter { !$0.address.hasPrefix("169.254.") }
+      .sorted { rank($0.name) < rank($1.name) }
+      .map(\.address)
+      .filter { seen.insert($0).inserted }
   }
 }
 #endif
