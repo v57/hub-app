@@ -244,8 +244,10 @@ extension Hub {
     var icon: Icon
     var apps: Int
     var group: String?
+    /// The id of the device the connection is attached to
+    var device: String?
     enum CodingKeys: CodingKey {
-      case id, key, services, apps, permissions, name, icon, group
+      case id, key, services, apps, permissions, name, icon, group, device
     }
     init(from decoder: any Decoder) throws {
       let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -256,6 +258,28 @@ extension Hub {
       name = container.decodeIfPresent(.name, "")
       icon = container.decodeIfPresent(.icon) ?? Icon(symbol: .init(name: "hexagon"))
       group = container.decodeIfPresent(.group)
+      device = container.decodeIfPresent(.device)
+    }
+
+    /// Named as the Devices page names its device, when the connection is the device's own (it declared the name the
+    /// hub made unique: "iPhone" for the device the hub calls "iPhone-2"), so one device reads the same everywhere
+    func named(from devices: [Device]) -> User {
+      guard let device, let entry = devices.first(where: { $0.id == device }), entry.name != name,
+        !name.isEmpty, entry.name.hasPrefix(name + "-"), Int(entry.name.dropFirst(name.count + 1)) != nil
+      else { return self }
+      var user = self
+      user.name = entry.name
+      return user
+    }
+
+    /// The hub lets it through Lockdown whatever its list says: this app's own key, and the owners
+    func isAlwaysTrusted(by hub: Hub) -> Bool {
+      key == hub.key || group == "owners"
+    }
+
+    /// Whether it connects while Lockdown is on
+    func isTrusted(by hub: Hub, whitelist: WhitelistStatus) -> Bool {
+      isAlwaysTrusted(by: hub) || (key.map(whitelist.users.contains) ?? false)
     }
   }
   

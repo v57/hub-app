@@ -15,7 +15,8 @@ import HubService
 
 struct ConnectionsPage: View {
   @Environment(Hub.self) private var hub
-  @HubState(\.users) private var users
+  @HubState(\.users) private var connections
+  @HubState(\.devices) private var devices
   @HubState(\.groups) private var groups
   @HubState(\.hostPending) private var pending
   @HubState(\.whitelist) private var whitelist
@@ -24,6 +25,9 @@ struct ConnectionsPage: View {
   @State private var selection: String?
   @State private var pushed: String?
   @Environment(\.kitIdiom) private var idiom
+
+  /// The connections, a device's own named as Devices names it
+  private var users: [Hub.User] { connections.map { $0.named(from: devices) } }
 
   private var shown: [Hub.User] {
     users.filter { search.isEmpty || $0.name.localizedCaseInsensitiveContains(search) || ($0.key ?? "").localizedCaseInsensitiveContains(search) }
@@ -55,7 +59,7 @@ struct ConnectionsPage: View {
             if style == .grid || idiom == .phone {
               LazyVGrid(columns: [GridItem(.adaptive(minimum: idiom == .phone ? 150 : 180), spacing: KitMetrics.gutter, alignment: .top)], spacing: KitMetrics.gutter) {
                 ForEach(section.users) { user in
-                  ConnectionCard(user: user, isMe: user.key == hub.key, isTrusted: user.key.map(whitelist.users.contains) ?? false, isSelected: selection == user.id) {
+                  ConnectionCard(user: user, isMe: user.key == hub.key, isTrusted: user.isTrusted(by: hub, whitelist: whitelist), isSelected: selection == user.id) {
                     select(user.id)
                   }
                 }
@@ -177,7 +181,9 @@ struct ConnectionInspector: View {
   @HubState(\.whitelist) private var whitelist
 
   var body: some View {
-    let isTrusted = user.key.map(whitelist.users.contains) ?? false
+    // As the Lockdown page has it: this app and the owners always connect
+    let isTrusted = user.isTrusted(by: hub, whitelist: whitelist)
+    let isAlwaysTrusted = user.isAlwaysTrusted(by: hub)
     VStack(alignment: .leading, spacing: KitMetrics.gutter) {
       RichHeader(Text(user.name.isEmpty ? "Unauthorized" : user.name), size: .title) {
         Tile(systemImage: user.icon.symbol?.name ?? "hexagon", hue: .gray, size: 28)
@@ -209,12 +215,17 @@ struct ConnectionInspector: View {
           }
         }
         if hub.canLockdown {
-          KitSection("Lockdown", meta: [isTrusted ? String(localized: "Trusted") : String(localized: "Not trusted")], systemImage: "lock.shield", hue: .blue) {
+          KitSection("Lockdown", meta: [isAlwaysTrusted ? String(localized: "Always trusted") : isTrusted ? String(localized: "Trusted") : String(localized: "Not trusted")], systemImage: "lock.shield", hue: .blue) {
             Toggle("Can connect in Lockdown", isOn: Binding { isTrusted } set: { trust in
               Task { try? await hub.lockdown(trust ? SetLockdown(add: [key]) : SetLockdown(remove: [key])) }
             })
             .toggleStyle(.kitSwitch)
+            .disabled(isAlwaysTrusted)
             .padding(8)
+            if isAlwaysTrusted {
+              Text(user.key == hub.key ? "You · always trusted" : "Owner · always trusted")
+                .kitFont(.caption).padding([.horizontal, .bottom], 8)
+            }
           }
         }
         HStack {
@@ -356,18 +367,20 @@ struct ChipFlow: View {
 
 struct LockdownPage: View {
   @Environment(Hub.self) private var hub
-  @HubState(\.users) private var users
+  @HubState(\.users) private var connections
+  @HubState(\.devices) private var devices
   @HubState(\.whitelist) private var whitelist
   @State private var search = ""
   @State private var isOn = false
   @Environment(\.kitIdiom) private var idiom
 
+  /// The connections, a device's own named as Devices names it
+  private var users: [Hub.User] { connections.map { $0.named(from: devices) } }
+
   var body: some View {
     let keyed = users.filter { search.isEmpty || $0.name.localizedCaseInsensitiveContains(search) }
     // Owners always connect (the hub lets them through Lockdown), this app's own key among them: they're trusted
-    let isTrusted = { (user: Hub.User) in
-      user.key == hub.key || user.group == "owners" || (user.key.map(whitelist.users.contains) ?? false)
-    }
+    let isTrusted = { (user: Hub.User) in user.isTrusted(by: hub, whitelist: whitelist) }
     let trusted = keyed.filter(isTrusted)
     let untrusted = keyed.filter { !isTrusted($0) }
     ScrollView {
@@ -451,7 +464,7 @@ struct LockdownPage: View {
                       Task { try? await hub.lockdown(trust ? SetLockdown(add: [key]) : SetLockdown(remove: [key])) }
                     })
                     .toggleStyle(.kitSwitch).labelsHidden().controlSize(.small)
-                    .disabled(user.key == hub.key || user.group == "owners")
+                    .disabled(user.isAlwaysTrusted(by: hub))
                   }
                 }
               }
@@ -702,11 +715,12 @@ private struct GroupInspector: View {
   /// After the group is deleted (iPhone: the pushed page goes back)
   var onDelete: (() -> Void)?
   @Environment(Hub.self) private var hub
-  @HubState(\.users) private var users
+  @HubState(\.users) private var connections
+  @HubState(\.devices) private var devices
   @State private var isDeleting = false
 
   var body: some View {
-    let members = users.filter { $0.group == group.name }
+    let members = connections.map { $0.named(from: devices) }.filter { $0.group == group.name }
     let edited = edits[group.name]
     VStack(alignment: .leading, spacing: KitMetrics.gutter) {
       KitSection(Hub.groupTitle(group.name), meta: [members.count == 1 ? String(localized: "1 member") : String(localized: "\(members.count) members"), String(localized: "\(group.permissions.count) permissions")], systemImage: "person.2", hue: .purple) {
