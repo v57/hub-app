@@ -5,8 +5,8 @@
 //  What This Device's Storage answers its hub with, off the main actor: the paths of hub-s3-local (`s3/read` and
 //  `s3/write` presign, `s3/read/directory`, `s3/size`, `s3/list` and its stream, `s3/delete`, `s3/updated`,
 //  `s3/update/status`, `s3/status`), and `s3/space` for hub-s3-raid, over the folder S3ServerSwift serves as the
-//  bucket `hub`. Links are presigned against the Hub Network share's authority (`*.hub.invalid`) and fail closed until
-//  the share is published, as hub-s3-local's do; they carry no ACL. The size limit is kept here: uploads past it are
+//  bucket `hub`. Links are presigned against the Hub Network share's overlay address and port and fail closed until
+//  the share is published; they carry no ACL. The size limit is kept here: uploads past it are
 //  refused before their body, and uploads on their way hold their room until they end.
 //
 
@@ -206,28 +206,24 @@ final class StorageBackend: @unchecked Sendable {
     return presigner.url(method: method, key: key, expires: Self.linkLifetime).absoluteString
   }
 
-  /// hub-s3-local's `overlayS3Endpoint`: the share's canonical `*.hub.invalid` authority and its port, over TCP
+  /// The share's overlay address and port, over TCP. Not its `*.hub.invalid` authority, as hub-s3-local presigns: an
+  /// Apple device's tunnel answers only the names its profile was installed with, so no Apple client resolved it, the
+  /// hub's own Mac included, and `URLSession` timed out. The address reaches the device the same way, through the
+  /// member's link or the hub's machine, as the camera's viewers connect.
   static func overlayEndpoint(_ publication: NetworkSharePublication?) throws -> URL {
     guard let publication else { throw StorageError.notPublished }
     guard publication.protocol == .tcp else {
       throw StorageError.invalidShare("unsupported protocol '\(publication.protocol.rawValue)'")
     }
     guard publication.port > 0 else { throw StorageError.invalidShare("invalid port '\(publication.port)'") }
-    guard isCanonicalAuthority(publication.authority), let url = URL(string: "http://\(publication.authority):\(publication.port)") else {
-      throw StorageError.invalidShare("invalid authority '\(publication.authority)'")
-    }
+    let address = publication.overlayAddress
+    guard isOverlay(address) else { throw StorageError.invalidShare("invalid overlay address '\(address)'") }
+    var components = URLComponents()
+    components.scheme = "http"
+    components.host = address.contains(":") ? "[\(address)]" : address
+    components.port = Int(publication.port)
+    guard let url = components.url else { throw StorageError.invalidShare("invalid overlay address '\(address)'") }
     return url
-  }
-
-  /// Labels of letters, digits and inner hyphens, ending in `.hub.invalid`
-  static func isCanonicalAuthority(_ authority: String) -> Bool {
-    guard authority.hasSuffix(".hub.invalid"), authority.count <= 253 else { return false }
-    let labels = authority.split(separator: ".", omittingEmptySubsequences: false)
-    guard labels.count >= 3 else { return false }
-    return labels.allSatisfy { label in
-      guard (1...63).contains(label.count), label.first != "-", label.last != "-" else { return false }
-      return label.allSatisfy { ($0.isASCII && ($0.isLowercase || $0.isNumber)) || $0 == "-" }
-    }
   }
 
   /// A direct origin (Debug's `--storage-endpoint`), with the server's port when it names none
@@ -359,7 +355,11 @@ final class StorageBackend: @unchecked Sendable {
   /// Hub Network's overlay (100.64.0.0/10 holds the hub's 100.96.0.0/11; fd48:5542:4e45::/48) or this device, as the
   /// camera's server answers
   static func isAllowed(_ address: String) -> Bool {
-    if address == "127.0.0.1" || address == "::1" { return true }
+    address == "127.0.0.1" || address == "::1" || isOverlay(address)
+  }
+
+  /// An address in Hub Network's overlay
+  static func isOverlay(_ address: String) -> Bool {
     if address.lowercased().hasPrefix("fd48:5542:4e45:") { return true }
     let octets = address.split(separator: ".").compactMap { UInt8($0) }
     return octets.count == 4 && octets[0] == 100 && octets[1] & 0xC0 == 64

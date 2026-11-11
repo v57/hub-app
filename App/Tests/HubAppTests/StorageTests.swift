@@ -171,8 +171,8 @@ final class StorageTests: XCTestCase {
 
   // MARK: Links
 
-  func publication(authority: String = "s3.abcd1234.hub.invalid", protocol: NetworkProtocol = .tcp, port: UInt16 = 443) -> NetworkSharePublication {
-    NetworkSharePublication(resourceId: "r", authority: authority, providerId: "p", protocol: `protocol`, overlayAddress: "100.96.0.2", port: port)
+  func publication(address: String = "100.96.0.2", protocol: NetworkProtocol = .tcp, port: UInt16 = 443) -> NetworkSharePublication {
+    NetworkSharePublication(resourceId: "r", authority: "s3.abcd1234.hub.invalid", providerId: "p", protocol: `protocol`, overlayAddress: address, port: port)
   }
 
   func testLinksFailClosedUntilTheShareIsPublished() throws {
@@ -184,7 +184,7 @@ final class StorageTests: XCTestCase {
     }
     backend.set(publication: publication())
     let link = try XCTUnwrap(URL(string: try backend.link(method: "PUT", key: "photos/a b.jpg")))
-    XCTAssertEqual(link.host, "s3.abcd1234.hub.invalid")
+    XCTAssertEqual(link.host, "100.96.0.2")
     XCTAssertEqual(link.port, 443)
     XCTAssertEqual(link.scheme, "http")
     XCTAssertTrue(link.path.hasPrefix("/hub/photos/"))
@@ -192,14 +192,15 @@ final class StorageTests: XCTestCase {
     XCTAssertTrue(link.query?.contains("X-Amz-Expires=604800") ?? false)
   }
 
-  func testOnlyCanonicalShareAuthoritiesAreUsed() {
-    XCTAssertThrowsError(try StorageBackend.overlayEndpoint(publication(authority: "evil.example.com")))
-    XCTAssertThrowsError(try StorageBackend.overlayEndpoint(publication(authority: "a..hub.invalid")))
-    XCTAssertThrowsError(try StorageBackend.overlayEndpoint(publication(authority: "-a.hub.invalid")))
-    XCTAssertThrowsError(try StorageBackend.overlayEndpoint(publication(authority: "A.hub.invalid")))
+  /// Links go to the share's overlay address: Apple devices' tunnels don't resolve other devices' `*.hub.invalid` names
+  func testLinksGoToTheSharesOverlayAddress() {
+    XCTAssertThrowsError(try StorageBackend.overlayEndpoint(publication(address: "192.168.1.6")))
+    XCTAssertThrowsError(try StorageBackend.overlayEndpoint(publication(address: "127.0.0.1")))
+    XCTAssertThrowsError(try StorageBackend.overlayEndpoint(publication(address: "evil.example.com")))
     XCTAssertThrowsError(try StorageBackend.overlayEndpoint(publication(protocol: .udp)))
     XCTAssertThrowsError(try StorageBackend.overlayEndpoint(publication(port: 0)))
-    XCTAssertEqual(try StorageBackend.overlayEndpoint(publication()).absoluteString, "http://s3.abcd1234.hub.invalid:443")
+    XCTAssertEqual(try StorageBackend.overlayEndpoint(publication()).absoluteString, "http://100.96.0.2:443")
+    XCTAssertEqual(try StorageBackend.overlayEndpoint(publication(address: "fd48:5542:4e45::5")).absoluteString, "http://[fd48:5542:4e45::5]:443")
   }
 
   func testDirectEndpointTakesTheServersPort() {
