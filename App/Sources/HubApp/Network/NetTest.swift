@@ -59,6 +59,15 @@ enum NetTest {
       guard let link = arguments.firstIndex(of: "--net-link").flatMap({ $0 + 1 < arguments.count ? arguments[$0 + 1] : nil }) else {
         return fail("no --net-link")
       }
+      // A device another network removed keeps its tunnel trying that network, and a join refuses to start over a
+      // tunnel that is up (activeVPNConflict): a test join replaces it, as the HN9xx acceptance run does
+      if let tunnel = try? PacketTunnelController() {
+        let status = await tunnel.status
+        if status != .disconnected, status != .notInstalled {
+          await tunnel.stop()
+          log("stopped this device's tunnel (\(status))")
+        }
+      }
       do {
         let hub = try await HubNets.main.join(link: link)
         log("joined \(hub.settings.name) \(hub.settings.address.absoluteString)")

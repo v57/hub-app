@@ -144,6 +144,9 @@ actor NativeJoinStore {
   private let decoder: JSONDecoder
 
   private let appIdentity: @Sendable () -> KeyChain
+  /// Transactions this store staged or resumed since launch: an unfinished one from before was cut off with its
+  /// process (a join that fails cleans up after itself), and only its own invitation could finish it
+  private var live: Set<String> = []
 
   init(
     directory: URL? = nil,
@@ -168,10 +171,12 @@ actor NativeJoinStore {
     }
     if let existing = try load(transactionId: tokenId) {
       _ = try self.identity(for: existing)
+      live.insert(tokenId)
       return existing
     }
 
     try rejectDifferentUnfinishedTransaction(tokenId)
+    live.insert(tokenId)
     // The joiner is a service key of its own (`AppCredentials.joinScope`) on a device key of its own: nothing an
     // invitation leads to can use them on another hub. It keeps the app's owner rights elsewhere untouched.
     let profile = identity ?? appIdentity()
@@ -205,6 +210,7 @@ actor NativeJoinStore {
     guard !tokenId.isEmpty else { throw NativeJoinStoreError.invalidToken }
     guard let record = try load(transactionId: tokenId) else { return nil }
     _ = try identity(for: record)
+    live.insert(tokenId)
     return record
   }
 
@@ -316,6 +322,7 @@ actor NativeJoinStore {
   }
 
   func cleanup(transactionId: String) throws {
+    live.remove(transactionId)
     let accounts = secretAccounts(transactionId)
     try secrets.delete(account: accounts.profile)
     try secrets.delete(account: accounts.wireGuard)
@@ -384,9 +391,14 @@ actor NativeJoinStore {
     for url in urls where url.pathExtension == "json" {
       guard let data = try? Data(contentsOf: url),
             let record = try? decoder.decode(NativeJoinRecord.self, from: data) else { continue }
-      if record.transactionId != transactionId, record.stage != .committed {
-        throw NativeJoinStoreError.transactionConflict
+      guard record.transactionId != transactionId, record.stage != .committed else { continue }
+      // One that an earlier launch left (the app was killed mid-join) would refuse every other invitation for good:
+      // this join takes over
+      guard live.contains(record.transactionId) else {
+        try cleanup(transactionId: record.transactionId)
+        continue
       }
+      throw NativeJoinStoreError.transactionConflict
     }
   }
 
