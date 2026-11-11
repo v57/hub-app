@@ -295,7 +295,7 @@ struct UseInternetSheet: View {
           }
         }
       }
-      Text("Share their internet  \(sharing.count) of \(total)").kitFont(.sectionHeader).padding(.top, 4)
+      Text("Devices that share their internet").kitFont(.sectionHeader).padding(.top, 4)
       FormCard {
         ForEach(shown) { device in
           let isUsing = device.id == using?.id
@@ -303,8 +303,13 @@ struct UseInternetSheet: View {
                   error: busy == nil && error != nil && device.id == lastTried ? error : nil) {
             if isUsing {
               Button("Stop") { stop() }.buttonStyle(.kit).disabled(busy != nil)
+            } else if busy == device.id {
+              HStack(spacing: 8) {
+                Text("Connecting…").kitFont(.caption).foregroundStyle(Hue.orange.text)
+                Button("Cancel") { cancel() }.buttonStyle(.kit)
+              }
             } else {
-              Button(busy == device.id ? "Connecting…" : "Use") { use(device) }
+              Button("Use") { use(device) }
                 .buttonStyle(.kit).disabled(busy != nil || !device.sharesInternet || !facts.isJoined)
             }
           }
@@ -364,20 +369,34 @@ struct UseInternetSheet: View {
     return parts.joined(separator: " · ")
   }
 
+  @State private var request: Task<Void, Never>?
+
   private func use(_ device: NetDevice) {
     busy = device.id
     lastTried = device.id
     error = nil
-    Task {
-      do { try await hub.net.useInternet(of: device) } catch { self.error = error.networkLine }
-      busy = nil
+    request = Task {
+      do {
+        try await hub.net.useInternet(of: device)
+      } catch is CancellationError {
+      } catch {
+        self.error = error.networkLine
+      }
+      if !Task.isCancelled { busy = nil }
     }
+  }
+
+  /// Stops waiting for the device's internet: a grant the hub sends later is dropped
+  private func cancel() {
+    request?.cancel()
+    request = nil
+    busy = nil
   }
 
   private func stop() {
     busy = "own"
     error = nil
-    Task {
+    request = Task {
       do { try await hub.net.stopUsingInternet() } catch { self.error = error.networkLine }
       busy = nil
     }

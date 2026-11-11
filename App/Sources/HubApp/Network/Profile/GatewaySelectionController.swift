@@ -99,16 +99,22 @@ final class GatewaySelectionController {
     }
   }
 
+  /// `isWanted`: whether the caller still wants this gateway once the hub granted it (the user may have cancelled or
+  /// chosen another meanwhile); when not, the tunnel stays as it is and this throws `CancellationError`
   func select(
     _ gateway: ReachableGateway,
     hub: Hub,
     tunnel: PacketTunnelController,
-    controlPlaneHosts: [String] = []
+    controlPlaneHosts: [String] = [],
+    isWanted: @MainActor () -> Bool = { true }
   ) async throws {
-    try await tunnel.replaceAndStart(
-      configuration: configuration(gateway, hub: hub, controlPlaneHosts: controlPlaneHosts)
-    )
+    let configuration = try await configuration(gateway, hub: hub, controlPlaneHosts: controlPlaneHosts)
+    guard isWanted(), !Task.isCancelled else { throw CancellationError() }
+    try await tunnel.replaceAndStart(configuration: configuration)
   }
+
+  /// How long the hub has to grant a gateway: a hub that went away doesn't answer, and the channel would wait for it
+  static let grantTimeout: Duration = .seconds(20)
 
   /// The profile that sends this device's traffic through `gateway`, with a grant the hub issues for it now
   private func configuration(
@@ -124,17 +130,20 @@ final class GatewaySelectionController {
       throw GatewaySelectionError.membershipMismatch
     }
 
-    let response: GatewayGrantResponse = try await hub.client.send(
-      "network/gateway/grant",
-      GatewayGrantRequest(
-        clientKey: hub.key,
-        clientWireGuardKey: wireGuardKey,
-        gatewayKey: gateway.status.key,
-        ipv4: gateway.status.capability.ipv4,
-        ipv6: gateway.status.capability.ipv6,
-        dns: true
-      )
+    let request = GatewayGrantRequest(
+      clientKey: hub.key,
+      clientWireGuardKey: wireGuardKey,
+      gatewayKey: gateway.status.key,
+      ipv4: gateway.status.capability.ipv4,
+      ipv6: gateway.status.capability.ipv6,
+      dns: true
     )
+    let hubName = hub.settings.name
+    let response: GatewayGrantResponse = try await bounded(
+      Self.grantTimeout, timedOut: { GatewaySelectionError.hubDidNotAnswer(hubName) }
+    ) { @MainActor in
+      try await hub.client.send("network/gateway/grant", request)
+    }
     let grant = response.grant
     try HubNetworkSignedEnvelope.validateGatewayGrant(
       grant,
@@ -289,6 +298,76 @@ final class GatewaySelectionController {
   }
 }
 
-enum GatewaySelectionError: Error, Equatable {
+enum GatewaySelectionError: LocalizedError, Equatable {
   case membershipMismatch
+  /// The hub didn't grant the gateway in time (`grantTimeout`)
+  case hubDidNotAnswer(String)
+
+  var errorDescription: String? {
+    switch self {
+    case .membershipMismatch:
+      String(localized: "This device’s Hub Network membership doesn’t match that device’s network. Turn Hub Network off and on, then try again.")
+    case .hubDidNotAnswer(let hub):
+      String(localized: "\(hub) didn’t answer, so that device’s internet couldn’t be used. Check that \(hub) is online, then try again.")
+    }
+  }
+}
+
+/// `operation`'s result, or `timedOut()` once `limit` passes, or `CancellationError` once the caller is cancelled,
+/// whichever comes first. A channel send waits on through a hub that went away and ignores cancellation, so it can't
+/// be awaited directly where someone waits; when it answers late, its answer is dropped.
+@MainActor
+func bounded<T: Sendable>(
+  _ limit: Duration,
+  timedOut: @escaping @Sendable () -> Error,
+  _ operation: @escaping @MainActor @Sendable () async throws -> T
+) async throws -> T {
+  let once = BoundedResult<T>()
+  let work = Task { @MainActor in
+    do { once.finish(.success(try await operation())) } catch { once.finish(.failure(error)) }
+  }
+  let timer = Task {
+    try? await Task.sleep(for: limit)
+    once.finish(.failure(timedOut()))
+  }
+  defer {
+    work.cancel()
+    timer.cancel()
+  }
+  return try await withTaskCancellationHandler {
+    try await withCheckedThrowingContinuation { continuation in once.wait(continuation) }
+  } onCancel: {
+    once.finish(.failure(CancellationError()))
+  }
+}
+
+/// The first of `bounded`'s outcomes, handed to its waiter once
+private final class BoundedResult<T: Sendable>: @unchecked Sendable {
+  private let lock = NSLock()
+  private var continuation: CheckedContinuation<T, Error>?
+  private var result: Result<T, Error>?
+
+  func wait(_ continuation: CheckedContinuation<T, Error>) {
+    lock.lock()
+    if let result {
+      lock.unlock()
+      continuation.resume(with: result)
+      return
+    }
+    self.continuation = continuation
+    lock.unlock()
+  }
+
+  func finish(_ result: Result<T, Error>) {
+    lock.lock()
+    guard self.result == nil else {
+      lock.unlock()
+      return
+    }
+    self.result = result
+    let continuation = self.continuation
+    self.continuation = nil
+    lock.unlock()
+    continuation?.resume(with: result)
+  }
 }

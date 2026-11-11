@@ -123,6 +123,8 @@ final class HubNet {
   let hub: Hub
   private var nets: HubNets { .main }
   private var vpnRenewalTask: Task<Void, Never>?
+  /// Counts the choices of whose internet to use, so a choice that finishes after a newer one leaves it alone
+  @ObservationIgnored private var gatewayChoice = 0
   private var isResumingGateway = false
   /// The device whose internet this device chose last on this hub, kept until it stops using it
   private var chosenGateway: String? {
@@ -366,12 +368,25 @@ final class HubNet {
       peerEndpoint: device.endpoint
     )
     let tunnel = try PacketTunnelController()
+    // A later choice (another device, this device's own internet) or Cancel wins over this one, also when the hub
+    // grants it late
+    gatewayChoice += 1
+    let choice = gatewayChoice
     if (try? tunnel.installedConfiguration())?.gatewayGrant?.gatewayKey == device.key {
       // Already through it (a relaunch): a new grant is enough, the tunnel and its flows stay
       try await GatewaySelectionController().renew(reachable, hub: hub, tunnel: tunnel)
     } else {
-      try await GatewaySelectionController().select(reachable, hub: hub, tunnel: tunnel)
+      try await GatewaySelectionController().select(reachable, hub: hub, tunnel: tunnel) { [weak self] in
+        self?.gatewayChoice == choice
+      }
+      if Task.isCancelled, gatewayChoice == choice {
+        // Cancelled while the tunnel switched over: back to this device's own internet
+        try? await GatewaySelectionController().disable(tunnel: tunnel)
+        try? refreshAddress(from: tunnel)
+        throw CancellationError()
+      }
     }
+    guard gatewayChoice == choice else { throw CancellationError() }
     vpn = device
     chosenGateway = device.key
     vpnRenewalTask?.cancel()
@@ -435,6 +450,7 @@ final class HubNet {
     vpnRenewalTask?.cancel()
     vpnRenewalTask = nil
     chosenGateway = nil
+    gatewayChoice += 1
     guard HubNetworkBackend.current?.agent == nil else {
       vpn = nil
       return
