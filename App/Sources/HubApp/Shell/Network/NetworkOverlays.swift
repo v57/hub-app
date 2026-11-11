@@ -548,9 +548,11 @@ struct ShareAppSheet: View {
   }
 }
 
-/// Choose who may use a shared app, from the hub's people and devices
+/// Choose who may use a shared app: the devices on the hub's network, and the people connected to the hub where this
+/// device may see them (`hub/connections` is for owners). A policy's keys are the devices' network (profile) keys.
 struct ChoosePeopleSheet: View {
   let app: NetApp
+  var facts = NetworkFacts()
   @Environment(Hub.self) private var hub
   @Environment(\.kitDismiss) private var dismiss
   @HubState(\.users) private var users
@@ -558,16 +560,45 @@ struct ChoosePeopleSheet: View {
   @State private var busy = false
   @State private var error: String?
 
+  private struct Choice: Identifiable {
+    let id: String
+    let name: String
+    let help: String?
+    let symbol: String
+  }
+
+  /// The other devices on the network, then people the hub lists who aren't one of them, then keys the app's access
+  /// already names that neither lists now
+  private var choices: [Choice] {
+    var list = facts.others.map { device in
+      Choice(id: device.id, name: device.name, help: device.status == .asleep ? String(localized: "Device · asleep") : String(localized: "Device"), symbol: device.symbol)
+    }
+    var seen = Set(list.map(\.id))
+    for user in users {
+      guard let key = user.key, !seen.contains(key), key != hub.key else { continue }
+      seen.insert(key)
+      list.append(Choice(id: key, name: user.name, help: user.group.map(Hub.groupTitle), symbol: "person"))
+    }
+    for key in (app.policy?.keys ?? []).sorted() where !seen.contains(key) {
+      list.append(Choice(id: key, name: String(key.prefix(8)), help: String(localized: "Not on the network now"), symbol: "questionmark.circle"))
+    }
+    return list
+  }
+
   var body: some View {
+    let choices = self.choices
     KitSheet(title: "Who Can Use \(app.name)", meta: "People and devices in \(hub.settings.name)", systemImage: "person.2", hue: .teal, status: busy ? .working : .idle) {
       FormCard(footer: error) {
-        ForEach(users.filter { $0.key != nil }) { user in
-          FormRow(user.name, help: user.group.map(Hub.groupTitle), systemImage: "person", hue: .gray) {
-            Toggle(user.name, isOn: Binding { keys.contains(user.key ?? "") } set: { on in
-              if on { keys.insert(user.key ?? "") } else { keys.remove(user.key ?? "") }
+        ForEach(choices) { choice in
+          FormRow(choice.name, help: choice.help, systemImage: choice.symbol, hue: .gray) {
+            Toggle(choice.name, isOn: Binding { keys.contains(choice.id) } set: { on in
+              if on { keys.insert(choice.id) } else { keys.remove(choice.id) }
             })
             .toggleStyle(.kitSwitch).labelsHidden()
           }
+        }
+        if choices.isEmpty {
+          FormRow("No other devices on \(hub.settings.name)’s network yet", help: "Add a device from the Hub Network page, then choose it here.", systemImage: "person.2", hue: .gray)
         }
       }
     } footer: {
