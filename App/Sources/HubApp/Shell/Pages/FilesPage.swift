@@ -109,7 +109,7 @@ struct FilesPage: View {
       }
       if hub.hasStorage && hub.require(permissions: "s3/write") && idiom != .tv {
         ToolGroup {
-          Button("Upload", systemImage: "arrow.up.doc") { importing = true }
+          Button("Upload", systemImage: "arrow.up.doc") { chooseFiles() }
         }
       }
     }
@@ -127,7 +127,7 @@ struct FilesPage: View {
         .hub(hub)
       }
     }
-#if !os(tvOS)
+#if canImport(UIKit) && !os(tvOS)
     .fileImporter(isPresented: $importing, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
       if case .success(let urls) = result { upload(urls) }
     }
@@ -225,6 +225,21 @@ struct FilesPage: View {
     guard !parts.isEmpty else { return }
     parts.removeLast()
     path = parts.isEmpty ? "" : parts.joined(separator: "/") + "/"
+  }
+
+  /// Upload's picker: the Files browser on iPhone and iPad; the open panel on the Mac (files and folders) and the
+  /// system's file dialog on Linux and Windows. The sandboxed Mac app needs the user-selected files entitlement
+  /// (`ENABLE_USER_SELECTED_FILES`) for it: without it the panel returns at once with nothing chosen
+  private func chooseFiles() {
+#if canImport(UIKit)
+    importing = true
+#else
+    Task {
+      let urls = await KitDesktop.chooseFiles(
+        prompt: String(localized: "Upload"), canChooseFolders: true, allowsMultipleSelection: true)
+      if !urls.isEmpty { upload(urls) }
+    }
+#endif
   }
 
   private func upload(_ urls: [URL]) {
