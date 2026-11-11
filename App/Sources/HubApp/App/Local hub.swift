@@ -42,6 +42,8 @@ final class LocalHub {
 
   @ObservationIgnored private var server: HubServer?
   @ObservationIgnored private var statusTask: Task<Void, Never>?
+  /// The start in progress, which a second `start()` waits for instead of starting another hub
+  @ObservationIgnored private var starting: Task<Void, Never>?
   /// Hub has left the screen (iOS suspends it soon after)
   @ObservationIgnored private var isInBackground = false
 #if os(iOS) || os(tvOS) || os(visionOS)
@@ -96,7 +98,17 @@ final class LocalHub {
     await start()
   }
 
+  /// Starts the hub, or waits for the start in progress. At launch `.task` and the scene turning active both resume
+  /// it before `status` says it's starting, and a second start stopped the first hub and its client's attempt
   func start() async {
+    if let starting { return await starting.value }
+    let task = Task { await startServer() }
+    starting = task
+    await task.value
+    starting = nil
+  }
+
+  private func startServer() async {
     if server != nil, isRunning || isStarting { return }
     // A hub whose listener failed (the app was suspended) starts over
     if let old = server { await old.stop() }
