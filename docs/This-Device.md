@@ -81,11 +81,14 @@ storage: it’s a place on the hub’s [Files](Files.md) page, and apps and serv
 It’s off until you turn it on.
 
 1. Open **Storage**. If you’re connected to several hubs, pick one under **Hub**.
-2. Turn on **Share Storage**. The hub lists this device as a storage provider.
+2. Turn on **Share Storage**. The hub lists this device as a storage provider once its owner allows it under
+   **Requests**, the first time (it asks to post the `s3` APIs).
 3. Set the **Limit** under **Space**. Hub starts with a quarter of the free space, between 1 GB and 100 GB.
 
 **Space** shows what’s used of the limit and what’s free on this device. Hub refuses an upload that would go past the
-limit, or leave this device with less than 1 GB free. Lowering the limit keeps what’s stored.
+limit, or leave this device with less than 1 GB free; uploads still on their way count too, so several at once can’t
+go past it together. Lowering the limit keeps what’s stored. S3 RAID fills this device only up to the limit, not up to
+its free space.
 
 The files are in a folder of Hub’s own on this device, left out of backups. Turning **Share Storage** off stops sharing
 and keeps the files; turn it on again to share them again. To share with another hub, turn it off, pick the hub and turn

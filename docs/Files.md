@@ -20,7 +20,8 @@ If a hub runs the launcher but has no storage yet, **Files** opens **Connect Sto
 
 An iPhone, iPad or Mac running Hub can share part of its own storage with the hub: on that device, open **This
 Device** → **Storage** and turn on **Share Storage** (see [This Device](This-Device.md#storage)). It shows up here as a
-place named after the device, while Hub is open there and the device is on Hub Network.
+place named after the device, while Hub is open there and the device is on Hub Network. The first time, the hub’s owner
+allows the storage under **Requests** (it asks to post the `s3` APIs).
 
 Installing storage needs permission to install apps on the hub. Without it, Hub says **You don't have permissions to
 install services**. If you can install but not allow, ask the hub’s owner to give access to the storage service.
@@ -30,11 +31,13 @@ The keys you type for your own S3 storage go to the hub’s launcher, which keep
 ## Browse files
 
 - When a hub has several storage places, pick one from the cards at the top.
-- Use the path at the top or **Back** to move up. Double-tap a folder to open it.
-- The table shows **Name**, **Kind**, **Size** and **Modified**. On iPad and the Mac you can search.
+- Use the path at the top or **Back** to move up. Double-tap a folder to open it; on iPhone, tap it.
+- The table shows **Name**, **Kind**, **Size** and **Modified** (on iPhone, **Name** and **Size**). On iPad and the Mac
+  you can search.
 
-Select a file to see its **Folder**, **Modified** and **Size**. **Copy Link** copies a link to the file from the
-hub’s storage.
+Select a file to see its **Folder**, **Modified** and **Size**. On iPhone, tap the file and its details open on a page
+of their own. On an iPad in portrait with the sidebar shown, they float over the right side of the list. **Copy Link**
+copies a link to the file from the hub’s storage.
 
 ## Upload files
 
