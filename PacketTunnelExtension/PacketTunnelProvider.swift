@@ -22,6 +22,10 @@ import CryptoKit
 func extensionDiagnostics(_ line: String) {
   let stamp = ISO8601DateFormatter().string(from: Date())
   let entry = "[\(stamp)] \(line)"
+  // Links, probes and the coordinator log from concurrent tasks: unguarded, two appends to the buffer (or two
+  // read-append-writes of the file) at once corrupt it, which crashes the extension and drops the VPN
+  extensionDiagnosticsLock.lock()
+  defer { extensionDiagnosticsLock.unlock() }
   extensionDiagnosticsBuffer.append(entry)
   if extensionDiagnosticsBuffer.count > 200 {
     extensionDiagnosticsBuffer.removeFirst(extensionDiagnosticsBuffer.count - 200)
@@ -31,16 +35,27 @@ func extensionDiagnostics(_ line: String) {
     return
   }
   let url = container.appendingPathComponent("hn9xx-diag.log", isDirectory: false)
-  if let existing = try? String(contentsOf: url, encoding: .utf8) {
+  if var existing = try? String(contentsOf: url, encoding: .utf8) {
+    // Each line rewrites the file: keep its last 256 KB
+    if existing.utf8.count > 512 * 1024 {
+      existing = String(existing.suffix(256 * 1024))
+    }
     try? (existing + entry + "\n").data(using: .utf8)?.write(to: url, options: .atomic)
   } else {
     try? (entry + "\n").data(using: .utf8)?.write(to: url, options: .atomic)
   }
 }
 
-/// In-memory diag buffer, pulled by the app via the "hn9xx-diag" provider
-/// message (see `PacketTunnelProvider.handleAppMessage`).
-nonisolated(unsafe) var extensionDiagnosticsBuffer: [String] = []
+/// The last diagnostics lines, pulled by the app via the "hn9xx-diag" provider message (see
+/// `PacketTunnelProvider.handleAppMessage`)
+var extensionDiagnosticsLines: [String] {
+  extensionDiagnosticsLock.lock()
+  defer { extensionDiagnosticsLock.unlock() }
+  return extensionDiagnosticsBuffer
+}
+
+private let extensionDiagnosticsLock = NSLock()
+nonisolated(unsafe) private var extensionDiagnosticsBuffer: [String] = []
 
 final class PacketTunnelProvider: NEPacketTunnelProvider {
   private lazy var wireGuardAdapter = PacketTunnelWireGuardAdapter(provider: self)
@@ -533,7 +548,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
 
   override func handleAppMessage(_ messageData: Data) async -> Data? {
     if messageData == Data("hn9xx-diag".utf8) {
-      return Data(extensionDiagnosticsBuffer.joined(separator: "\n").utf8)
+      return Data(extensionDiagnosticsLines.joined(separator: "\n").utf8)
     }
     if let message = try? JSONDecoder().decode(GatewayProviderMessage.self, from: messageData), message.command == "cameraAlerts" {
       if cameraAlerts == nil { startCameraAlerts() } else { reloadCameraAlerts() }
