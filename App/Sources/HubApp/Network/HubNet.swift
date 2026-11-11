@@ -306,14 +306,38 @@ final class HubNet {
     }
   }
 
-  func shareTcp(port: Int, enabled: Bool) async throws {
+  /// `label`: the app's name, which the share carries so other devices show it (`shareName`)
+  func shareTcp(port: Int, enabled: Bool, label: String? = nil) async throws {
     print("HubNet.shareTcp", port, enabled)
-    try await share(port: port, protocol: .tcp, enabled: enabled)
+    try await share(port: port, protocol: .tcp, enabled: enabled, label: label)
   }
 
-  func shareUdp(port: Int, enabled: Bool) async throws {
+  func shareUdp(port: Int, enabled: Bool, label: String? = nil) async throws {
     print("HubNet.shareUdp", port, enabled)
-    try await share(port: port, protocol: .udp, enabled: enabled)
+    try await share(port: port, protocol: .udp, enabled: enabled, label: label)
+  }
+
+  /// A port's share name: `tcp-8096`, or with the app's name `tcp-8096:Jellyfin`. Hubs take any name up to 128 bytes;
+  /// other devices read the name after the colon (`NetworkAppNames.name(share:port:)`), older apps the port.
+  nonisolated static func shareName(protocol networkProtocol: String, port: Int, label: String?) -> String {
+    let base = "\(networkProtocol)-\(port)"
+    var label = (label ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !label.isEmpty else { return base }
+    while (base + ":" + label).utf8.count > 128 { label.removeLast() }
+    return base + ":" + label
+  }
+
+  /// The app's name a share carries, `nil` for a plain port's (`tcp-8096`) and every other kind of share
+  nonisolated static func label(ofShare name: String) -> String? {
+    guard let colon = name.firstIndex(of: ":"), name.hasPrefix("tcp-") || name.hasPrefix("udp-") else { return nil }
+    let label = name[name.index(after: colon)...].trimmingCharacters(in: .whitespacesAndNewlines)
+    return label.isEmpty ? nil : label
+  }
+
+  /// Whether a share name is this port's, with or without the app's name
+  nonisolated static func isShare(_ name: String, protocol networkProtocol: String, port: Int) -> Bool {
+    let base = "\(networkProtocol)-\(port)"
+    return name == base || name.hasPrefix(base + ":")
   }
 
   func shareNetwork(enabled: Bool) async throws {
@@ -747,7 +771,8 @@ final class HubNet {
   private func share(
     port: Int,
     protocol networkProtocol: NetworkProtocol,
-    enabled: Bool
+    enabled: Bool,
+    label: String? = nil
   ) async throws {
     let validatedPort = try Self.validatedPort(port)
     guard isJoined else { throw HubNetError.notJoined }
@@ -758,17 +783,20 @@ final class HubNet {
       try await share(port: validatedPort, enabled: enabled, through: agent)
       return
     }
-    let name = "\(networkProtocol.rawValue)-\(port)"
     if enabled {
       try await hub.service.network.publish(
         NetworkShare(
-          name: name,
+          name: Self.shareName(protocol: networkProtocol.rawValue, port: port, label: label),
           protocol: networkProtocol,
           target: LocalTarget(port: validatedPort)
         )
       )
       ports.insert(port)
     } else {
+      // The name it was published under, the app's name included
+      let name = hub.service.network.declaredShares.first {
+        $0.protocol == networkProtocol && Self.isShare($0.name, protocol: networkProtocol.rawValue, port: port)
+      }?.name ?? "\(networkProtocol.rawValue)-\(port)"
       try await hub.service.network.remove(name)
       ports.remove(port)
     }

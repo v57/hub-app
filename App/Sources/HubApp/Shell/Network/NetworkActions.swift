@@ -38,8 +38,8 @@ extension HubNet {
       guard let data = UserDefaults.standard.data(forKey: key),
             let paused = try? JSONDecoder().decode(Paused.self, from: data) else { return }
       UserDefaults.standard.removeObject(forKey: key)
-      for port in paused.tcp { try? await shareTcp(port: port, enabled: true) }
-      for port in paused.udp { try? await shareUdp(port: port, enabled: true) }
+      for port in paused.tcp { try? await shareTcp(port: port, enabled: true, label: NetworkAppNames.main.label(port: port)) }
+      for port in paused.udp { try? await shareUdp(port: port, enabled: true, label: NetworkAppNames.main.label(port: port)) }
       if paused.internet { try? await shareNetwork(enabled: true) }
     } else {
       let paused = Paused(tcp: sharedTcp.sorted(), udp: sharedUdp.sorted(), internet: isSharing)
@@ -99,9 +99,10 @@ extension HubNet {
     try await shareNetwork(enabled: enabled)
   }
 
-  /// Shares an app's port with the hub's devices, named for the lists, or stops sharing it
+  /// Shares an app's port with the hub's devices, named for the lists (the share carries the name, so other devices
+  /// show it), or stops sharing it
   func share(app name: String?, port: Int, udp: Bool = false, enabled: Bool) async throws {
-    if let name, !name.isEmpty { NetworkAppNames.main.set(name, port: port) }
+    if let name, !name.isEmpty, name != "Port \(port)" { NetworkAppNames.main.set(name, port: port) }
 #if DEBUG
     if hub.isDemo {
       var ports = sharedTcp
@@ -110,10 +111,11 @@ extension HubNet {
       return
     }
 #endif
+    let label = NetworkAppNames.main.label(port: port)
     if udp {
-      try await shareUdp(port: port, enabled: enabled)
+      try await shareUdp(port: port, enabled: enabled, label: label)
     } else {
-      try await shareTcp(port: port, enabled: enabled)
+      try await shareTcp(port: port, enabled: enabled, label: label)
     }
   }
 }

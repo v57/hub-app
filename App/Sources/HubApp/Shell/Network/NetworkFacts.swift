@@ -180,7 +180,8 @@ struct NetworkFacts: DynamicProperty {
     let ports = hub.net.sharedTcp.map { ("tcp", $0) } + hub.net.sharedUdp.map { ("udp", $0) }
     return ports.sorted { $0.1 < $1.1 }.map { kind, port in
       let id = "\(kind)-\(port)"
-      let resource = resources.first { $0.shareName == id && $0.ownerKey == hub.key }
+      // Published as `tcp-8096` or with the app's name, `tcp-8096:Jellyfin`
+      let resource = resources.first { HubNet.isShare($0.shareName, protocol: kind, port: port) && $0.ownerKey == hub.key }
       return NetApp(id: id, name: names.name(port: port), port: port, policy: resource?.policy, resource: resource)
     }
   }
@@ -328,9 +329,26 @@ final class NetworkAppNames {
   func name(port: Int) -> String {
     named[String(port)] ?? KnownPorts.app(port)?.name ?? "Port \(port)"
   }
+  /// Another device's share by what it says: the app's name it carries (`tcp-8096:Jellyfin`), Hub's own services
+  /// (`s3` is a device's Storage, `Camera: Kitchen` a camera), a plain port by this device's name for it, else the
+  /// share's own name
   func name(share: String, port: Int?) -> String {
-    if let port { return name(port: port) }
-    return share
+    if let label = HubNet.label(ofShare: share) { return label }
+    if share == "s3" { return String(localized: "Storage") }
+    if let port, Self.isPlainPort(share) { return name(port: port) }
+    return share.isEmpty ? port.map { name(port: $0) } ?? "" : share
+  }
+
+  /// `tcp-8096`, `udp-8096`, or hub-net's `port-8096-tcp`
+  private static func isPlainPort(_ share: String) -> Bool {
+    let parts = share.split(separator: "-", omittingEmptySubsequences: false)
+    if parts.count == 2 { return ["tcp", "udp"].contains(parts[0]) && Int(parts[1]) != nil }
+    return parts.count == 3 && parts[0] == "port" && Int(parts[1]) != nil && ["tcp", "udp"].contains(parts[2])
+  }
+
+  /// The name the user gave the app on this port, or the well-known app's: what a share of it carries
+  func label(port: Int) -> String? {
+    named[String(port)] ?? KnownPorts.app(port)?.name
   }
   func set(_ name: String, port: Int) {
     named[String(port)] = name
