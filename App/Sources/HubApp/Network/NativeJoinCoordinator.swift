@@ -13,11 +13,15 @@ enum NativeJoinProgressState: String, Sendable {
   case binding
   case activating
   case recovering
+  /// The hub holds this device until an owner approves it (the hub-net agent's join)
+  case awaitingApproval = "awaiting-approval"
 }
 
 struct NativeJoinProgress: Equatable, Sendable {
   let transactionId: String
   let state: NativeJoinProgressState
+  /// The safety code an owner compares before approving, while `awaitingApproval`
+  var approvalCode: String? = nil
 }
 
 enum NativeJoinFailureStage: String, Equatable, Sendable {

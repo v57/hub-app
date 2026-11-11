@@ -13,6 +13,7 @@ enum NativeJoinPresentation {
     case .connected, .binding: String(localized: "Enrolling this device…")
     case .activating: String(localized: "Activating Hub Network…")
     case .recovering: String(localized: "Recovering previous join…")
+    case .awaitingApproval: String(localized: "Waiting for an owner’s approval…")
     case nil: String(localized: "Joining…")
     }
   }

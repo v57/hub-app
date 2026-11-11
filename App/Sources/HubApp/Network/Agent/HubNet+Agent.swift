@@ -2,7 +2,7 @@
 //  HubNet+Agent.swift
 //  Hub
 //
-//  Hub Network through the hub-net agent, where there's no NetworkExtension (Linux). The app does the hub's side as on
+//  Hub Network through the hub-net agent, where there's no NetworkExtension (Linux and Windows). The app does the hub's side as on
 //  Apple platforms (the hub's machine issues an invitation, the hub lists the network) and hands the tunnel to the
 //  agent: `join` with the invitation, `local` for the hub that runs on this machine, `leave`, and `list` for what this
 //  device is on and its address.
@@ -18,11 +18,11 @@ enum HubNetworkBackend: Sendable {
   /// The hub-net agent, a privileged service with kernel WireGuard
   case agent(HubNetDaemon)
 
-  /// `nil` where Hub Network isn't available (Windows, until hub-net runs there)
+  /// `nil` where Hub Network isn't available
   static var current: HubNetworkBackend? {
 #if canImport(NetworkExtension)
     .packetTunnel
-#elseif os(Linux)
+#elseif os(Linux) || os(Windows)
     .agent(HubNetDaemon())
 #else
     nil
@@ -102,7 +102,12 @@ extension HubNet {
         // The hub proves its machine's agent over the agent's own socket (/run/hub-net/agent.sock)
         joined = try await agent.local(address: hub.settings.address.absoluteString)
       } else {
-        joined = try await agent.join(invitation: try await requestInvitation())
+        let invitation = try await requestInvitation()
+        // The hub holds a device its machine's agent invited until an owner approves it: an owner signed in here
+        // approves the device this agent joins as, the one whose safety code the agent shows
+        let approving = Task { await approveAgentDevice(of: invitation, through: agent) }
+        defer { approving.cancel() }
+        joined = try await agent.join(invitation: invitation)
       }
       HubNetAgentMemberships.set(joined.record.id, for: hub.settings.address)
       await refreshUntilConnected(agent)
@@ -113,6 +118,23 @@ extension HubNet {
       await refresh(from: agent)
     }
     await HubNets.main.refresh()
+  }
+
+  /// While the agent's join of `invitation` waits for an owner, approves the hub's pending device with the code the
+  /// agent shows, when this app may approve devices. The code ties the pending request to this machine's agent: the
+  /// hub works it out from the device's key, and the agent from the same key and the hub key it pinned.
+  private func approveAgentDevice(of invitation: String, through agent: HubNetDaemon) async {
+    guard hub.require(permissions: "hub/device/approve") else { return }
+    let subscription = hub.state.pendingDevices.subscribe(hub: hub)
+    defer { withExtendedLifetime(subscription) {} }
+    while !Task.isCancelled {
+      if let code = try? await agent.joinStatus(invitation: invitation),
+         let device = hub.state.pendingDevices.value.first(where: { hub.safetyCode(of: $0) == code }) {
+        _ = try? await hub.client.devices.approve(device.id)
+        return
+      }
+      try? await Task.sleep(for: .seconds(1))
+    }
   }
 
   /// Lets the hub's devices use this device's internet (`hub-net vpn allow`), or stops
@@ -160,8 +182,20 @@ extension NativeJoinCoordinator {
   static func agent(_ agent: HubNetDaemon) -> NativeJoinCoordinator {
     NativeJoinCoordinator { invitation, report in
       report(.init(transactionId: invitation.replayId, state: .rendezvous))
+      // The hub may hold this device for an owner's approval: show the code the agent gives to compare
+      let status = Task { @MainActor in
+        var shown: String?
+        while !Task.isCancelled {
+          if let code = try? await agent.joinStatus(invitation: invitation.url), code != shown {
+            shown = code
+            report(.init(transactionId: invitation.replayId, state: .awaitingApproval, approvalCode: code))
+          }
+          try? await Task.sleep(for: .seconds(1))
+        }
+      }
       let joined: HubNetDaemon.Joined
       do {
+        defer { status.cancel() }
         joined = try await agent.join(invitation: invitation.url)
       } catch HubNetDaemon.Failure.refused(let message) {
         throw NativeJoinError.bootstrapFailed(NativeJoinPresentation.sanitizeCause(message))

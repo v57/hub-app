@@ -191,7 +191,14 @@ struct JoinNetworkSheet: View {
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(.vertical, 4)
     } footer: {
-      SheetStatus(nets.joinProgress?.state == .awaitingVPNConsent ? "Choose Allow when asked" : "A few seconds", systemImage: "clock", hue: .gray)
+      if nets.joinProgress?.state == .awaitingApproval {
+        SheetStatus(
+          nets.joinProgress?.approvalCode.map { String(localized: "An owner approves this device in Hub: code \($0)") }
+            ?? String(localized: "Waiting for an owner to approve this device"),
+          systemImage: "checkmark.shield", hue: .orange)
+      } else {
+        SheetStatus(nets.joinProgress?.state == .awaitingVPNConsent ? "Choose Allow when asked" : "A few seconds", systemImage: "clock", hue: .gray)
+      }
     }
     .kitSheetDismissDisabled(true)
   }
@@ -201,7 +208,7 @@ struct JoinNetworkSheet: View {
     switch state {
     case nil, .validating, .staging, .awaitingVPNConsent: 1
     case .startingTunnel, .rendezvous: 2
-    case .connected, .binding, .recovering, .activating: 3
+    case .connected, .binding, .recovering, .activating, .awaitingApproval: 3
     }
   }
 

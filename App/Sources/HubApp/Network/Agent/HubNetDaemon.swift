@@ -3,12 +3,14 @@
 //  Hub
 //
 //  The hub-net agent (Network/hub-net, Go) is this device's Hub Network where there's no NetworkExtension: on Linux
-//  it runs as a privileged service with kernel WireGuard. The app talks to its command socket, the same requests its
-//  CLI sends (`hub-net join|local|leave|list|vpn`): JSON in an HTTP POST to /v1/command over a Unix socket.
+//  it runs as a privileged service with kernel WireGuard, on Windows as a LocalSystem service with WireGuardNT. The
+//  app talks to its command socket, the same requests its CLI sends (`hub-net join|local|leave|list|vpn`): JSON in an
+//  HTTP POST to /v1/command over a Unix socket, or on Windows over the named pipe `\\.\pipe\hub-net-command`.
 //
-//  The service's socket is `/var/lib/hub-net/command.sock`, for root only, unless it was started to share it with a
-//  group (`hub-net -socket /run/hub-net/command.sock -socket-group hub-net`); a member of that group runs the app.
-//  `HUB_NET_COMMAND_SOCKET` names another socket.
+//  On Linux the service's socket is `/var/lib/hub-net/command.sock`, for root only, unless it was started to share it
+//  with a group (`hub-net -socket /run/hub-net/command.sock -socket-group hub-net`); a member of that group runs the
+//  app. On Windows the pipe admits SYSTEM and elevated Administrators, and the group the service was installed with
+//  (`hub-net -socket-group hub-net service install`). `HUB_NET_COMMAND_SOCKET` names another socket or pipe.
 //
 
 import Foundation
@@ -18,6 +20,8 @@ import Glibc
 import Musl
 #elseif canImport(Darwin)
 import Darwin
+#elseif os(Windows)
+import WinSDK
 #endif
 
 /// The hub-net agent's command socket
@@ -123,11 +127,16 @@ struct HubNetDaemon: Sendable {
 
   let socketPath: String
 
-  /// The socket `HUB_NET_COMMAND_SOCKET` names, else the shared one under /run, else the service's own
+  /// The socket `HUB_NET_COMMAND_SOCKET` names, else the shared one under /run, else the service's own (on Windows
+  /// the service's pipe)
   static var defaultSocketPath: String {
     if let path = ProcessInfo.processInfo.environment["HUB_NET_COMMAND_SOCKET"], !path.isEmpty { return path }
+#if os(Windows)
+    return #"\\.\pipe\hub-net-command"#
+#else
     let shared = "/run/hub-net/command.sock"
     return FileManager.default.fileExists(atPath: shared) ? shared : "/var/lib/hub-net/command.sock"
+#endif
   }
 
   init(socketPath: String = Self.defaultSocketPath) {
@@ -141,12 +150,18 @@ struct HubNetDaemon: Sendable {
   }
 
   /// Joins a hub's network with an invitation (`hub://join/…` or its code). The agent meets the inviting device
-  /// directly, which can take a while.
+  /// directly, which can take a while, and when the hub holds the device for an owner's approval it waits for that
+  /// too, until the invitation's admission ends (10 minutes at most): `joinStatus` gives the code to compare meanwhile.
   func join(invitation: String) async throws -> Joined {
-    guard let joined = try await command(Request(command: "join", code: invitation), timeout: 180).joined else {
+    guard let joined = try await command(Request(command: "join", code: invitation), timeout: 13 * 60).joined else {
       throw Failure.malformed
     }
     return joined
+  }
+
+  /// The safety code of the join of `invitation` while the hub holds the device for an owner's approval, else nil
+  func joinStatus(invitation: String) async throws -> String? {
+    try await command(Request(command: "joinStatus", code: invitation), timeout: 10).approvalCode
   }
 
   /// Makes the agent the network agent of the hub that runs on this machine, at `address`
@@ -191,6 +206,7 @@ struct HubNetDaemon: Sendable {
   private struct Response: Decodable {
     let joined: Joined?
     let items: [Membership]?
+    let approvalCode: String?
     let error: String?
   }
 
@@ -210,14 +226,78 @@ struct HubNetDaemon: Sendable {
     return response
   }
 
-  /// One HTTP/1.1 request over the Unix socket, blocking: the response's body
-  private static func post(_ body: Data, path: String, socket socketPath: String, timeout: Int) throws -> Data {
-    let fd = try openSocket(socketPath, timeout: timeout)
-    defer { close(fd) }
+  private static func request(_ body: Data, path: String) -> Data {
     var message = Data(
       "POST \(path) HTTP/1.1\r\nHost: hub-net\r\nContent-Type: application/json\r\nContent-Length: \(body.count)\r\nConnection: close\r\n\r\n"
         .utf8)
     message.append(body)
+    return message
+  }
+
+#if os(Windows)
+  /// One HTTP/1.1 request over the service's named pipe, blocking: the response's body. The pipe is opened at the
+  /// Identification level, so the service can tell who asks but can't act as this user.
+  private static func post(_ body: Data, path: String, socket pipePath: String, timeout: Int) throws -> Data {
+    let handle = try openPipe(pipePath, timeout: timeout)
+    defer { CloseHandle(handle) }
+    let message = request(body, path: path)
+    try message.withUnsafeBytes { raw in
+      var sent = 0
+      while sent < raw.count {
+        var written: DWORD = 0
+        guard WriteFile(handle, raw.baseAddress! + sent, DWORD(raw.count - sent), &written, nil), written > 0 else {
+          throw Failure.notRunning(windowsError(GetLastError()))
+        }
+        sent += Int(written)
+      }
+    }
+    var response = Data()
+    var buffer = [UInt8](repeating: 0, count: 16 * 1024)
+    while true {
+      var count: DWORD = 0
+      if !ReadFile(handle, &buffer, DWORD(buffer.count), &count, nil) {
+        let code = GetLastError()
+        // The service closes its end after the response (Connection: close)
+        if code == DWORD(ERROR_BROKEN_PIPE) || code == DWORD(ERROR_PIPE_NOT_CONNECTED) { break }
+        if code == DWORD(ERROR_MORE_DATA) { response.append(contentsOf: buffer[0..<Int(count)]); continue }
+        throw Failure.notRunning(windowsError(code))
+      }
+      if count == 0 { break }
+      response.append(contentsOf: buffer[0..<Int(count)])
+      guard response.count < 4 * 1024 * 1024 else { throw Failure.malformed }
+    }
+    return try httpBody(response)
+  }
+
+  private static func openPipe(_ pipePath: String, timeout: Int) throws -> HANDLE {
+    let deadline = ContinuousClock.now.advanced(by: .seconds(min(timeout, 10)))
+    while true {
+      let handle = pipePath.withCString(encodedAs: UTF16.self) {
+        CreateFileW(
+          $0, DWORD(GENERIC_READ) | DWORD(GENERIC_WRITE), 0, nil, DWORD(OPEN_EXISTING),
+          // SECURITY_IDENTIFICATION, a macro Swift doesn't import: SecurityIdentification << 16
+          DWORD(SECURITY_SQOS_PRESENT) | (DWORD(SecurityIdentification.rawValue) << 16), nil)
+      }
+      if let handle, handle != INVALID_HANDLE_VALUE { return handle }
+      let code = GetLastError()
+      // Every instance is serving another request: wait for one
+      if code == DWORD(ERROR_PIPE_BUSY), ContinuousClock.now < deadline {
+        _ = pipePath.withCString(encodedAs: UTF16.self) { WaitNamedPipeW($0, 1000) }
+        continue
+      }
+      throw code == DWORD(ERROR_ACCESS_DENIED) ? Failure.notPermitted(windowsError(code)) : Failure.notRunning(windowsError(code))
+    }
+  }
+
+  private static func windowsError(_ code: DWORD) -> String {
+    "Windows error \(code)"
+  }
+#else
+  /// One HTTP/1.1 request over the Unix socket, blocking: the response's body
+  private static func post(_ body: Data, path: String, socket socketPath: String, timeout: Int) throws -> Data {
+    let fd = try openSocket(socketPath, timeout: timeout)
+    defer { close(fd) }
+    let message = request(body, path: path)
     try message.withUnsafeBytes { raw in
       var sent = 0
       while sent < raw.count {
@@ -287,6 +367,7 @@ struct HubNetDaemon: Sendable {
     send(fd, pointer, count, 0)
 #endif
   }
+#endif
 
   /// The body of an HTTP/1.1 response, de-chunked; any status (the agent answers errors as JSON with 400)
   static func httpBody(_ response: Data) throws -> Data {
