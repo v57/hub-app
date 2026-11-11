@@ -306,16 +306,26 @@ final class HubNet {
   func createInviteCode() async throws -> String {
     guard isJoined else { throw HubNetError.notJoined }
     if HubNetworkBackend.current?.agent != nil { return try await createInviteCodeThroughAgent() }
-    let deadline = ContinuousClock.now.advanced(by: .seconds(5))
-    var identity: PacketTunnelBootstrapIdentity?
-    while identity == nil {
-      identity = hub.networkAppAgent.availableIdentity
-      guard ContinuousClock.now < deadline else {
-        throw HubNetError.localAgentUnavailable
+    if hub.isOnHubMachine {
+      // This app is the hub's agent: wait for its own lease, which signs the invitation
+      let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+      var identity: PacketTunnelBootstrapIdentity?
+      while identity == nil {
+        identity = hub.networkAppAgent.availableIdentity
+        guard ContinuousClock.now < deadline else {
+          throw HubNetError.localAgentUnavailable
+        }
+        try await Task.sleep(for: .milliseconds(25))
       }
-      try await Task.sleep(for: .milliseconds(25))
+      try await waitForInvitationAgent(identity)
+    } else {
+      // Another device asks the agent on the hub's machine, as the owner's Mac does: this device never binds as the
+      // hub's agent (only the hub's machine may), so it has no lease of its own to wait for
+      guard hub.api.contains("hub/net/list") else { throw HubNetError.invitationsNotAllowed }
+      if hub.api.contains("hub/net/local-agent") {
+        try await waitForInvitationAgent(nil)
+      }
     }
-    try await waitForInvitationAgent(identity!)
     let agent = try await localInviter()
     guard let node = await Self.currentNodeEndpoint(hub: hub) else {
       throw HubNetError.nodeNotSet
@@ -718,17 +728,23 @@ final class HubNet {
     }
   }
 
+  /// Waits until the hub's agent can sign invitations: this app's own lease (`identity`) on the hub's machine, or
+  /// whichever agent the hub's machine runs (`nil`). Gives up after 10 seconds: the stream may never say so.
   private func waitForInvitationAgent(
-    _ identity: PacketTunnelBootstrapIdentity
+    _ identity: PacketTunnelBootstrapIdentity?
   ) async throws {
-    for try await status: HubNetworkLocalAgentStatus in
-      hub.client.values("hub/net/local-agent") {
-      guard status.canIssueInvitation,
-            status.tunnelInstanceId == identity.tunnelInstanceId,
-            status.generation == identity.generation else { continue }
-      return
+    let subscription = hub.state.networkLocalAgent.subscribe(hub: hub)
+    defer { withExtendedLifetime(subscription) {} }
+    let deadline = ContinuousClock.now.advanced(by: .seconds(10))
+    while true {
+      let status = hub.state.networkLocalAgent.value
+      if status.canIssueInvitation,
+         identity == nil || (status.tunnelInstanceId == identity?.tunnelInstanceId && status.generation == identity?.generation) {
+        return
+      }
+      guard ContinuousClock.now < deadline else { throw HubNetError.localAgentUnavailable }
+      try await Task.sleep(for: .milliseconds(100))
     }
-    throw HubNetError.localAgentUnavailable
   }
 
   /// The node `hub/net/node` names (v57.dev's by default), `nil` from a hub older than that default with none set
@@ -874,6 +890,8 @@ enum HubNetError: LocalizedError, Equatable {
   case deviceUnavailable
   case invalidInvitation
   case invalidPort(Int)
+  /// This device may not ask the hub for invitations (`hub/net/list`)
+  case invitationsNotAllowed
   case localAgentUnavailable
   case notJoined
   case nodeNotSet
@@ -888,8 +906,10 @@ enum HubNetError: LocalizedError, Equatable {
       "Hub returned an invalid invitation."
     case .invalidPort(let port):
       "Port \(port) must be between 1 and 65535."
+    case .invitationsNotAllowed:
+      "This device can’t add devices to the hub’s network. An owner can allow it in Access, or add the device from the hub’s own device."
     case .localAgentUnavailable:
-      "Local Hub Network agent is not ready to create invitations."
+      "The hub’s device isn’t ready to make invitations yet. Check that Hub Network is on there, then try again."
     case .notJoined:
       "Join Hub Network before sharing ports."
     case .nodeNotSet:
