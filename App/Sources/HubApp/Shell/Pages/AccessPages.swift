@@ -306,7 +306,9 @@ struct RequestsPage: View {
           }
           LazyVGrid(columns: [GridItem(.adaptive(minimum: idiom == .phone ? 280 : 300), spacing: KitMetrics.gutter, alignment: .top)], spacing: KitMetrics.gutter) {
             ForEach(pending.list) { item in
-              GridCard(isSelected: selection == item.id, action: { withAnimation(.kit) { selection = selection == item.id ? nil : item.id } }) {
+              // Selected by a tap rather than as a button: a button around the card would take Allow in, and VoiceOver
+              // (or any accessibility press) could only select the card, never allow
+              GridCard(isSelected: selection == item.id) {
                 VStack(alignment: .leading, spacing: 8) {
                   RichHeader(item.name, meta: ["…" + item.id.suffix(8)], systemImage: "hexagon", hue: .orange)
                     .padding(.horizontal, 4).padding(.top, 2)
@@ -323,6 +325,8 @@ struct RequestsPage: View {
                   .padding(.horizontal, 6)
                 }
               }
+              .onTapGesture { withAnimation(.kit) { selection = selection == item.id ? nil : item.id } }
+              .accessibilityElement(children: .contain)
             }
           }
         }
