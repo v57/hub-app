@@ -1,5 +1,5 @@
 {
-  "originHash" : "3f157f4d239cac794f7adaa22a473ddb3d3ae7a79138076fa39af248f47dbff2",
+  "originHash" : "48a3e38c1f98b163493353964474af2d4ef239392da2f33ae8a9fbc71dc410fc",
   "pins" : [
     {
       "identity" : "channelswift",
@@ -7,7 +7,7 @@
       "location" : "https://github.com/v57/ChannelSwift.git",
       "state" : {
         "branch" : "main",
-        "revision" : "0cd14cad9014cfd920b09b1703c6b364c26c68c9"
+        "revision" : "64792f4cf1343fddcecd490ab9fd86105057fb04"
       }
     },
     {
@@ -16,7 +16,7 @@
       "location" : "https://github.com/v57/Component.git",
       "state" : {
         "branch" : "main",
-        "revision" : "588fc5839c6c8cc3e9a15855bc865cef343113d4"
+        "revision" : "f45a518c92b0866c9ea3ef79da34fa7575197b55"
       }
     },
     {
@@ -25,7 +25,7 @@
       "location" : "https://github.com/v57/HubServer.git",
       "state" : {
         "branch" : "main",
-        "revision" : "d3e3f2959637843fad4b3997f3e7c7e69a2e1a08"
+        "revision" : "f9edcb7ae3e81f013df5b59f0073fa9f58e312a7"
       }
     },
     {
@@ -34,7 +34,7 @@
       "location" : "https://github.com/v57/HubService.git",
       "state" : {
         "branch" : "main",
-        "revision" : "e71f9a218e9ca52659a86ae6fceabea21be339d6"
+        "revision" : "ed4f0197145686d11e7de59c587ae75bcf6fd0e4"
       }
     },
     {
@@ -43,7 +43,16 @@
       "location" : "https://github.com/v57/Platform.git",
       "state" : {
         "branch" : "main",
-        "revision" : "5da0561b61c3384fdaef210c0b4ee6b67e343ac1"
+        "revision" : "e89d8c1a57376d310546e006d2cc18947576d977"
+      }
+    },
+    {
+      "identity" : "s3serverswift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/v57/S3ServerSwift.git",
+      "state" : {
+        "branch" : "main",
+        "revision" : "9f52c3f91152fbe0b4684917dcf9cd0e012caa52"
       }
     },
     {
@@ -52,7 +61,7 @@
       "location" : "https://github.com/v57/Vault.git",
       "state" : {
         "branch" : "main",
-        "revision" : "d05d6017f3fc2bf18741705083cd2f59e27cbb15"
+        "revision" : "f41ad026e1f6f3b795cac56991d3e1805fee6033"
       }
     }
   ],
