@@ -145,8 +145,11 @@ final class HubNet {
   /// without the user turning it off in Hub (the extension ended, or the VPN was stopped in Settings). `nil` while it runs.
   private(set) var tunnelProblem: String?
   @ObservationIgnored private var tunnelDownTask: Task<Void, Never>?
+  /// `tunnelDownTask` waits to check the tunnel
+  @ObservationIgnored private var tunnelDownPending = false
   /// Restarts after the tunnel failed, this launch: an extension that keeps failing isn't started again and again
   @ObservationIgnored private var tunnelRecoveries = 0
+  @ObservationIgnored private var isRecoveringTunnel = false
   /// Watches that the tunnel carries traffic to the hub while it says connected (`watchTraffic`)
   @ObservationIgnored private var trafficWatchTask: Task<Void, Never>?
   /// `tunnelProblem` is the traffic watch's: it clears it once the hub answers again
@@ -221,6 +224,8 @@ final class HubNet {
     // A tunnel that comes up after the hub's connection (started from Settings, back after a rebuild or a wake)
     // finds the hub without its registration: restore it then too
 #if canImport(NetworkExtension)
+    // Status changes reach only a configuration the app keeps loaded
+    Task { await PacketTunnelController.watchStatus() }
     tunnelObserver = NotificationCenter.default.addObserver(
       forName: .NEVPNStatusDidChange, object: nil, queue: .main
     ) { [weak self] notification in
@@ -231,7 +236,8 @@ final class HubNet {
         let wasConnected = self.tunnelWasConnected
         self.tunnelWasConnected = status == .connected
         if status == .connected {
-          self.tunnelDownTask?.cancel()
+          // Up again: no check needed, unless it's the recovery starting it
+          if !self.isRecoveringTunnel { self.tunnelDownTask?.cancel() }
           // Found stopped outside Hub, then up again (VPN On Demand, Settings): on again here too, not Off over a
           // running tunnel
           if !self.isJoined, self.tunnelProblem != nil {
@@ -645,16 +651,26 @@ final class HubNet {
   /// it's still down while Hub Network is on here: a tunnel that failed (the extension crashed, "Plugin failed") is
   /// started again, a few times per launch; one stopped outside Hub (Settings, `scutil --nc stop`) stays stopped, and
   /// the switch says Off. Either way the card and the page say so instead of On.
+  /// The status repeats while the tunnel is down (each load of its configuration anywhere in the app posts it again,
+  /// every few seconds while the hub's client looks for links): the first starts the check, and the repeats leave it
+  /// be until it's done. Restarting the wait on each one put the check off for as long as the tunnel stayed down, and
+  /// cancelling a recovery under way left it down (H-021).
   private func tunnelWentDown() {
+    if let tunnelDownTask, !tunnelDownTask.isCancelled, tunnelDownPending { return }
     tunnelDownTask?.cancel()
+    tunnelDownPending = true
     tunnelDownTask = Task { [weak self] in
       try? await Task.sleep(for: .seconds(3))
-      guard !Task.isCancelled else { return }
-      await self?.recoverTunnel()
+      guard !Task.isCancelled, let self else { return }
+      await self.recoverTunnel()
+      self.tunnelDownPending = false
     }
   }
 
   private func recoverTunnel() async {
+    guard !isRecoveringTunnel else { return }
+    isRecoveringTunnel = true
+    defer { isRecoveringTunnel = false }
     guard isJoined, HubNetworkBackend.current?.agent == nil, !hub.isDemo, registration == nil, !isRestoring,
           !wasTurnedOff,
           let tunnel = try? PacketTunnelController(),
@@ -663,7 +679,12 @@ final class HubNet {
     case .disconnected, .invalid: break
     default: return
     }
-    guard let failure = await tunnel.lastDisconnectError() else {
+    let failure = await tunnel.lastDisconnectError()
+    // Ended without being stopped: an extension killed along with the app (a relaunch from Xcode or devicectl) or by an
+    // update never got `stopTunnel`. iOS 27 reports that as error 12 (internal error); where the system reports no
+    // error, the extension's own record still tells it from a stop (H-021)
+    let ended = failure == nil && PacketTunnelController.extensionWasEnded
+    guard failure != nil || ended else {
       // Stopped: by this app (it starts it again or meant it), or outside Hub
       if let stopped = PacketTunnelController.stopRequested, ContinuousClock.now - stopped < .seconds(30) { return }
       print("[HubNet] the tunnel for \(hub.settings.name) was stopped outside Hub")
@@ -671,8 +692,8 @@ final class HubNet {
       tunnelProblem = String(localized: "Hub Network was turned off outside Hub, in Settings or by another app. Turn it on to reconnect.")
       return
     }
-    let reason = failure.localizedDescription
-    print("[HubNet] the tunnel for \(hub.settings.name) went down: \(failure)")
+    let reason = failure?.localizedDescription ?? String(localized: "its extension ended")
+    print("[HubNet] the tunnel for \(hub.settings.name) went down: \(failure.map { "\($0)" } ?? "the extension ended without stopping")")
     guard tunnelRecoveries < 5 else {
       isJoined = false
       tunnelProblem = String(localized: "Hub Network keeps stopping (\(reason)). Turn it on to try again.")
@@ -712,6 +733,7 @@ final class HubNet {
       while !Task.isCancelled {
         try? await Task.sleep(for: .seconds(TrafficWatch.interval))
         guard !Task.isCancelled, let self else { return }
+        await self.checkTunnelDown()
         await self.checkTraffic(&watch)
       }
     }
@@ -733,6 +755,18 @@ final class HubNet {
     var rxBytes: Int?
     var restarts = 0
     var lastRestart: ContinuousClock.Instant?
+  }
+
+  /// A tunnel found down that no status change reported (none arrives while the app holds no configuration, e.g. right
+  /// after a relaunch whose termination took the extension with it): the same recovery as a reported one
+  private func checkTunnelDown() async {
+    guard isJoined, !isRecoveringTunnel, let tunnel = try? PacketTunnelController() else { return }
+    switch await tunnel.status {
+    case .disconnected, .invalid: break
+    default: return
+    }
+    print("[HubNet] found the tunnel for \(hub.settings.name) down")
+    await recoverTunnel()
   }
 
   private func checkTraffic(_ watch: inout TrafficWatch) async {

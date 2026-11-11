@@ -120,6 +120,33 @@ final class PacketTunnelController: PacketTunnelControlling {
   /// soon after is one of those, which start it again or mean it to stay down
   static var stopRequested: ContinuousClock.Instant?
 
+  /// The configuration kept loaded for `NEVPNStatusDidChange`, which reaches only connections of managers the app holds.
+  /// Every controller drops its own after use, so a tunnel that went down while none was loaded went unnoticed: after
+  /// a relaunch that ended the extension with the app (H-021), nothing started it again.
+  private static var watched: NETunnelProviderManager?
+  private static var configurationObserver: NSObjectProtocol?
+
+  /// Keeps Hub Network's configuration loaded from now on, reloaded whenever a configuration changes, so the tunnel's
+  /// status changes reach the app
+  static func watchStatus() async {
+    if configurationObserver == nil {
+      configurationObserver = NotificationCenter.default.addObserver(
+        forName: .NEVPNConfigurationChange, object: nil, queue: .main
+      ) { _ in
+        Task { @MainActor in watched = try? await PacketTunnelController().loadManager() }
+      }
+    }
+    if watched == nil {
+      watched = try? await PacketTunnelController().loadManager()
+    }
+  }
+
+  /// Whether the extension's process ended while its tunnel ran: it records starting and `stopTunnel` (which a stop by
+  /// this app, Settings or `scutil --nc stop` calls), not being killed along with the app or by an update
+  static var extensionWasEnded: Bool {
+    UserDefaults(suiteName: HubNetworkAppGroup.identifier)?.bool(forKey: "HubNet.extensionRunning") == true
+  }
+
   /// Why the tunnel last went down: the system's error when it failed (`pluginFailed` when the extension ended),
   /// `nil` when it was stopped, by this app, Settings or `scutil --nc stop`
   func lastDisconnectError() async -> Error? {

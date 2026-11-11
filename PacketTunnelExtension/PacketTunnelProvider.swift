@@ -161,6 +161,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
       }
       startCoordinator(profile: profile)
       startCameraAlerts()
+      Self.setRunning(true)
     } catch {
       gatewayServingState = profile.servesGateway ? .unavailable : .disabled
       await wireGuardAdapter.stop()
@@ -210,9 +211,16 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     extensionDiagnostics(line)
   }
 
+  /// Whether the tunnel runs, as the app reads it (`PacketTunnelController.extensionWasEnded`): one that went down
+  /// without `stopTunnel` was ended with its process (the app's termination took it along, an update), not stopped
+  private static func setRunning(_ running: Bool) {
+    UserDefaults(suiteName: "group.dev.v57.hub")?.set(running, forKey: "HubNet.extensionRunning")
+  }
+
   override func stopTunnel(with reason: NEProviderStopReason) async {
     // The system says why it stops the tunnel only here; the diagnostics file keeps it for NetTest
     Self.writeDiagnostics("stopTunnel: \(reason.name) (\(reason.rawValue))")
+    Self.setRunning(false)
     gatewayServingState = .disabled
     gatewayExpiryTask?.cancel()
     gatewayExpiryTask = nil
