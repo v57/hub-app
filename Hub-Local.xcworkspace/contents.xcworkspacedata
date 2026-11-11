@@ -23,6 +23,6 @@
       location = "group:../../Core/HubServer">
    </FileRef>
    <FileRef
-      location = "group:../../Services/s3">
+      location = "group:../../Services/S3ServerSwift">
    </FileRef>
 </Workspace>

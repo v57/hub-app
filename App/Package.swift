@@ -7,7 +7,7 @@ import PackageDescription
 //
 //     cd App && V57_LOCAL=1 swift build --product Hub
 //
-// Hub's own packages (HubService, HubServer, ChannelSwift, and s3 for S3ServerSwift) and the v57 packages (Component,
+// Hub's own packages (HubService, HubServer, ChannelSwift, S3ServerSwift) and the v57 packages (Component,
 // Vault, Platform, SwiftUI) come from GitHub's main branch, or with `V57_LOCAL=1` from the checkouts next to this one:
 // ~/Developer/Hub/… and ~/Developer/v57/… (in Xcode, open Hub-Local.xcworkspace instead).
 
@@ -36,7 +36,8 @@ let package = Package(
   products: [.library(name: "HubApp", targets: ["HubApp"])],
   dependencies: [
     hub("HubService", "HubService/HubService"), hub("ChannelSwift", "Channel/ChannelSwift"),
-    hub("HubServer", "Core/HubServer"), hub("s3", "Services/s3"), v57("Component"), v57("Vault"), v57("Platform"),
+    hub("HubServer", "Core/HubServer"), hub("S3ServerSwift", "Services/S3ServerSwift"),
+    v57("Component"), v57("Vault"), v57("Platform"),
   ],
   targets: [
     .target(
@@ -57,7 +58,7 @@ let package = Package(
         .product(name: "PlatformCamera", package: "Platform", condition: camera),
         .product(name: "PlatformMedia", package: "Platform", condition: camera),
         .product(name: "ChannelServer", package: "HubServer"),
-        .product(name: "S3ServerSwift", package: "s3", condition: storage),
+        .product(name: "S3ServerSwift", package: "S3ServerSwift", condition: storage),
       ],
       // As the Xcode target had it: Swift 6 with the project's upcoming features that Swift 6 doesn't turn on itself.
       swiftSettings: [
