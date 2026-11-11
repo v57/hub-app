@@ -275,6 +275,7 @@ final class HubNet {
       }
       await hub.networkAppAgent.disable(tunnel: tunnel)
       await tunnel.stop()
+      UserDefaults.standard.set(true, forKey: PacketTunnelController.turnedOffKey)
       isJoined = false
       address = nil
       await refreshGlobalVPN()
@@ -465,8 +466,10 @@ final class HubNet {
     }
     guard let tunnel = try? PacketTunnelController(),
           let profile = try? tunnel.installedConfiguration(),
-          profile.hubURL == hub.settings.address,
-          await tunnel.status == .connected else { return }
+          profile.hubURL == hub.settings.address else { return }
+    if await tunnel.status != .connected {
+      guard await startStoppedTunnel(tunnel) else { return }
+    }
     // A joined non-owner device must not bind as the Apple local agent; the
     // bind API is only present for owners, so gate on it to avoid a
     // misleading `unavailable` state. Nor may a device away from the hub's
@@ -484,6 +487,52 @@ final class HubNet {
     // After a relaunch the inviter still has to mirror members into the extension
     startInviterAgentWatcher()
     startLinksWatcher()
+  }
+
+  /// Set by turning Hub Network off (`setOn(false)`), with what it shared, until the switch turns it on again. A join
+  /// through an invitation or Debug's `--net-test` turns it on without clearing it
+  var pausedKey: String { "network.paused.\(hub.settings.address.absoluteString)" }
+  /// Hubs whose stopped tunnel this launch already started, so a tunnel the user stops elsewhere (Settings → VPN) stays
+  /// stopped until the next launch
+  private static var startedStoppedTunnels: Set<URL> = []
+
+  /// Whether the user turned Hub Network off here: what the last start or turn-off recorded, or on a device that has
+  /// recorded neither yet, whether the switch left its paused shares
+  private var wasTurnedOff: Bool {
+    let defaults = UserDefaults.standard
+    if defaults.object(forKey: PacketTunnelController.turnedOffKey) != nil {
+      return defaults.bool(forKey: PacketTunnelController.turnedOffKey)
+    }
+    return defaults.object(forKey: pausedKey) != nil
+  }
+
+  /// Hub Network stays on through what stops its tunnel without the user turning it off: installing an update of the
+  /// app ends the extension, and iOS starts it again only for VPN On Demand (a device that uses another's internet).
+  /// The switch still read On while every Hub Network address timed out, a hub reached through it included. Once per
+  /// launch: starts the tunnel unless Hub Network was turned off here, and answers whether it connected.
+  private func startStoppedTunnel(_ tunnel: PacketTunnelController) async -> Bool {
+    let url = hub.settings.address
+    guard !hub.isDemo, !wasTurnedOff, !Self.startedStoppedTunnels.contains(url) else { return false }
+    switch await tunnel.status {
+    case .disconnected, .invalid: break
+    default: return false
+    }
+    Self.startedStoppedTunnels.insert(url)
+    do {
+      try await tunnel.start()
+    } catch {
+      print("[HubNet] couldn't start the stopped tunnel for \(hub.settings.name): \(error)")
+      return false
+    }
+    for _ in 0..<40 {
+      if await tunnel.status == .connected {
+        print("[HubNet] started the stopped tunnel for \(hub.settings.name)")
+        return true
+      }
+      try? await Task.sleep(for: .milliseconds(250))
+    }
+    print("[HubNet] the stopped tunnel for \(hub.settings.name) didn't connect")
+    return false
   }
 
   func connectionChanged(_ connected: Bool) {

@@ -14,7 +14,7 @@ extension HubNet {
   /// The one switch: this device on or off the hub's network. Off forgets nothing: the apps it shared and its internet
   /// sharing come back when it's turned on again.
   func setOn(_ on: Bool) async throws {
-    let key = "network.paused.\(hub.settings.address.absoluteString)"
+    let key = pausedKey
 #if DEBUG
     if hub.isDemo {
       try? await Task.sleep(for: .seconds(on ? 1.5 : 0.4))

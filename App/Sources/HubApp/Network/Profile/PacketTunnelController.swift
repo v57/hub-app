@@ -108,7 +108,13 @@ final class PacketTunnelController: PacketTunnelControlling {
     }
     try manager.connection.startVPNTunnel()
     try await waitForConnection(manager, expected: .connected)
+    UserDefaults.standard.set(false, forKey: Self.turnedOffKey)
   }
+
+  /// `true` once the user turned Hub Network off on this device (`HubNet.joinNetwork(enabled: false)`), `false` from the
+  /// next start on, whoever starts it (the switch, a join, an invitation); absent on devices that haven't started or
+  /// stopped it since. A tunnel that's down while this isn't `true` was stopped by something else, such as an update
+  static let turnedOffKey = "HubNet.tunnelTurnedOff"
 
   func replaceAndStart(
     configuration: HubNetworkProfileConfiguration
@@ -750,6 +756,7 @@ final class PacketTunnelController: PacketTunnelControlling {
 final class PacketTunnelController: PacketTunnelControlling {
   static let providerBundleIdentifier = "dev.v57.Hub.PacketTunnelExtension"
   static let localizedDescription = "Hub Network"
+  static let turnedOffKey = "HubNet.tunnelTurnedOff"
   private static var unavailable: PacketTunnelControllerError { .bootstrapRuntimeUnavailable }
 
   init(store: HubNetworkProfileStore) {}
