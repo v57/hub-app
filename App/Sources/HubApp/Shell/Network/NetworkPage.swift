@@ -38,7 +38,7 @@ struct HubNetworkPage: View {
     ScrollView {
       VStack(alignment: .leading, spacing: KitMetrics.gutter) {
         NetworkHero(
-          state: heroState, devices: devices, error: error, isPhone: idiom == .phone,
+          state: heroState, devices: devices, error: error ?? hub.net.tunnelProblem, isPhone: idiom == .phone,
           turn: turn, add: { adding = true }
         )
         if devices.count > Self.tileLimit {
@@ -85,6 +85,10 @@ struct HubNetworkPage: View {
       hubHost = info?.host
     }
     .task { await hub.net.restoreIfActive() }
+    // A start that timed out may still connect: its error goes once this device is on the network
+    .onChange(of: facts.isJoined) { _, joined in
+      if joined { error = nil }
+    }
 #if DEBUG
     // `--net-sheet device:home-nas`, `why:gaming-pc`, `add`, `internet`, `share`: an overlay at launch, for captures
     .task {

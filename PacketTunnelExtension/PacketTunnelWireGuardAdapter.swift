@@ -1,6 +1,7 @@
 import HubService
 import NetworkExtension
 import OSLog
+import os
 import WireGuardKit
 
 /// Extension-local owner for WireGuardKit's userspace backend.
@@ -863,7 +864,11 @@ final class PacketTunnelWireGuardAdapter {
   /// few times, and keep the last successful resolution so a transient
   /// failure reuses the known-good numeric endpoint instead of falling back
   /// to the raw `.local` hostname (which wg-go cannot parse → -2).
-  private static var cachedResolution: String?
+  ///
+  /// Per host, behind a lock: the links' probes resolve at the same time, and an unguarded static String written from
+  /// two of them released the same storage twice and crashed the extension (EXC_BAD_ACCESS in
+  /// `swift_release_dealloc`), which macOS reports as the VPN disconnected ("Plugin failed").
+  private static let cachedResolutions = OSAllocatedUnfairLock(initialState: [String: String]())
 
   static func resolvedEndpoint(_ endpoint: String) -> String {
     var host = endpoint
@@ -888,7 +893,7 @@ final class PacketTunnelWireGuardAdapter {
     }
     guard gai == 0, let first = result else {
       extensionDiagnostics("probe resolve failed for \(host) gai=\(gai)")
-      if let cached = cachedResolution {
+      if let cached = cachedResolutions.withLock({ $0[host] }) {
         extensionDiagnostics("probe resolve using cached \(host) -> \(cached)")
         return cached
       }
@@ -908,7 +913,7 @@ final class PacketTunnelWireGuardAdapter {
         if fallback == nil { fallback = ip }
         if ReachableAddress.isRoutableIPv4(ip) {
           extensionDiagnostics("probe resolve \(host) -> \(ip):\(port) (routable)")
-          cachedResolution = "\(ip):\(port)"
+          cachedResolutions.withLock { $0[host] = "\(ip):\(port)" }
           return "\(ip):\(port)"
         }
         extensionDiagnostics("probe resolve \(host) -> \(ip):\(port) (skipped, unroutable)")
@@ -917,7 +922,7 @@ final class PacketTunnelWireGuardAdapter {
     }
     if let fallback {
       extensionDiagnostics("probe resolve \(host) -> no routable address, using \(fallback):\(port)")
-      cachedResolution = "\(fallback):\(port)"
+      cachedResolutions.withLock { $0[host] = "\(fallback):\(port)" }
       return "\(fallback):\(port)"
     }
     return endpoint

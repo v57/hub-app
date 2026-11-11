@@ -85,7 +85,7 @@ private struct NetworkCardContent: View {
         Text(offMessage).kitFont(.caption).fixedSize(horizontal: false, vertical: true)
           .padding(.horizontal, 8).padding(.vertical, 4)
       }
-      if let error {
+      if let error = error ?? hub.net.tunnelProblem {
         Text(error).kitFont(.caption).foregroundStyle(Hue.red.text).fixedSize(horizontal: false, vertical: true).padding(.horizontal, 8)
       }
     } icon: {
@@ -166,6 +166,7 @@ private struct NetworkCardContent: View {
       return (String(localized: "Switching to \(device.name)…"), .orange)
     }
     if isConnecting { return (String(localized: "Connecting…"), .orange) }
+    if facts.isJoined, hub.net.tunnelProblem != nil { return (String(localized: "Reconnecting…"), .orange) }
     if facts.isJoined {
       if let using = facts.usingInternet { return (String(localized: "On · internet via \(using.name)"), .green) }
       let count = facts.devices.count

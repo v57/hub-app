@@ -116,6 +116,19 @@ final class PacketTunnelController: PacketTunnelControlling {
   /// stopped it since. A tunnel that's down while this isn't `true` was stopped by something else, such as an update
   static let turnedOffKey = "HubNet.tunnelTurnedOff"
 
+  /// When this app last stopped the tunnel itself (to replace its profile, turn it off, leave): a tunnel that goes down
+  /// soon after is one of those, which start it again or mean it to stay down
+  static var stopRequested: ContinuousClock.Instant?
+
+  /// Why the tunnel last went down: the system's error when it failed (`pluginFailed` when the extension ended),
+  /// `nil` when it was stopped, by this app, Settings or `scutil --nc stop`
+  func lastDisconnectError() async -> Error? {
+    guard let manager = try? await loadManager() else { return nil }
+    return await withCheckedContinuation { continuation in
+      manager.connection.fetchLastDisconnectError { error in continuation.resume(returning: error) }
+    }
+  }
+
   func replaceAndStart(
     configuration: HubNetworkProfileConfiguration
   ) async throws {
@@ -127,6 +140,7 @@ final class PacketTunnelController: PacketTunnelControlling {
         try await save(manager)
         try await load(manager)
       }
+      Self.stopRequested = .now
       manager.connection.stopVPNTunnel()
       try await waitForConnection(manager, expected: .disconnected)
     }
@@ -144,6 +158,7 @@ final class PacketTunnelController: PacketTunnelControlling {
       try? await save(manager)
     }
     guard manager.connection.status != .disconnected, manager.connection.status != .invalid else { return }
+    Self.stopRequested = .now
     manager.connection.stopVPNTunnel()
     try? await waitForConnection(manager, expected: .disconnected)
   }
@@ -174,6 +189,7 @@ final class PacketTunnelController: PacketTunnelControlling {
         manager.isEnabled = false
         try await save(manager)
       }
+      Self.stopRequested = .now
       manager.connection.stopVPNTunnel()
     }
     try store.remove()
@@ -185,6 +201,7 @@ final class PacketTunnelController: PacketTunnelControlling {
   /// build (macOS rejects it with a tunnel activation failure).
   func deleteSystemProfile() async throws {
     if let manager = try await loadManager() {
+      Self.stopRequested = .now
       manager.connection.stopVPNTunnel()
       try await remove(manager)
     }
@@ -557,6 +574,7 @@ final class PacketTunnelController: PacketTunnelControlling {
   }
 
   private func restart(_ manager: NETunnelProviderManager) async throws {
+    Self.stopRequested = .now
     manager.connection.stopVPNTunnel()
     try await waitForConnection(manager, expected: .disconnected)
     try manager.connection.startVPNTunnel()
@@ -769,6 +787,8 @@ final class PacketTunnelController: PacketTunnelControlling {
   func start() async throws { throw Self.unavailable }
   func replaceAndStart(configuration: HubNetworkProfileConfiguration) async throws { throw Self.unavailable }
   func stop() async {}
+  static var stopRequested: ContinuousClock.Instant?
+  func lastDisconnectError() async -> Error? { nil }
   func waitUntilDisconnected() async {}
   func remove() async throws {}
   func deleteSystemProfile() async throws {}

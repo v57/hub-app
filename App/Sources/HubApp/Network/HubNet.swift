@@ -139,6 +139,12 @@ final class HubNet {
   @ObservationIgnored private var isRestoring = false
 
   private(set) var isJoined = false
+  /// Why this device's tunnel is down while Hub Network is on here, or that it's starting it again: it went down
+  /// without the user turning it off in Hub (the extension ended, or the VPN was stopped in Settings). `nil` while it runs.
+  private(set) var tunnelProblem: String?
+  @ObservationIgnored private var tunnelDownTask: Task<Void, Never>?
+  /// Restarts after the tunnel failed, this launch: an extension that keeps failing isn't started again and again
+  @ObservationIgnored private var tunnelRecoveries = 0
   private(set) var isSharing = false
   private(set) var vpn: Device?
   /// Whether this device uses its own internet while the device whose internet it uses can't be reached; otherwise
@@ -218,6 +224,13 @@ final class HubNet {
         // Only the change to connected: saving a profile posts the same status again and again
         let wasConnected = self.tunnelWasConnected
         self.tunnelWasConnected = status == .connected
+        if status == .connected {
+          self.tunnelDownTask?.cancel()
+          self.tunnelProblem = nil
+        } else if status == .disconnected || status == .invalid {
+          // Also when this launch hasn't seen it connected: it may have been up since before the app started
+          self.tunnelWentDown()
+        }
         guard status == .connected, !wasConnected, self.hub.isConnected, !self.isRestoring else { return }
         self.reconnectTask = Task { [weak self] in await self?.restoreAfterConnecting() }
       }
@@ -252,6 +265,7 @@ final class HubNet {
       }
       try refreshAddress(from: tunnel)
       isJoined = true
+      tunnelProblem = nil
       await refreshGlobalVPN()
       startInviterAgentWatcher()
       startLinksWatcher()
@@ -277,6 +291,8 @@ final class HubNet {
       await tunnel.stop()
       UserDefaults.standard.set(true, forKey: PacketTunnelController.turnedOffKey)
       isJoined = false
+      tunnelDownTask?.cancel()
+      tunnelProblem = nil
       address = nil
       await refreshGlobalVPN()
     }
@@ -489,6 +505,7 @@ final class HubNet {
     }
     address = Self.address(from: profile)
     isJoined = true
+    tunnelProblem = nil
     isSharing = profile.servesGateway
     if profile.usesGateway {
       vpn = devices.first { $0.key == profile.gatewayGrant?.gatewayKey }
@@ -544,6 +561,64 @@ final class HubNet {
     print("[HubNet] the stopped tunnel for \(hub.settings.name) didn't connect")
     return false
   }
+
+#if canImport(NetworkExtension)
+  /// The tunnel went down. After a few seconds (this app's own profile changes stop it and start it again at once), if
+  /// it's still down while Hub Network is on here: a tunnel that failed (the extension crashed, "Plugin failed") is
+  /// started again, a few times per launch; one stopped outside Hub (Settings, `scutil --nc stop`) stays stopped, and
+  /// the switch says Off. Either way the card and the page say so instead of On.
+  private func tunnelWentDown() {
+    tunnelDownTask?.cancel()
+    tunnelDownTask = Task { [weak self] in
+      try? await Task.sleep(for: .seconds(3))
+      guard !Task.isCancelled else { return }
+      await self?.recoverTunnel()
+    }
+  }
+
+  private func recoverTunnel() async {
+    guard isJoined, HubNetworkBackend.current?.agent == nil, !hub.isDemo, registration == nil, !isRestoring,
+          !wasTurnedOff,
+          let tunnel = try? PacketTunnelController(),
+          let profile = try? tunnel.installedConfiguration(), profile.hubURL == hub.settings.address else { return }
+    switch await tunnel.status {
+    case .disconnected, .invalid: break
+    default: return
+    }
+    guard let failure = await tunnel.lastDisconnectError() else {
+      // Stopped: by this app (it starts it again or meant it), or outside Hub
+      if let stopped = PacketTunnelController.stopRequested, ContinuousClock.now - stopped < .seconds(30) { return }
+      print("[HubNet] the tunnel for \(hub.settings.name) was stopped outside Hub")
+      isJoined = false
+      tunnelProblem = String(localized: "Hub Network was turned off outside Hub, in Settings or by another app. Turn it on to reconnect.")
+      return
+    }
+    let reason = failure.localizedDescription
+    print("[HubNet] the tunnel for \(hub.settings.name) went down: \(failure)")
+    guard tunnelRecoveries < 5 else {
+      isJoined = false
+      tunnelProblem = String(localized: "Hub Network keeps stopping (\(reason)). Turn it on to try again.")
+      return
+    }
+    tunnelRecoveries += 1
+    tunnelProblem = String(localized: "Hub Network stopped unexpectedly. Reconnecting…")
+    for attempt in 0..<3 {
+      guard !Task.isCancelled, isJoined, !wasTurnedOff else { return }
+      do {
+        try await tunnel.start()
+        print("[HubNet] started the tunnel for \(hub.settings.name) again")
+        tunnelProblem = nil
+        return
+      } catch {
+        print("[HubNet] couldn't start the tunnel for \(hub.settings.name) again: \(error)")
+        try? await Task.sleep(for: .seconds(2 << attempt))
+      }
+    }
+    guard !Task.isCancelled, await tunnel.status != .connected else { return }
+    isJoined = false
+    tunnelProblem = String(localized: "Hub Network stopped unexpectedly (\(reason)) and couldn’t start again. Turn it on to try again.")
+  }
+#endif
 
   func connectionChanged(_ connected: Bool) {
     guard connected else {
