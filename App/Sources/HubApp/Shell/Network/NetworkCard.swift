@@ -61,6 +61,16 @@ private struct NetworkCardContent: View {
   @State private var target: String?
   @State private var choosing = false
   @State private var error: String?
+  /// Where the switch starts in the card, which the title's button stops short of
+  @State private var switchLeading: CGFloat?
+
+  private static let cardSpace = "HubNetworkCard"
+
+  /// Between the title's button and the switch: the section's chevron (shown on touch, and on hover on the Mac) and a
+  /// gap a finger can miss by
+  private static func switchClearance(_ idiom: KitIdiom) -> CGFloat {
+    idiom == .mac ? 16 + 2 + 8 : 24 + 2 + 16
+  }
 
   var body: some View {
     KitSection(Text("Hub Network")) {
@@ -101,16 +111,22 @@ private struct NetworkCardContent: View {
       Toggle("Hub Network", isOn: Binding { facts.isJoined || isConnecting } set: { turn($0) })
         .toggleStyle(.kitSwitch).labelsHidden().controlSize(.small)
         .disabled(facts.hubNetworkOff && !facts.isJoined)
+        .onGeometryChange(for: CGFloat.self) { $0.frame(in: .named(Self.cardSpace)).minX } action: { switchLeading = $0 }
     }
-    // The title opens the Hub Network page
+    // The title opens the Hub Network page. It ends well before the section's chevron and the switch, measured: a
+    // fixed inset left the switch's edge a few points away on iPhone, and the header must never turn Hub Network off
     .overlay(alignment: .topLeading) {
-      Button { Navigator.main.open(hub, .network) } label: {
-        Color.clear.frame(height: idiom == .mac ? 40 : idiom == .phone ? 52 : 48).contentShape(Rectangle())
+      if let switchLeading {
+        Button { Navigator.main.open(hub, .network) } label: {
+          Color.clear
+            .frame(width: max(0, switchLeading - Self.switchClearance(idiom)), height: idiom == .mac ? 40 : idiom == .phone ? 52 : 48)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Open Hub Network")
       }
-      .buttonStyle(.plain)
-      .padding(.trailing, 60)
-      .accessibilityLabel("Open Hub Network")
     }
+    .coordinateSpace(.named(Self.cardSpace))
     .kitSheet(isPresented: $choosing) {
       UseInternetSheet()
     }
