@@ -78,7 +78,7 @@ struct NetApp: Identifiable, Hashable {
 
   /// "Family can use it · port 5432"
   func line(hub: String) -> String {
-    [policy.map { $0.whoCanUse(hub: hub) }, port.map { String(localized: "port \($0)") }].compactMap { $0 }.joined(separator: " · ")
+    [policy.map { $0.whoCanUse(hub: hub) }, port.map { String(localized: "port \(String($0))") }].compactMap { $0 }.joined(separator: " · ")
   }
 }
 

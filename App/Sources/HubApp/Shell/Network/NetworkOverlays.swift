@@ -421,6 +421,11 @@ struct ShareAppSheet: View {
   @State private var error: String?
   @State private var running: [ListeningApps.Found]?
   @HubState(\.groups) private var groups
+  @FocusState private var focused: Field?
+
+  enum Field: Hashable {
+    case name, port
+  }
 
   enum Choice: Hashable {
     case app(Int)
@@ -445,8 +450,10 @@ struct ShareAppSheet: View {
       }
       if choice == .another || idiom.isTouch && choice == nil {
         FormCard {
-          FormRow("Name", systemImage: "textformat", field: TextField("Jellyfin", text: $name).autocorrectionDisabled())
-          FormRow("Port", help: "The port the app listens on, on this \(KitDevice.nameInSentence)", systemImage: "number", error: error.map { "\($0)" }, field: TextField("8096", text: $port).kitFont(.mono).kitTextContent(.number))
+          FormRow("Name", systemImage: "textformat", field: TextField("Jellyfin", text: $name).autocorrectionDisabled()
+            .focused($focused, equals: .name).onSubmit { focused = .port })
+          FormRow("Port", help: "The port the app listens on, on this \(KitDevice.nameInSentence)", systemImage: "number", error: error.map { "\($0)" }, field: TextField("8096", text: $port).kitFont(.mono).kitTextContent(.number)
+            .focused($focused, equals: .port))
           FormRow("Kind", systemImage: "arrow.left.arrow.right", hue: .gray) {
             KitSegmented(selection: $udp, options: [("TCP", false), ("UDP", true)]).fixedSize()
           }
@@ -455,7 +462,10 @@ struct ShareAppSheet: View {
       Text("Who can use it").kitFont(.sectionHeader).padding(.top, 4)
       FormCard {
         FormRow(access.title(hub: hub.settings.name), help: accessHelp, systemImage: "person.2", hue: .teal) {
-          Button("Change") { showsAccess = true }
+          Button("Change") {
+            focused = nil
+            showsAccess = true
+          }
             .buttonStyle(.kit)
             .kitMenu(isPresented: $showsAccess) {
               ForEach(AccessChoice.choices(hub: hub, groups: groups.groups.map(\.name).sorted()), id: \.self) { item in
@@ -477,12 +487,17 @@ struct ShareAppSheet: View {
         .disabled(selected == nil || busy)
     }
     .kitSheetDismissDisabled(busy)
+    // The keyboard covers the sheet's bottom, where Who can use it and the footer are: scrolling puts it away
+    .scrollDismissesKeyboard(.immediately)
+    .onChange(of: choice) { _, choice in
+      if choice == .another { focused = .name }
+    }
     .task { running = await ListeningApps.scan() }
   }
 
   private func appRow(_ app: ListeningApps.Found) -> some View {
     let isShared = facts.sharedApps.contains { $0.id == "tcp-\(app.port)" }
-    return FormRow("\(NetworkAppNames.main.name(port: app.port))", help: "\(app.app.kind) · port \(app.port)", systemImage: KnownPorts.symbol(app.port), hue: .blue) {
+    return FormRow("\(NetworkAppNames.main.name(port: app.port))", help: "\(app.app.kind) · port \(String(app.port))", systemImage: KnownPorts.symbol(app.port), hue: .blue) {
       if isShared {
         Chip("Shared", hue: .green)
       } else if choice == .app(app.port) {
@@ -529,17 +544,22 @@ struct ShareAppSheet: View {
     error = nil
     defer { busy = false }
     do {
-      try await hub.net.share(app: selected.name, port: selected.port, udp: udp && choice == .another, enabled: true)
-      if access.policy.mode != .hub {
-        // The hub lists the share a moment after it's published
-        let id = "\(udp && choice == .another ? "udp" : "tcp")-\(selected.port)"
-        for _ in 0..<30 {
-          if let app = facts.sharedApps.first(where: { $0.id == id }), app.resource != nil || hub.isDemo {
-            try await hub.setAccess(access.policy, of: app)
+      // Published with who may use it; the hub keeps an earlier share's (the same port shared before), and the
+      // hub-net agent shares without one: those are set once the hub lists the share, a moment after
+      try await hub.net.share(app: selected.name, port: selected.port, udp: udp && choice == .another, enabled: true, policy: access.policy)
+      let id = "\(udp && choice == .another ? "udp" : "tcp")-\(selected.port)"
+      for _ in 0..<30 {
+        if let app = facts.sharedApps.first(where: { $0.id == id }) {
+          if hub.isDemo {
+            if access.policy.mode != .hub { try await hub.setAccess(access.policy, of: app) }
             break
           }
-          try await Task.sleep(for: .milliseconds(200))
+          if let resource = app.resource {
+            if !access.matches(resource.policy) { try await hub.setAccess(access.policy, of: app) }
+            break
+          }
         }
+        try await Task.sleep(for: .milliseconds(200))
       }
       dismiss()
     } catch {

@@ -100,8 +100,8 @@ extension HubNet {
   }
 
   /// Shares an app's port with the hub's devices, named for the lists (the share carries the name, so other devices
-  /// show it), or stops sharing it
-  func share(app name: String?, port: Int, udp: Bool = false, enabled: Bool) async throws {
+  /// show it), or stops sharing it. `policy`: who may use it
+  func share(app name: String?, port: Int, udp: Bool = false, enabled: Bool, policy: HubNetworkPolicy? = nil) async throws {
     if let name, !name.isEmpty, name != "Port \(port)" { NetworkAppNames.main.set(name, port: port) }
 #if DEBUG
     if hub.isDemo {
@@ -113,9 +113,9 @@ extension HubNet {
 #endif
     let label = NetworkAppNames.main.label(port: port)
     if udp {
-      try await shareUdp(port: port, enabled: enabled, label: label)
+      try await shareUdp(port: port, enabled: enabled, label: label, policy: policy)
     } else {
-      try await shareTcp(port: port, enabled: enabled, label: label)
+      try await shareTcp(port: port, enabled: enabled, label: label, policy: policy)
     }
   }
 }

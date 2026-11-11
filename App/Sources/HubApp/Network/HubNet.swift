@@ -306,15 +306,16 @@ final class HubNet {
     }
   }
 
-  /// `label`: the app's name, which the share carries so other devices show it (`shareName`)
-  func shareTcp(port: Int, enabled: Bool, label: String? = nil) async throws {
+  /// `label`: the app's name, which the share carries so other devices show it (`shareName`); `policy`: who may use a
+  /// new share (the hub keeps an existing one's)
+  func shareTcp(port: Int, enabled: Bool, label: String? = nil, policy: HubNetworkPolicy? = nil) async throws {
     print("HubNet.shareTcp", port, enabled)
-    try await share(port: port, protocol: .tcp, enabled: enabled, label: label)
+    try await share(port: port, protocol: .tcp, enabled: enabled, label: label, policy: policy)
   }
 
-  func shareUdp(port: Int, enabled: Bool, label: String? = nil) async throws {
+  func shareUdp(port: Int, enabled: Bool, label: String? = nil, policy: HubNetworkPolicy? = nil) async throws {
     print("HubNet.shareUdp", port, enabled)
-    try await share(port: port, protocol: .udp, enabled: enabled, label: label)
+    try await share(port: port, protocol: .udp, enabled: enabled, label: label, policy: policy)
   }
 
   /// A port's share name: `tcp-8096`, or with the app's name `tcp-8096:Jellyfin`. Hubs take any name up to 128 bytes;
@@ -772,7 +773,8 @@ final class HubNet {
     port: Int,
     protocol networkProtocol: NetworkProtocol,
     enabled: Bool,
-    label: String? = nil
+    label: String? = nil,
+    policy: HubNetworkPolicy? = nil
   ) async throws {
     let validatedPort = try Self.validatedPort(port)
     guard isJoined else { throw HubNetError.notJoined }
@@ -788,7 +790,8 @@ final class HubNet {
         NetworkShare(
           name: Self.shareName(protocol: networkProtocol.rawValue, port: port, label: label),
           protocol: networkProtocol,
-          target: LocalTarget(port: validatedPort)
+          target: LocalTarget(port: validatedPort),
+          policy: policy?.servicePolicy ?? .private
         )
       )
       ports.insert(port)
@@ -1009,6 +1012,19 @@ final class HubNet {
     if let tcp { sharedTcp = tcp }
   }
 #endif
+}
+
+extension HubNetworkPolicy {
+  /// The same policy as HubService publishes it
+  var servicePolicy: NetworkPolicy {
+    switch mode {
+    case .hub: .hub
+    case .group: group.flatMap { $0.isEmpty ? nil : NetworkPolicy.group($0) } ?? .private
+    case .keys: keys.flatMap { $0.isEmpty ? nil : NetworkPolicy.keys($0) } ?? .private
+    case .private: .private
+    case .disabled: .disabled
+    }
+  }
 }
 
 enum HubNetError: LocalizedError, Equatable {
