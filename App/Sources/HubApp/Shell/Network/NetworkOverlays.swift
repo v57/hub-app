@@ -478,7 +478,11 @@ struct ShareAppSheet: View {
         Text(error).kitFont(.caption).foregroundStyle(Hue.red.text)
       }
     } footer: {
-      if let selected {
+      if idiom.isTouch, focused != nil {
+        // The number pad has no Return key, and a sheet that fits doesn't scroll, so scrolling can't put the keyboard
+        // away: the bar sits right above the keyboard (over Who can use it's Change), and Done there puts it away
+        Button("Done") { focused = nil }
+      } else if let selected {
         SheetStatus(selected.name, systemImage: KnownPorts.symbol(selected.port), hue: .blue)
       }
       Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction).disabled(busy)
