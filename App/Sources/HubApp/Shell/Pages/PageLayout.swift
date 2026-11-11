@@ -49,24 +49,51 @@ private struct PageToolbar<Title: View>: ViewModifier {
 }
 
 /// The page's main area and, beside it, the selected thing's inspector. On iPhone there's no room beside it: the
-/// page pushes the inspector instead.
+/// page pushes the inspector instead. Where the main area and the inspector don't fit side by side (an iPad in portrait
+/// with the sidebar shown), the inspector floats over the main area's trailing side instead of running off the screen,
+/// unless the page asks to keep the split (`floatsWhenNarrow: false`, a camera's controls beside its picture).
 struct PageWithInspector<Main: View, Inspector: View>: View {
   var name: String
   var showsInspector = true
+  var floatsWhenNarrow = true
   @ViewBuilder var main: Main
   @ViewBuilder var inspector: Inspector
   @Environment(\.kitIdiom) private var idiom
+
+  private static var mainMinWidth: CGFloat { 420 }
+  private static var inspectorRange: ClosedRange<CGFloat> { 280...460 }
 
   var body: some View {
     if idiom == .phone || !showsInspector {
       main.kitPane(.content)
     } else {
-      ResizableSplit(
-        "hub.\(name).inspector", pane: .trailing, width: idiom.isTouch ? 340 : 320, range: 280...460, mainMinWidth: 420
-      ) {
-        main.kitPane(.content)
-      } pane: {
-        KitInspector(width: nil) { inspector }
+      // The width the page is offered, not the split's own: a split too wide runs past it, so it'd never look narrow
+      GeometryReader { proxy in
+        let width = proxy.size.width
+        Group {
+          if floatsWhenNarrow, width < Self.mainMinWidth + Self.inspectorRange.lowerBound {
+            main.kitPane(.content)
+              .overlay(alignment: .trailing) {
+                KitInspector(width: nil) { inspector }
+                  .frame(width: min(340, max(240, width - 48)))
+                  .frame(maxHeight: .infinity)
+                  .clipShape(RoundedRectangle(cornerRadius: KitMetrics.radiusCard))
+                  .shadow(color: .black.opacity(0.18), radius: 16, x: -2, y: 4)
+                  .padding(8)
+                  .transition(.move(edge: .trailing).combined(with: .opacity))
+              }
+          } else {
+            ResizableSplit(
+              "hub.\(name).inspector", pane: .trailing, width: idiom.isTouch ? 340 : 320, range: Self.inspectorRange,
+              mainMinWidth: Self.mainMinWidth
+            ) {
+              main.kitPane(.content)
+            } pane: {
+              KitInspector(width: nil) { inspector }
+            }
+          }
+        }
+        .frame(width: proxy.size.width, height: proxy.size.height)
       }
     }
   }

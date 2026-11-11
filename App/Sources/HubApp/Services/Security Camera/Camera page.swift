@@ -42,7 +42,7 @@ struct CameraPage: View {
   var body: some View {
     let viewer = viewers.viewer(camera)
     let event = playing.flatMap { id in viewer.events.first { $0.id == id } }
-    PageWithInspector(name: "camera", showsInspector: true) {
+    PageWithInspector(name: "camera", showsInspector: true, floatsWhenNarrow: false) {
       ScrollView {
         VStack(alignment: .leading, spacing: 12) {
           Group {

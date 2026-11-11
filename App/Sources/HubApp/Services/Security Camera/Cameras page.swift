@@ -93,7 +93,7 @@ struct CamerasPage: View {
   }
 
   private func grid(_ cameras: [HubCamera], viewers: CameraViewers) -> some View {
-    PageWithInspector(name: "cameras", showsInspector: !cameras.isEmpty) {
+    PageWithInspector(name: "cameras", showsInspector: !cameras.isEmpty, floatsWhenNarrow: false) {
       ScrollView {
         VStack(alignment: .leading, spacing: KitMetrics.gutter) {
           CameraBanners()

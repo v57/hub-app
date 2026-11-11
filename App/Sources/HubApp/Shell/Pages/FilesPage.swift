@@ -20,6 +20,8 @@ struct FilesPage: View {
   @State private var list = Listing()
   @State private var isLoading = true
   @State private var selection: String?
+  /// iPhone: the file whose inspector is pushed
+  @State private var pushed: String?
   @State private var sort: KitGridSort? = KitGridSort("Name")
   @State private var search = ""
   @State private var importing = false
@@ -74,6 +76,11 @@ struct FilesPage: View {
               KitGrid(rows, columns: columns, selection: Binding {
                 selection.map { [$0] } ?? []
               } set: { ids in
+                // iPhone: a tap opens a folder or pushes a file's inspector (there's no room beside the table)
+                if idiom == .phone, let id = ids.first {
+                  if id.hasSuffix("/") { path += id } else { pushed = id }
+                  return
+                }
                 withAnimation(.kit) { selection = ids.first }
               }, sort: $sort, primaryAction: { ids in
                 if let id = ids.first, id.hasSuffix("/") { path += id }
@@ -106,12 +113,27 @@ struct FilesPage: View {
         }
       }
     }
+    .navigationDestination(item: $pushed) { id in
+      if let file = rows.first(where: { $0.id == id }) {
+        ScrollView {
+          FileInspector(file: file, path: path, context: HubContext(service: place)) {
+            await delete(file)
+            pushed = nil
+          }
+          .padding(KitMetrics.gutter)
+        }
+        .kitPane(.content)
+        .pageToolbar(file.name, meta: [file.kind], systemImage: file.systemImage, hue: .blue) { }
+        .hub(hub)
+      }
+    }
 #if !os(tvOS)
     .fileImporter(isPresented: $importing, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
       if case .success(let urls) = result { upload(urls) }
     }
 #endif
-    .task(id: hub.isConnected) {
+    // Again once the hub's permissions arrive: a page opened at launch saw no storage yet and never loaded its places
+    .task(id: "\(hub.isConnected)/\(hub.hasStorage)") {
       guard hub.hasStorage, !hub.isDemo else { return }
       do {
         for try await providers in hub.client.devices.providers("s3/list") {
@@ -120,7 +142,7 @@ struct FilesPage: View {
         }
       } catch { }
     }
-    .task(id: "\(place ?? "")/\(path)") {
+    .task(id: "\(place ?? "")/\(path)/\(hub.hasStorage)") {
       guard place != nil || places.isEmpty, hub.hasStorage, !hub.isDemo else { return }
       isLoading = true
       selection = nil
@@ -174,6 +196,12 @@ struct FilesPage: View {
   }
 
   private var columns: [KitGridColumn<FileRow>] {
+    let all = allColumns
+    // iPhone: the name and size fit the screen; kind and date are in the file's inspector
+    return idiom == .phone ? Array(all.prefix(2)) : all
+  }
+
+  private var allColumns: [KitGridColumn<FileRow>] {
     [
       KitGridColumn("Name", width: 280) { row in
         HStack(spacing: 8) {
