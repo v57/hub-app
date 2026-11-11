@@ -136,11 +136,18 @@ private struct NetworkCardContent: View {
   private func row(_ device: NetDevice) -> some View {
     let isUsing = facts.usingInternet?.id == device.id
     let isLast = facts.lastInternet?.id == device.id
-    let isOffline = device.status == .asleep || !device.sharesInternet
+    let isAsleep = device.status == .asleep
+    let isOffline = isAsleep || !device.sharesInternet
+    // Online but no longer sharing its internet isn't offline
+    let lastLine: String =
+      target != nil ? String(localized: "Last used")
+      : isAsleep ? String(localized: "Last used · offline")
+      : !device.sharesInternet ? String(localized: "Last used · not sharing now")
+      : String(localized: "Last used · available")
     let line: String =
       target == device.id ? String(localized: "Connecting…")
       : isUsing ? String(localized: "Using its internet")
-      : isLast ? (target != nil ? String(localized: "Last used") : isOffline ? String(localized: "Last used · offline") : String(localized: "Last used · available"))
+      : isLast ? lastLine
       : device.gateway?.capability.metered == true ? String(localized: "Available · metered") : String(localized: "Available")
     return SidebarRow(device.name) {
       RowTile(systemImage: device.symbol)

@@ -233,6 +233,12 @@ final class HubNet {
           // Also when this launch hasn't seen it connected: it may have been up since before the app started
           self.tunnelWentDown()
         }
+        // Back up (after choosing whose internet to use, Stop, a restart): a hub reached through the tunnel lost its
+        // connection meanwhile, and its client would wait out the backoff its failed attempts built up
+        if status == .connected, !wasConnected, !self.hub.isConnected, !self.hub.isDemo,
+           (try? PacketTunnelController().installedConfiguration())?.hubURL == self.hub.settings.address {
+          self.hub.client.reconnectNow()
+        }
         guard status == .connected, !wasConnected, self.hub.isConnected, !self.isRestoring else { return }
         self.reconnectTask = Task { [weak self] in await self?.restoreAfterConnecting() }
       }
