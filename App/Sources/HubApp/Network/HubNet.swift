@@ -147,6 +147,10 @@ final class HubNet {
   @ObservationIgnored private var tunnelDownTask: Task<Void, Never>?
   /// Restarts after the tunnel failed, this launch: an extension that keeps failing isn't started again and again
   @ObservationIgnored private var tunnelRecoveries = 0
+  /// Watches that the tunnel carries traffic to the hub while it says connected (`watchTraffic`)
+  @ObservationIgnored private var trafficWatchTask: Task<Void, Never>?
+  /// `tunnelProblem` is the traffic watch's: it clears it once the hub answers again
+  @ObservationIgnored private var tunnelProblemIsTraffic = false
   private(set) var isSharing = false
   private(set) var vpn: Device?
   /// Whether this device uses its own internet while the device whose internet it uses can't be reached; otherwise
@@ -300,12 +304,15 @@ final class HubNet {
       await refreshGlobalVPN()
       startInviterAgentWatcher()
       startLinksWatcher()
+      startTrafficWatch()
       print("done")
     } else {
       inviterAgentWatcherTask?.cancel()
       inviterAgentWatcherTask = nil
       linksWatcherTask?.cancel()
       linksWatcherTask = nil
+      trafficWatchTask?.cancel()
+      trafficWatchTask = nil
       if vpn != nil {
         try await disableVpn()
       }
@@ -584,6 +591,7 @@ final class HubNet {
     // After a relaunch the inviter still has to mirror members into the extension
     startInviterAgentWatcher()
     startLinksWatcher()
+    startTrafficWatch()
   }
 
   /// Set by turning Hub Network off (`setOn(false)`), with what it shared, until the switch turns it on again. A join
@@ -687,6 +695,139 @@ final class HubNet {
     guard !Task.isCancelled, await tunnel.status != .connected else { return }
     isJoined = false
     tunnelProblem = String(localized: "Hub Network stopped unexpectedly (\(reason)) and couldn’t start again. Turn it on to try again.")
+  }
+#endif
+
+  /// Watches that the tunnel carries traffic while it says it's connected (H-021): after Hub launched, the iPhone's and
+  /// the iPad's cards said "On · 0 devices" with the VPN connected, while their hub (ws://100.96.0.1:1997, reached only
+  /// through the tunnel) stayed Offline and the Mac couldn't ping them; only turning Hub Network off and on brought
+  /// traffic back. A hub reached through the overlay that doesn't answer while WireGuard has neither a recent
+  /// handshake nor new bytes from the hub's machine is a stalled tunnel: it is restarted (what off and on did), a few
+  /// times per launch, and the card says Reconnecting… and then why, instead of On.
+  private func startTrafficWatch() {
+#if canImport(NetworkExtension)
+    trafficWatchTask?.cancel()
+    trafficWatchTask = Task { [weak self] in
+      var watch = TrafficWatch()
+      while !Task.isCancelled {
+        try? await Task.sleep(for: .seconds(TrafficWatch.interval))
+        guard !Task.isCancelled, let self else { return }
+        await self.checkTraffic(&watch)
+      }
+    }
+#endif
+  }
+
+#if canImport(NetworkExtension)
+  /// What the traffic watch remembers between two checks.
+  struct TrafficWatch {
+    static let interval: Double = 20
+    /// A stall this long (no handshake within `handshakeAge`, no bytes in) restarts the tunnel
+    static let stallAge: Duration = .seconds(90)
+    /// WireGuard renews a handshake every 2 minutes while traffic flows (the links keep it alive every 25 s)
+    static let handshakeAge: TimeInterval = 180
+    /// Restarts per launch, and the time between two
+    static let maximumRestarts = 3
+    static let restartSpacing: Duration = .seconds(300)
+    var stalledSince: ContinuousClock.Instant?
+    var rxBytes: Int?
+    var restarts = 0
+    var lastRestart: ContinuousClock.Instant?
+  }
+
+  private func checkTraffic(_ watch: inout TrafficWatch) async {
+    // Only where the tunnel is this app's, the hub is another machine's, and its address is on the overlay: a hub on
+    // the LAN or the internet that doesn't answer says nothing about the tunnel
+    guard isJoined, HubNetworkBackend.current?.agent == nil, !hub.isDemo, !hub.isOnHubMachine, registration == nil,
+          !isRestoring, !wasTurnedOff, let host = hub.settings.address.host(), Self.isOverlay(host: host),
+          let tunnel = try? PacketTunnelController(), await tunnel.status == .connected else {
+      watch.stalledSince = nil
+      watch.rxBytes = nil
+      return
+    }
+    let traffic = await Self.hubTraffic(tunnel: tunnel, host: host)
+    let received = traffic.rxBytes.map { rx in watch.rxBytes.map { rx > $0 } ?? false } ?? false
+    watch.rxBytes = traffic.rxBytes
+    let handshaken = traffic.lastHandshake.map { Date().timeIntervalSince($0) < TrafficWatch.handshakeAge } ?? false
+    if hub.isConnected || handshaken || received {
+      watch.stalledSince = nil
+      if tunnelProblemIsTraffic {
+        tunnelProblemIsTraffic = false
+        tunnelProblem = nil
+      }
+      return
+    }
+    let now = ContinuousClock.now
+    guard let since = watch.stalledSince else {
+      watch.stalledSince = now
+      return
+    }
+    guard now - since >= TrafficWatch.stallAge else { return }
+    let name = hub.settings.name
+    let handshake = traffic.lastHandshake.map { "\(Int(Date().timeIntervalSince($0))) s ago" } ?? "never"
+    print("[HubNet] the tunnel carries nothing to \(name) (\(host)): handshake \(handshake), rx \(traffic.rxBytes.map(String.init) ?? "-")")
+    if watch.restarts < TrafficWatch.maximumRestarts,
+       watch.lastRestart.map({ now - $0 >= TrafficWatch.restartSpacing }) ?? true {
+      watch.restarts += 1
+      watch.lastRestart = now
+      watch.stalledSince = nil
+      watch.rxBytes = nil
+      tunnelProblemIsTraffic = true
+      tunnelProblem = String(localized: "Hub Network isn’t reaching \(name). Reconnecting…")
+      await tunnel.stop()
+      do {
+        try await tunnel.start()
+        print("[HubNet] restarted the stalled tunnel for \(name)")
+        // Its status observer clears the problem on connecting: the next checks set it again if the restart didn't help
+      } catch {
+        print("[HubNet] couldn't restart the stalled tunnel for \(name): \(error)")
+      }
+      return
+    }
+    tunnelProblemIsTraffic = true
+    tunnelProblem = String(localized: "Hub Network is on, but nothing reaches \(name) through it. Check that the device running \(name) is on and online, or turn Hub Network off and on.")
+  }
+
+  /// The WireGuard peer that carries `host` (the link to the hub's machine): its last handshake and the bytes received
+  /// from it, as the extension's link status lists them.
+  private static func hubTraffic(tunnel: PacketTunnelController, host: String) async -> (lastHandshake: Date?, rxBytes: Int?) {
+    struct Status: Decodable {
+      struct Peer: Decodable {
+        let wireGuardKey: String
+        let routes: [String]
+        let lastHandshake: Date?
+      }
+      struct WireGuardPeer: Decodable {
+        let wireGuardKey: String
+        let allowedIPs: [String]
+        let rxBytes: Int
+      }
+      let peers: [Peer]
+      let wireGuard: [WireGuardPeer]?
+    }
+    let decoder = JSONDecoder()
+    decoder.dateDecodingStrategy = .iso8601
+    guard let data = try? await tunnel.linkStatus(), let status = try? decoder.decode(Status.self, from: data) else {
+      return (nil, nil)
+    }
+    let route = { (routes: [String]) in routes.contains { $0.split(separator: "/").first.map(String.init) == host } }
+    let link = status.peers.first { route($0.routes) }
+    let peer = status.wireGuard?.first { $0.wireGuardKey == link?.wireGuardKey }
+      ?? status.wireGuard?.first { route($0.allowedIPs) }
+    return (link?.lastHandshake, peer?.rxBytes)
+  }
+
+  /// An address in Hub Network's overlay: 100.96.0.0/11 or fd48:5542:4e45::/48.
+  nonisolated static func isOverlay(host: String) -> Bool {
+    let host = host.trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
+    if let v4 = IPv4Address(host) {
+      let bytes = Array(v4.rawValue)
+      return bytes[0] == 100 && (bytes[1] & 0b1110_0000) == 96
+    }
+    if let v6 = IPv6Address(host) {
+      return Array(v6.rawValue).starts(with: [0xfd, 0x48, 0x55, 0x42, 0x4e, 0x45])
+    }
+    return false
   }
 #endif
 
