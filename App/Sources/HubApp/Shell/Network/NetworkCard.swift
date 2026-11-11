@@ -45,7 +45,9 @@ struct HubNetworkCard: View {
   @MainActor static func hub(profile: URL?) -> Hub? {
     let list = Hubs.main.list
     if let joined = list.first(where: \.net.isJoined) { return joined }
-    if let profile, let hub = list.first(where: { $0.settings.address == profile }), hub.canViewNetwork { return hub }
+    // The hub this device has a membership on, also while it doesn't answer: a hub reached only through Hub Network
+    // is out of reach until its switch here turns the tunnel on, so without the card nothing could
+    if let profile, let hub = list.first(where: { $0.settings.address == profile }) { return hub }
     if let open = Navigator.main.openHub, open.canViewNetwork { return open }
     return nil
   }

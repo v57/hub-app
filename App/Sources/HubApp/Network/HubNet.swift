@@ -228,6 +228,11 @@ final class HubNet {
         self.tunnelWasConnected = status == .connected
         if status == .connected {
           self.tunnelDownTask?.cancel()
+          // Found stopped outside Hub, then up again (VPN On Demand, Settings): on again here too, not Off over a
+          // running tunnel
+          if !self.isJoined, self.tunnelProblem != nil {
+            Task { [weak self] in await self?.restoreIfActive() }
+          }
           self.tunnelProblem = nil
         } else if status == .disconnected || status == .invalid {
           // Also when this launch hasn't seen it connected: it may have been up since before the app started
@@ -254,20 +259,38 @@ final class HubNet {
     }
     let tunnel = try PacketTunnelController()
     if enabled {
-      // The profile saves whether this device serves invitations, which needs the hub's node: learn it first, or a
-      // device that joins right after its owner sets the node never registers its inviter
-      var node = node
-      if node == nil { node = await Self.currentNodeEndpoint(hub: hub, timeout: .seconds(2)) }
-      if let node {
-        HubService.Group.HubNetworkNodeEndpointStore.shared.set(node)
-      }
-      if await tunnel.status == .notInstalled {
-        try await tunnel.authorizeAndInstallLocalHub(hub: hub)
+      if !hub.isConnected, await tunnel.status != .notInstalled,
+         (try? tunnel.installedConfiguration())?.hubURL == hub.settings.address {
+        // A hub this device reaches only through Hub Network (its overlay address, ws://100.96.0.1:1997, away from the
+        // hub's own network) doesn't answer while the tunnel is down, and registering first waited for it for good:
+        // the switch stayed on Connecting…. The membership is installed: start the tunnel with it, and once the hub
+        // answers through it, its connection registers this device again (restoreAfterConnecting)
+        try await tunnel.start()
+        print("[HubNet] started the tunnel for \(hub.settings.name), which answers only through it")
       } else {
-        // The same one-at-a-time registration a reconnect and the agent use
-        try await registerAgain(tunnel: tunnel)
+        // The profile saves whether this device serves invitations, which needs the hub's node: learn it first, or a
+        // device that joins right after its owner sets the node never registers its inviter
+        var node = node
+        if node == nil { node = await Self.currentNodeEndpoint(hub: hub, timeout: .seconds(2)) }
+        if let node {
+          HubService.Group.HubNetworkNodeEndpointStore.shared.set(node)
+        }
+        // A request waits for the hub's connection, ignoring cancellation: bounded, so a hub that stops answering
+        // midway ends in an error instead of Connecting… for good
+        let name = hub.settings.name
+        let unreachable: @Sendable () -> Error = { HubNetError.hubUnreachable(name) }
+        if await tunnel.status == .notInstalled {
+          try await bounded(.seconds(30), timedOut: unreachable) { [hub] in
+            try await tunnel.authorizeAndInstallLocalHub(hub: hub)
+          }
+        } else {
+          // The same one-at-a-time registration a reconnect and the agent use
+          try await bounded(.seconds(30), timedOut: unreachable) { [weak self] in
+            try await self?.registerAgain(tunnel: tunnel)
+          }
+        }
+        try await tunnel.start()
       }
-      try await tunnel.start()
       if hub.isOnHubMachine {
         hub.networkAppAgent.enable(tunnel: tunnel)
       }
@@ -1036,6 +1059,8 @@ enum HubNetError: LocalizedError, Equatable {
   case localAgentUnavailable
   case notJoined
   case nodeNotSet
+  /// The hub didn't answer in time (its name)
+  case hubUnreachable(String)
   /// What the hub-net agent can't do yet (using another device's internet)
   case unavailableThroughAgent
 
@@ -1055,6 +1080,8 @@ enum HubNetError: LocalizedError, Equatable {
       "Join Hub Network before sharing ports."
     case .nodeNotSet:
       "This Hub has no Hub Network node. An owner has to set one before invitations work."
+    case .hubUnreachable(let name):
+      "\(name) didn’t answer, so Hub Network couldn’t turn on. Check that it’s running and reachable, then try again."
     case .unavailableThroughAgent:
       "Using another device’s internet isn’t available through the hub-net service yet."
     }

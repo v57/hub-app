@@ -8,6 +8,7 @@
 
 #if canImport(ComponentKit)
 import SwiftUI
+import Channel
 import HubService
 
 extension HubNet {
@@ -37,6 +38,12 @@ extension HubNet {
       try await joinNetwork(enabled: true)
       guard let data = UserDefaults.standard.data(forKey: key),
             let paused = try? JSONDecoder().decode(Paused.self, from: data) else { return }
+      if !paused.tcp.isEmpty || !paused.udp.isEmpty || paused.internet {
+        // A hub reached only through Hub Network answers once the tunnel is up: what it shared goes back then. If it
+        // doesn't answer by then, it stays paused for the next time the switch turns it on
+        for _ in 0..<80 where !hub.isConnected { try? await Task.sleep(for: .milliseconds(250)) }
+        guard hub.isConnected else { return }
+      }
       UserDefaults.standard.removeObject(forKey: key)
       for port in paused.tcp { try? await shareTcp(port: port, enabled: true, label: NetworkAppNames.main.label(port: port)) }
       for port in paused.udp { try? await shareUdp(port: port, enabled: true, label: NetworkAppNames.main.label(port: port)) }
@@ -144,7 +151,12 @@ extension Error {
   /// One readable line for a caption: what went wrong in Hub Network
   var networkLine: String {
     if self is CancellationError { return String(localized: "This took too long. Try again.") }
-    let message = localizedDescription.split(whereSeparator: \.isNewline).joined(separator: " ")
+    // The hub's refusal: its own words, where the system's description of the struct says only
+    // "The operation couldn’t be completed. (Channel.ChannelError error 1.)"
+    let text = (self as? ChannelError).map { error in
+      error.text.prefix(1).uppercased() + error.text.dropFirst() + (error.text.hasSuffix(".") ? "" : ".")
+    } ?? localizedDescription
+    let message = text.split(whereSeparator: \.isNewline).joined(separator: " ")
       .trimmingCharacters(in: .whitespaces)
     return String(message.prefix(240))
   }
