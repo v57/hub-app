@@ -27,6 +27,10 @@ struct DevicesPage: View {
   private var approved: [Device] {
     devices.filter { $0.approved && !$0.revoked }
   }
+  /// Requests an owner turned down: they don't ask again until allowed to
+  private var denied: [Device] {
+    devices.filter { $0.denied && !$0.approved && !$0.revoked }
+  }
   private var shown: [Device] {
     approved.filter { device in
       filter.matches(device) && (search.isEmpty || device.name.localizedCaseInsensitiveContains(search)
@@ -44,6 +48,9 @@ struct DevicesPage: View {
         // One asking to attach is asked about above
         ForEach(pending.filter { device in !attachRequests.contains { $0.id == device.id } }.prefix(3)) { device in
           PendingDeviceBanner(device: device)
+        }
+        if !denied.isEmpty && hub.require(permissions: "hub/device/remove") {
+          DeniedDevicesSection(devices: denied)
         }
         if style == .list || idiom == .phone {
           filters
@@ -191,7 +198,16 @@ struct PendingDeviceBanner: View {
     ) {
       if hub.require(permissions: "hub/device/approve") {
         if idiom != .phone && hub.require(permissions: "hub/device/remove") {
-          AsyncButton("Deny") { try await hub.client.devices.remove(device.id) }.buttonStyle(.kit)
+          // Deny keeps the request turned down; removing it let the device, still connected, ask again at once (H-033).
+          // Older hubs only remove.
+          AsyncButton("Deny") {
+            if hub.api.contains("hub/device/deny") {
+              try await hub.client.devices.deny(device.id)
+            } else {
+              try await hub.client.devices.remove(device.id)
+            }
+          }
+          .buttonStyle(.kit)
         }
         Button("Approve…") { isApproving = true }
           .buttonStyle(.kitPrimary)
@@ -206,6 +222,42 @@ struct PendingDeviceBanner: View {
       confirm: code == nil ? "Approve Without a Code" : "Codes Match, Approve", role: code == nil ? .destructive : nil
     ) {
       Task { _ = try? await hub.client.devices.approve(device.id) }
+    }
+  }
+}
+
+/// Devices whose request an owner denied (H-033): they stay refused until allowed to ask again, which makes a new
+/// request with a new code to compare, or revoked, which refuses them for good and takes them off this list
+struct DeniedDevicesSection: View {
+  let devices: [Device]
+  @Environment(Hub.self) private var hub
+  @State private var revoking: Device?
+
+  var body: some View {
+    KitSection("Denied", meta: [devices.count == 1 ? String(localized: "1 device") : String(localized: "\(devices.count) devices")], systemImage: "hand.raised", hue: .gray) {
+      ForEach(devices) { device in
+        SidebarRow(device.name, subtitle: MetaLine.join([
+          device.platform.map(Device.systemName) ?? "",
+          String(localized: "can’t ask to join until you allow it"),
+        ])) {
+          Tile(systemImage: Device.symbol(platform: device.platform), hue: .gray, size: 18)
+        } trailing: {
+          HStack(spacing: 6) {
+            AsyncButton("Allow to Ask Again") { try await hub.client.devices.remove(device.id) }
+              .buttonStyle(.kit).controlSize(.small)
+            if hub.require(permissions: "hub/device/revoke") {
+              Button("Revoke…", role: .destructive) { revoking = device }.buttonStyle(.kit).controlSize(.small)
+            }
+          }
+        }
+      }
+    }
+    .kitDialog(
+      "Revoke \(revoking?.name ?? "")?", isPresented: Binding(get: { revoking != nil }, set: { if !$0 { revoking = nil } }),
+      message: "It can never ask to join this hub again, and it leaves this list.",
+      systemImage: "xmark.shield", hue: .red, confirm: "Revoke", role: .destructive
+    ) {
+      if let device = revoking { Task { try? await hub.client.devices.revoke(device.id) } }
     }
   }
 }

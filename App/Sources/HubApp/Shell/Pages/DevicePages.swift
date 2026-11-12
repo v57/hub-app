@@ -189,6 +189,7 @@ private struct HubKeysSection: View {
     case .waiting: String(localized: "Waiting for its turn with this hub. The code comes once the hub has this \(KitDevice.nameInSentence)’s request.")
     case .pending: String(localized: "An owner compares this code and approves this \(KitDevice.nameInSentence).")
     case .approved: nil
+    case .denied: String(localized: "An owner of this hub denied this \(KitDevice.nameInSentence). It can ask again once an owner allows it under Devices.")
     case nil: hub.isConnected ? String(localized: "This hub gives no safety code to compare.") : nil
     }
   }
