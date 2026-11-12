@@ -134,8 +134,8 @@ private struct GroupHeader: View {
 
   var body: some View {
     RichHeader(name.map { "\(Hub.groupTitle($0))" } ?? "No group", meta: [
-      count == 1 ? String(localized: "1 connection") : String(localized: "\(count) connections"),
-      name == "owners" ? String(localized: "every permission") : permissions.map { $0 == 1 ? String(localized: "1 permission") : String(localized: "\($0) permissions") } ?? String(localized: "no permissions"),
+      String(localized: "\(count) connections"),
+      name == "owners" ? String(localized: "every permission") : permissions.map { String(localized: "\($0) permissions") } ?? String(localized: "no permissions"),
     ], systemImage: name == "owners" ? "key" : name == nil ? "questionmark" : "person.2", hue: name == "owners" ? .red : name == nil ? .gray : .purple)
     .padding(.horizontal, 4).padding(.top, 6)
   }
@@ -164,8 +164,8 @@ private struct ConnectionCard: View {
         .titleAccessory { if isMe { Chip("You").controlSize(.small) } }
         .padding(.horizontal, 4).padding(.top, 2)
         Text(user.services == 0 && user.apps == 0 ? String(localized: "No services") : MetaLine.join([
-          user.services > 0 ? (user.services == 1 ? String(localized: "1 service") : String(localized: "\(user.services) services")) : "",
-          user.apps > 0 ? (user.apps == 1 ? String(localized: "1 app") : String(localized: "\(user.apps) apps")) : "",
+          user.services > 0 ? (String(localized: "\(user.services) services")) : "",
+          user.apps > 0 ? (String(localized: "\(user.apps) apps")) : "",
         ]))
         .kitFont(.caption).padding(.horizontal, 6)
       }
@@ -256,8 +256,8 @@ extension Hub.User {
   func line(isMe: Bool) -> String {
     MetaLine.join([
       key.map { "…" + $0.suffix(8) } ?? String(localized: "no key"), isMe ? String(localized: "you") : "",
-      services > 0 ? (services == 1 ? String(localized: "1 service") : String(localized: "\(services) services")) : "",
-      apps > 0 ? (apps == 1 ? String(localized: "1 app") : String(localized: "\(apps) apps")) : "",
+      services > 0 ? (String(localized: "\(services) services")) : "",
+      apps > 0 ? (String(localized: "\(apps) apps")) : "",
     ])
   }
 }
@@ -268,7 +268,7 @@ struct ServiceRequestsCard: View {
   @Environment(Hub.self) private var hub
 
   var body: some View {
-    KitSection("Requests", meta: [items.count == 1 ? String(localized: "1 service asks to post APIs") : String(localized: "\(items.count) services ask to post APIs"), String(localized: "they get only the APIs listed")], systemImage: "clock", hue: .orange) {
+    KitSection("Requests", meta: [String(localized: "\(items.count) services ask to post APIs"), String(localized: "they get only the APIs listed")], systemImage: "clock", hue: .orange) {
       ForEach(items) { item in
         SidebarRow(item.name, subtitle: MetaLine.join([item.pending.joined(separator: ", "), "…" + item.id.suffix(8)])) {
           Tile(systemImage: "hexagon", hue: .orange, size: 20)
@@ -339,7 +339,7 @@ struct RequestsPage: View {
           KitSection("Key", systemImage: "key", hue: .red) {
             InspectorRow("Key", copyText: item.id) { Text("…" + item.id.suffix(16)).kitFont(.mono) }
           }
-          KitSection("Wants to post", meta: [item.pending.count == 1 ? String(localized: "1 API") : String(localized: "\(item.pending.count) APIs")], systemImage: "hexagon", hue: .blue) {
+          KitSection("Wants to post", meta: [String(localized: "\(item.pending.count) APIs")], systemImage: "hexagon", hue: .blue) {
             ForEach(item.pending, id: \.self) { path in
               InspectorRow(path, value: "", copyable: false)
             }
@@ -405,7 +405,7 @@ struct LockdownPage: View {
         .kitSurface(.card)
         if !whitelist.enabled && !untrusted.isEmpty {
           Banner(
-            untrusted.count == 1 ? "1 connection would be refused" : "\(untrusted.count) connections would be refused",
+            "\(untrusted.count) connections would be refused",
             message: untrusted.count == 1
               ? "\(untrustedNames(untrusted)) isn’t trusted. Trust it first, or turn Lockdown on and it’ll be disconnected."
               : "\(untrustedNames(untrusted)) aren’t trusted. Trust them first, or turn Lockdown on and they’ll be disconnected.",
@@ -565,7 +565,7 @@ struct PermissionsPage: View {
       if let selectedGroup, !names.contains(selectedGroup) { self.selectedGroup = nil }
     }
     .pageToolbar(String(localized: "Permissions"), meta: PageMeta.parts(hub, [
-      groups.groups.count == 1 ? String(localized: "1 group") : String(localized: "\(groups.groups.count) groups"),
+      String(localized: "\(groups.groups.count) groups"),
       String(localized: "\(permissions.sections.reduce(0) { $0 + $1.permissions.count }) permissions"),
       edits.isEmpty ? "" : String(localized: "\(edits.count) unsaved"),
     ]), systemImage: HubPage.permissions.systemImage, hue: .orange) {
@@ -727,7 +727,7 @@ private struct GroupInspector: View {
     let members = connections.map { $0.named(from: devices) }.filter { $0.group == group.name }
     let edited = edits[group.name]
     VStack(alignment: .leading, spacing: KitMetrics.gutter) {
-      KitSection(Hub.groupTitle(group.name), meta: [members.count == 1 ? String(localized: "1 member") : String(localized: "\(members.count) members"), String(localized: "\(group.permissions.count) permissions")], systemImage: "person.2", hue: .purple) {
+      KitSection(Hub.groupTitle(group.name), meta: [String(localized: "\(members.count) members"), String(localized: "\(group.permissions.count) permissions")], systemImage: "person.2", hue: .purple) {
         ForEach(members) { user in
           SidebarRow(user.name, subtitle: user.key.map { "…" + $0.suffix(8) }) {
             Tile(systemImage: user.icon.symbol?.name ?? "hexagon", hue: .gray, size: 18)

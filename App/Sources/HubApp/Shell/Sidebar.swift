@@ -334,7 +334,7 @@ enum AccessMeta {
     let waiting = facts.pendingDevices.count
     if waiting > 0 { parts.append(String(localized: "\(waiting) waiting")) }
     let requests = facts.badges.security ?? 0
-    if requests > 0 { parts.append(requests == 1 ? String(localized: "1 request") : String(localized: "\(requests) requests")) }
+    if requests > 0 { parts.append(String(localized: "\(requests) requests")) }
     if hub.canLockdown { parts.append(lockdown ? String(localized: "Lockdown on") : String(localized: "Lockdown off")) }
     return parts
   }
@@ -390,7 +390,7 @@ struct HubPageRow: View {
     case .connections:
       if !facts.users.isEmpty { Count(facts.users.count) }
     case .permissions:
-      if !groups.groups.isEmpty { Text(groups.groups.count == 1 ? "1 group" : "\(groups.groups.count) groups").kitFont(.caption) }
+      if !groups.groups.isEmpty { Text("\(groups.groups.count) groups").kitFont(.caption) }
     case .lockdown:
       Text(whitelist.enabled ? "On" : "Off").kitFont(.caption)
     case .cameras:
@@ -429,7 +429,7 @@ private struct NetworkSection: View {
         StatusDot(hue: hub.net.isJoined ? .green : .gray, isHollow: !hub.net.isJoined, size: 6)
         Text(hub.net.isJoined ? "On" : "Off")
         if !agents.isEmpty {
-          Text("· \(agents.count == 1 ? "1 device" : "\(agents.count) devices")")
+          Text("· \(agents.count) devices")
         }
       }
     }

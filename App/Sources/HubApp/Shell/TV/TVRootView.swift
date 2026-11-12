@@ -120,7 +120,7 @@ private struct TVAllHubs: View {
     let listed = navigator.sorted(hubs.list).filter { !$0.reach.isHidden }
     VStack(alignment: .leading, spacing: 32) {
       Text(MetaLine.join([
-        listed.count == 1 ? String(localized: "1 hub") : String(localized: "\(hubs.list.count) hubs"), String(localized: "\(hubs.list.filter(\.isConnected).count) online"),
+        String(localized: "\(hubs.list.count) hubs"), String(localized: "\(hubs.list.filter(\.isConnected).count) online"),
       ]))
       .kitFont(.caption)
       ScrollView {
@@ -151,7 +151,7 @@ private struct TVHubSection: View {
         MetaLine([facts.summary])
       } accessory: {
         if facts.requests > 0 {
-          Chip(facts.requests == 1 ? "1 request" : "\(facts.requests) requests", hue: .orange)
+          Chip("\(facts.requests) requests", hue: .orange)
         }
       }
       if hub.reach == .online {

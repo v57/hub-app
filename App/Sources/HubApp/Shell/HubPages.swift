@@ -136,7 +136,7 @@ struct AppsPage: View {
       .padding(KitMetrics.gutter)
     }
     .kitPane(.content)
-    .pageToolbar(String(localized: "Apps"), meta: PageMeta.parts(hub, [apps.count == 1 ? String(localized: "1 app") : String(localized: "\(apps.count) apps")]), systemImage: HubPage.apps.systemImage, hue: .purple) { }
+    .pageToolbar(String(localized: "Apps"), meta: PageMeta.parts(hub, [String(localized: "\(apps.count) apps")]), systemImage: HubPage.apps.systemImage, hue: .purple) { }
   }
 }
 

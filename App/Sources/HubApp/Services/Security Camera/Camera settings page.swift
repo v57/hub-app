@@ -137,7 +137,7 @@ struct CameraSettingsPage: View {
   private var meta: [String] {
     guard isOnHere else { return [camera.isOn ? String(localized: "on for \(camera.hub?.settings.name ?? String(localized: "another hub"))") : String(localized: "Off")] }
     let on = camera.orderedUnits.count
-    var parts = [on == 1 ? String(localized: "1 camera on") : String(localized: "\(on) cameras on"), String(localized: "for \(hub.settings.name)")]
+    var parts = [String(localized: "\(on) cameras on"), String(localized: "for \(hub.settings.name)")]
     let watching = camera.orderedUnits.reduce(0) { $0 + $1.viewers }
     if watching > 0 { parts.append(String(localized: "\(watching) watching")) }
     return parts
@@ -633,7 +633,7 @@ private struct PictureCard: View {
 
   /// "1 encoder", "3 encoders": one for each camera on
   private var encoders: String {
-    camera.orderedUnits.count == 1 ? String(localized: "1 encoder") : String(localized: "\(camera.orderedUnits.count) encoders")
+    String(localized: "\(camera.orderedUnits.count) encoders")
   }
 
   private func pressureHue(_ pressure: CameraBudget.Pressure) -> Hue {
@@ -708,7 +708,7 @@ private struct WhenToRecordCard: View {
         }
         if recording.when == .whenAway {
           FormRow("Away After", help: "No keyboard or mouse for this long. Locked or asleep counts at once.", systemImage: "hourglass") {
-            KitPicker("Away After", selection: binding(\.recording.awayMinutes), options: CameraRecording.minuteChoices.map { ($0 == 1 ? String(localized: "1 minute") : String(localized: "\($0) minutes"), $0) })
+            KitPicker("Away After", selection: binding(\.recording.awayMinutes), options: CameraRecording.minuteChoices.map { (String(localized: "\($0) minutes"), $0) })
               .fixedSize()
           }
           FormRow("Live View While Paused", help: recording.liveWhilePaused ? "Viewers still see the picture; nothing is recorded" : "The camera stops while you use the \(KitDevice.nameInSentence)", systemImage: "eye") {
@@ -772,7 +772,7 @@ private struct ClipsCard: View {
           .disabled(!hub.hasStorage && storage.target == .device)
         }
         FormRow("Delete After", systemImage: "calendar") {
-          KitPicker("Delete After", selection: $camera.settings.storage.days, options: [1, 3, 7, 14, 30, 90].map { ($0 == 1 ? String(localized: "1 day") : String(localized: "\($0) days"), $0) } + [(String(localized: "Never"), 0)])
+          KitPicker("Delete After", selection: $camera.settings.storage.days, options: [1, 3, 7, 14, 30, 90].map { (String(localized: "\($0) days"), $0) } + [(String(localized: "Never"), 0)])
             .fixedSize()
         }
         FormRow("Size Limit", help: "The oldest clips go first", systemImage: "internaldrive") {
@@ -832,7 +832,7 @@ private struct AccessCard: View {
           }
         }
         if let unit = camera.units[setup.id] {
-          FormRow(String(localized: "Shared"), help: unit.isPublished ? (unit.viewers == 1 ? String(localized: "As “\(unit.shareName)” on Hub Network · 1 watching") : String(localized: "As “\(unit.shareName)” on Hub Network · \(unit.viewers) watching")) : unit.shareProblem ?? String(localized: "Not shared yet"), systemImage: "network", hue: unit.isPublished ? .green : .orange)
+          FormRow(String(localized: "Shared"), help: unit.isPublished ? (String(localized: "As “\(unit.shareName)” on Hub Network · \(unit.viewers) watching")) : unit.shareProblem ?? String(localized: "Not shared yet"), systemImage: "network", hue: unit.isPublished ? .green : .orange)
         }
       }
     }

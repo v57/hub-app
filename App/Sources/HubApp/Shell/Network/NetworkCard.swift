@@ -195,7 +195,7 @@ private struct NetworkCardContent: View {
     if facts.isJoined {
       if let using = facts.usingInternet { return (String(localized: "On · internet via \(using.name)"), .green) }
       let count = facts.devices.count
-      return (count == 1 ? String(localized: "On · 1 device") : String(localized: "On · \(count) devices"), .green)
+      return (String(localized: "On · \(count) devices"), .green)
     }
     if facts.hubNetworkOff { return (String(localized: "Waiting for \(hub.settings.name)"), .orange) }
     return (String(localized: "Off"), .gray)

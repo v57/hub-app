@@ -68,7 +68,7 @@ struct LauncherPage: View {
       }
     }
     .pageToolbar(String(localized: "Launcher"), meta: PageMeta.parts(hub, [
-      info.apps.count == 1 ? String(localized: "1 app") : String(localized: "\(info.apps.count) apps"),
+      String(localized: "\(info.apps.count) apps"),
       updating.map { String(localized: "Updating \($0)") } ?? "",
     ]), systemImage: HubPage.launcher.systemImage, hue: .gray) {
       if idiom != .phone {
@@ -221,7 +221,7 @@ private struct LauncherInspector: View {
         }
         InspectorRow("Restart on crash", value: app.restarts ? String(localized: "On") : String(localized: "Off"), copyable: false)
       }
-      KitSection("Environment values", meta: [env.filter { !$0.key.isEmpty }.count == 1 ? String(localized: "1 value") : String(localized: "\(env.filter { !$0.key.isEmpty }.count) values")], systemImage: "list.bullet.rectangle", hue: .gray) {
+      KitSection("Environment values", meta: [String(localized: "\(env.filter { !$0.key.isEmpty }.count) values")], systemImage: "list.bullet.rectangle", hue: .gray) {
         ForEach($env) { $item in
           HStack(spacing: 6) {
             TextField("KEY", text: $item.key).kitField(mono: true).frame(width: 110)

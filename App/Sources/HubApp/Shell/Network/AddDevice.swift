@@ -81,7 +81,7 @@ struct AddDeviceSheet: View {
       .padding(.vertical, 12)
     } footer: {
       let count = facts.devices.count
-      SheetStatus(count == 1 ? String(localized: "\(hub.settings.name) has 1 device") : String(localized: "\(hub.settings.name) has \(count) devices"), systemImage: "checkmark", hue: .green)
+      SheetStatus(String(localized: "\(hub.settings.name) has \(count) devices"), systemImage: "checkmark", hue: .green)
       Button("Add Another") {
         known = nil
         attempt += 1

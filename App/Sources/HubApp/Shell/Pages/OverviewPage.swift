@@ -136,13 +136,11 @@ struct NeedsYouBanner: View {
   private var title: String {
     let requests = facts.requests
     switch (requests, updates.count) {
-    case (1, 0): return String(localized: "1 request needs you")
     case (_, 0): return String(localized: "\(requests) requests need you")
-    case (0, 1): return String(localized: "1 update needs you")
     case (0, _): return String(localized: "\(updates.count) updates need you")
     default:
-      let requestsPart = requests == 1 ? String(localized: "1 request") : String(localized: "\(requests) requests")
-      let updatesPart = updates.count == 1 ? String(localized: "1 update") : String(localized: "\(updates.count) updates")
+      let requestsPart = String(localized: "\(requests) requests")
+      let updatesPart = String(localized: "\(updates.count) updates")
       return String(localized: "\(requestsPart) and \(updatesPart) need you")
     }
   }

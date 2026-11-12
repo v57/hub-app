@@ -333,7 +333,7 @@ struct HubNetworkView: View {
     if canSeeDevices || canInvite {
       let keys = memberKeys
       KitSection(
-        "Devices", meta: [keys.count == 1 ? String(localized: "1 device") : String(localized: "\(keys.count) devices")],
+        "Devices", meta: [String(localized: "\(keys.count) devices")],
         systemImage: "laptopcomputer.and.iphone", hue: .blue, status: isCreatingInvitation ? .working : .idle
       ) {
         if let invitationError {
@@ -519,7 +519,7 @@ struct HubNetworkView: View {
   private var services: some View {
     KitSection(
       "Services",
-      meta: [resources.count == 1 ? String(localized: "1 on this network") : String(localized: "\(resources.count) on this network")],
+      meta: [String(localized: "\(resources.count) on this network")],
       systemImage: "point.3.connected.trianglepath.dotted", hue: .purple
     ) {
       ForEach(resources.sorted { $0.shareName < $1.shareName }, id: \.id) { resource in
@@ -541,7 +541,7 @@ struct HubNetworkView: View {
   private var problemsSection: some View {
     KitSection(
       "Connection Problems",
-      meta: [problems.count == 1 ? String(localized: "1 service") : String(localized: "\(problems.count) services")],
+      meta: [String(localized: "\(problems.count) services")],
       systemImage: "exclamationmark.triangle", hue: .orange
     ) {
       ForEach(problems, id: \.id) { problem in
@@ -1065,7 +1065,7 @@ private extension HubNetworkPolicy {
     switch mode {
     case .hub: String(localized: "Everyone on this Hub")
     case .group: group.map { String(localized: "Group \($0)") } ?? String(localized: "A group")
-    case .keys: keys?.count == 1 ? String(localized: "1 key") : String(localized: "\(keys?.count ?? 0) keys")
+    case .keys: String(localized: "\(keys?.count ?? 0) keys")
     case .private: String(localized: "Only its owner")
     case .disabled: String(localized: "No one")
     }

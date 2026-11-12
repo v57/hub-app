@@ -57,8 +57,8 @@ struct AllHubsView: View {
     let online = hubs.list.filter(\.isConnected).count
     let requests = hubs.list.reduce(0) { $0 + ($1.state.statusBadges.value.security ?? 0) + $1.state.pendingDevices.value.count }
     return [
-      hubs.list.count == 1 ? String(localized: "1 hub") : String(localized: "\(hubs.list.count) hubs"), String(localized: "\(online) online"),
-      requests == 0 ? "" : requests == 1 ? String(localized: "1 request") : String(localized: "\(requests) requests"),
+      String(localized: "\(hubs.list.count) hubs"), String(localized: "\(online) online"),
+      requests == 0 ? "" : String(localized: "\(requests) requests"),
     ]
   }
 }
@@ -186,7 +186,7 @@ struct HubCard: View {
     case .online:
       if facts.requests > 0 {
         Button { Navigator.main.open(hub, facts.pendingDevices.isEmpty ? .requests : .devices) } label: {
-          Chip(facts.requests == 1 ? "1 request" : "\(facts.requests) requests", hue: .orange).controlSize(.small)
+          Chip("\(facts.requests) requests", hue: .orange).controlSize(.small)
         }
         .buttonStyle(.plain)
       } else {

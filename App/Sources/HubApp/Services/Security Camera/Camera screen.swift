@@ -53,7 +53,7 @@ struct CameraScreen: View {
     return VStack(alignment: .leading, spacing: 18) {
       HStack(spacing: 8) {
         VideoChip(title: camera.interruption == nil ? String(localized: "LIVE") : String(localized: "PAUSED"), tone: camera.interruption == nil ? .live : .plain)
-        if watching > 0 { Text(watching == 1 ? "1 watching" : "\(watching) watching").kitFont(.callout).foregroundStyle(.white.opacity(0.7)) }
+        if watching > 0 { Text("\(watching) watching").kitFont(.callout).foregroundStyle(.white.opacity(0.7)) }
         if motion { VideoChip(title: String(localized: "Motion"), systemImage: "figure.walk.motion", tone: .motion) }
       }
       VStack(alignment: .leading, spacing: 2) {

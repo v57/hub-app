@@ -154,7 +154,7 @@ struct CamerasPage: View {
 #endif
 
   private func meta(_ cameras: [HubCamera], _ viewers: CameraViewers) -> [String] {
-    var parts = [cameras.count == 1 ? String(localized: "1 camera") : String(localized: "\(cameras.count) cameras")]
+    var parts = [String(localized: "\(cameras.count) cameras")]
     let moving = cameras.filter { viewers.viewer($0).motion?.isActive == true }.count
     if moving > 0 { parts.append(String(localized: "\(moving) with motion now")) }
     return parts
@@ -301,9 +301,7 @@ private struct AddCameraTile: View {
         Image(systemName: camera.isOn ? "web.camera" : "plus").font(.system(size: 20, weight: .medium)).foregroundStyle(.kitSecondary)
         Text(camera.isOn ? "This \(KitDevice.name) as a Camera" : "Add a Camera").kitFont(.headline)
         Text(camera.isOn
-          ? camera.orderedUnits.count == 1
-            ? String(localized: "1 camera on · settings, zones and video")
-            : String(localized: "\(camera.orderedUnits.count) cameras on · settings, zones and video")
+          ? String(localized: "\(camera.orderedUnits.count) cameras on · settings, zones and video")
           : String(localized: "Use this \(KitDevice.nameInSentence), or an old iPhone or iPad that stays at home."))
           .kitFont(.caption).multilineTextAlignment(.center).frame(maxWidth: 260)
       }
@@ -507,7 +505,7 @@ private struct CameraEventsSection: View {
 
   var body: some View {
     let events = events
-    KitSection("Motion Events", meta: [span == .today ? String(localized: "Today") : String(localized: "Last 7 days"), events.count == 1 ? String(localized: "1 event") : String(localized: "\(events.count) events")], systemImage: "figure.walk.motion", hue: .orange) {
+    KitSection("Motion Events", meta: [span == .today ? String(localized: "Today") : String(localized: "Last 7 days"), String(localized: "\(events.count) events")], systemImage: "figure.walk.motion", hue: .orange) {
       if events.isEmpty {
         Text(span == .today ? "Nothing moved today. Clips of motion show up here." : "Nothing moved this week.")
           .kitFont(.caption).padding(8)
@@ -590,9 +588,7 @@ private struct CameraStorageLine: View {
       Text(known == 0 ? "Clips" : onHub == known ? "Clips go to \(hub.settings.name)’s storage" : onHub == 0 ? "Clips stay on each camera" : "Clips on \(hub.settings.name)’s storage and on cameras")
         .kitFont(.callout)
       Spacer()
-      Text(events.count == 1
-        ? String(localized: "1 clip · \(CameraFormat.bytes(Double(events.reduce(0) { $0 + $1.size })))")
-        : String(localized: "\(events.count) clips · \(CameraFormat.bytes(Double(events.reduce(0) { $0 + $1.size })))"))
+      Text(String(localized: "\(events.count) clips · \(CameraFormat.bytes(Double(events.reduce(0) { $0 + $1.size })))"))
         .kitFont(.caption).monospacedDigit()
     }
     .padding(.horizontal, 12)

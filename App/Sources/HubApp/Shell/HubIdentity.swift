@@ -79,7 +79,7 @@ struct HubFacts: DynamicProperty {
     switch hub.reach {
     case .online:
       let unencrypted = hub.client.transport.isUnencryptedNetwork ? String(localized: "Not encrypted") : nil
-      return [role, services == 1 ? String(localized: "1 service") : String(localized: "\(services) services"), unencrypted].compactMap { $0 }.joined(separator: " · ")
+      return [role, String(localized: "\(services) services"), unencrypted].compactMap { $0 }.joined(separator: " · ")
     case .connecting: return String(localized: "Connecting…")
     case .offline: return String(localized: "Offline")
     case .refused where hub.refusal == .hubNeedsUpdate: return String(localized: "Needs an update")

@@ -280,7 +280,7 @@ struct UseInternetSheet: View {
       .sorted { ($0.id == using?.id ? 0 : $0.sharesInternet ? 1 : 2, $0.name) < ($1.id == using?.id ? 0 : $1.sharesInternet ? 1 : 2, $1.name) }
     KitSheet(
       title: "Use Internet Through",
-      meta: "\(hub.settings.name) · \(sharing.count == 1 ? String(localized: "1 device shares its") : String(localized: "\(sharing.count) devices share theirs"))",
+      meta: "\(hub.settings.name) · \(String(localized: "\(sharing.count) devices share theirs"))",
       systemImage: "globe", hue: .indigo, status: busy != nil ? .working : .idle
     ) {
       if total > 8 {
@@ -340,9 +340,7 @@ struct UseInternetSheet: View {
       }
       let others = total - 1 - sharing.count
       if others > 0 {
-        Text(others == 1
-          ? String(localized: "1 other device doesn’t share their internet. A device shares it from its own Hub Network page.")
-          : String(localized: "\(others) other devices don’t share their internet. A device shares it from its own Hub Network page."))
+        Text(String(localized: "\(others) other devices don’t share their internet. A device shares it from its own Hub Network page."))
           .kitFont(.caption).fixedSize(horizontal: false, vertical: true)
       }
     } footer: {

@@ -120,7 +120,7 @@ struct ServicesPage: View {
           ScrollView {
             VStack(spacing: KitMetrics.gutter) {
               ForEach(groups) { group in
-                KitSection(group.name, meta: [group.children?.count == 1 ? String(localized: "1 API") : String(localized: "\(group.children?.count ?? 0) APIs")], systemImage: "hexagon", hue: .blue) {
+                KitSection(group.name, meta: [String(localized: "\(group.children?.count ?? 0) APIs")], systemImage: "hexagon", hue: .blue) {
                   ForEach(group.children ?? []) { row in
                     SidebarRow("\(row.name)", subtitle: "\(row.service?.requests ?? 0) requests") {
                       EmptyView()
@@ -185,7 +185,7 @@ struct ServicesPage: View {
     let running = status.services.reduce(0) { $0 + ($1.running ?? 0) }
     let waiting = paths.filter(\.needsApproval).count
     return PageMeta.parts(hub, [
-      paths.count == 1 ? String(localized: "1 API") : String(localized: "\(paths.count) APIs"),
+      String(localized: "\(paths.count) APIs"),
       running > 0 ? String(localized: "\(running) running") : "",
       waiting > 0 ? String(localized: "\(waiting) pending") : "",
     ])

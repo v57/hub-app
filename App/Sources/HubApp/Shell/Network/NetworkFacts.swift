@@ -63,7 +63,7 @@ struct NetDevice: Identifiable, Hashable {
   }
   /// "2 apps"
   var appsLine: String? {
-    apps.isEmpty ? nil : apps.count == 1 ? String(localized: "1 app") : String(localized: "\(apps.count) apps")
+    apps.isEmpty ? nil : String(localized: "\(apps.count) apps")
   }
 }
 
@@ -88,7 +88,7 @@ extension HubNetworkPolicy {
     switch mode {
     case .hub: String(localized: "Everyone in \(hub)")
     case .group: group.map(Hub.groupTitle) ?? String(localized: "A group")
-    case .keys: keys?.count == 1 ? String(localized: "1 person") : String(localized: "\(keys?.count ?? 0) people")
+    case .keys: String(localized: "\(keys?.count ?? 0) people")
     case .private: String(localized: "Only Me")
     case .disabled: String(localized: "No one")
     }

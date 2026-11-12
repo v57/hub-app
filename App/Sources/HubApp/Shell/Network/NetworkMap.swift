@@ -259,7 +259,7 @@ struct NetworkMap: View {
     return HStack(spacing: 12) {
       if !isOn {
         // Off, this device can't tell who is online
-        HStack(spacing: 4) { StatusDot(hue: .gray, isHollow: true, size: 7); Text(devices.count == 1 ? "1 device" : "\(devices.count) devices") }
+        HStack(spacing: 4) { StatusDot(hue: .gray, isHollow: true, size: 7); Text("\(devices.count) devices") }
       } else {
         HStack(spacing: 4) { StatusDot(hue: .green, size: 7); Text("\(online) online") }
         HStack(spacing: 4) { StatusDot(hue: .gray, isHollow: true, size: 7); Text("\(asleep) asleep") }
@@ -275,7 +275,7 @@ struct NetworkMap: View {
 
   private var accessibilityText: String {
     let others = devices.count
-    return others == 1 ? String(localized: "\(hubName) and 1 device") : String(localized: "\(hubName) and \(others) devices")
+    return String(localized: "\(hubName) and \(others) devices")
   }
 }
 

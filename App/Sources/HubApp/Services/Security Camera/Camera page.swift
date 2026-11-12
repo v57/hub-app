@@ -145,9 +145,7 @@ struct CameraPage: View {
     let recorded = events.reduce(0) { $0 + $1.duration }
     let title = HStack(alignment: .firstTextBaseline, spacing: 10) {
       Text(dayTitle(day)).kitFont(.headline)
-      Text(events.count == 1
-        ? String(localized: "1 event · \(CameraFormat.duration(recorded)) recorded")
-        : String(localized: "\(events.count) events · \(CameraFormat.duration(recorded)) recorded"))
+      Text(String(localized: "\(events.count) events · \(CameraFormat.duration(recorded)) recorded"))
         .kitFont(.caption)
         .lineLimit(1)
     }
@@ -187,7 +185,7 @@ struct CameraPage: View {
         }
       }
       let events = viewer.events.filter { Calendar.current.isDate($0.start, inSameDayAs: day) }
-      KitSection("Motion Events", meta: [dayTitle(day), events.count == 1 ? String(localized: "1 event") : String(localized: "\(events.count) events")], systemImage: "figure.walk.motion", hue: .orange) {
+      KitSection("Motion Events", meta: [dayTitle(day), String(localized: "\(events.count) events")], systemImage: "figure.walk.motion", hue: .orange) {
         if events.isEmpty {
           Text(viewer.state == .live ? String(localized: "Nothing moved. Clips of motion show up here.") : viewer.tileLine)
             .kitFont(.caption).padding(8)
@@ -220,7 +218,7 @@ struct CameraPage: View {
     rows.append((String(localized: "Network"), viewer.behind > 0.5 ? String(localized: "Hub Network · \(String(format: "%.1f", viewer.behind)) s behind") : "Hub Network"))
     rows.append((String(localized: "Clips"), info.storage == CameraStoragePolicy.Target.hub.rawValue ? String(localized: "\(hub.settings.name)’s storage") : String(localized: "on the camera’s device")))
     rows.append((String(localized: "Sensitivity"), "\(Int((info.sensitivity * 100).rounded()))%"))
-    if let viewers = info.viewers { rows.append((String(localized: "Watching"), viewers == 1 ? String(localized: "1 device") : String(localized: "\(viewers) devices"))) }
+    if let viewers = info.viewers { rows.append((String(localized: "Watching"), String(localized: "\(viewers) devices"))) }
     return rows
   }
 

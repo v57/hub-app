@@ -131,7 +131,7 @@ struct DevicesPage: View {
 
   private var meta: [String] {
     PageMeta.parts(hub, [
-      approved.count == 1 ? String(localized: "1 device") : String(localized: "\(approved.count) devices"),
+      String(localized: "\(approved.count) devices"),
       String(localized: "\(approved.filter(\.online).count) online"),
       pending.isEmpty ? "" : String(localized: "\(pending.count) waiting"),
     ])
@@ -234,7 +234,7 @@ struct DeniedDevicesSection: View {
   @State private var revoking: Device?
 
   var body: some View {
-    KitSection("Denied", meta: [devices.count == 1 ? String(localized: "1 device") : String(localized: "\(devices.count) devices")], systemImage: "hand.raised", hue: .gray) {
+    KitSection("Denied", meta: [String(localized: "\(devices.count) devices")], systemImage: "hand.raised", hue: .gray) {
       ForEach(devices) { device in
         SidebarRow(device.name, subtitle: MetaLine.join([
           device.platform.map(Device.systemName) ?? "",
@@ -693,7 +693,7 @@ extension Device {
     if isThisDevice { parts.append(String(localized: "this \(KitDevice.nameInSentence)")) }
     if let parent { parts.append(String(localized: "under \(parent)")) }
     if online || compact {
-      parts.append(services.count == 1 ? String(localized: "1 service") : String(localized: "\(services.count) services"))
+      parts.append(String(localized: "\(services.count) services"))
     }
     if !online, let lastSeen {
       parts.append(String(localized: "seen \(lastSeen.formatted(.relative(presentation: .named)))"))

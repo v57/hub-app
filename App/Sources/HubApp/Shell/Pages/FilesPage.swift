@@ -63,7 +63,7 @@ struct FilesPage: View {
                   .fontWeight(index == crumbs.count - 1 ? .semibold : .regular)
               }
               Spacer()
-              Text(MetaLine.join([rows.count == 1 ? String(localized: "1 item") : String(localized: "\(rows.count) items"), totalSize])).kitFont(.caption)
+              Text(MetaLine.join([String(localized: "\(rows.count) items"), totalSize])).kitFont(.caption)
             }
             .padding(.horizontal, 4)
             if isLoading && rows.isEmpty {

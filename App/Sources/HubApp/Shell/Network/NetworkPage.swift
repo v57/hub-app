@@ -157,7 +157,7 @@ struct HubNetworkPage: View {
     let count = facts.devices.count
     return [
       facts.isJoined ? String(localized: "On") : isSwitching ? String(localized: "Connecting…") : String(localized: "Off"),
-      count == 1 ? String(localized: "1 device") : String(localized: "\(count) devices"),
+      String(localized: "\(count) devices"),
     ]
   }
 
@@ -392,7 +392,7 @@ struct NetworkHero: View {
 
   private var message: String {
     let others = devices.filter { !$0.isThisDevice }
-    let reach = others.count == 1 ? String(localized: "1 device") : String(localized: "\(others.count) devices")
+    let reach = String(localized: "\(others.count) devices")
     switch state {
     case .on, .turningOff:
       if isPhone { return String(localized: "Reach \(name) and \(reach) from this \(KitDevice.nameInSentence), wherever you are.") }
