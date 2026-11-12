@@ -97,7 +97,7 @@ struct ServicesPage: View {
           })
           Spacer()
           if idiom != .phone {
-            Text("\(status.requests.formatted()) requests since \(since.formatted(date: .omitted, time: .shortened))")
+            Text("\(status.requests) requests since \(since.formatted(date: .omitted, time: .shortened))")
               .kitFont(.caption)
           }
         }
