@@ -2,7 +2,8 @@
 //  NetworkInvitationTests.swift
 //  Tests
 //
-//  What the hub machine's net/invite holds for a member (H-034).
+//  What the hub machine's net/invite holds for a member (H-034), and invitation links that say they're for browsing
+//  through the inviting device's internet (H-035).
 //
 
 import CryptoKit
@@ -53,5 +54,31 @@ final class NetworkInvitationTests: XCTestCase {
 
   func testAnInvitationForACallerTheHubDidNotNameIsHeld() throws {
     XCTAssertNotNil(try HubService.Group.invitationHold(code: code(), caller: nil))
+  }
+
+  func testABrowseLinkCarriesTheSameInvitation() throws {
+    let code = code()
+    let join = NetworkInvitationParser.urlPrefix + code
+    let browse = NetworkInvitationLink.browse(join)
+    XCTAssertEqual(browse, "hub://browse/" + code)
+    XCTAssertEqual(NetworkInvitationLink.browse(code), browse, "a bare code becomes a browse link too")
+    XCTAssertTrue(NetworkInvitationLink.parse(browse).browse)
+    XCTAssertEqual(NetworkInvitationLink.parse(browse).link, join)
+    XCTAssertFalse(NetworkInvitationLink.parse(join).browse)
+    XCTAssertEqual(NetworkInvitationLink.parse(" \(join)\n").link, join)
+    XCTAssertEqual(try NetworkInvitationLink.decode(browse).replayId, try NetworkInvitationParser.decode(join).replayId)
+    XCTAssertThrowsError(try NetworkInvitationParser.decode(browse), "the plain parser takes only join links")
+  }
+
+  func testTheRouterTakesBothLinksAndSaysWhichOne() throws {
+    let router = NetworkInvitationRouter()
+    router.open(URL(string: "hub://browse/" + code())!)
+    XCTAssertTrue(router.pendingIsBrowse)
+    _ = router.consume()
+    router.open(URL(string: NetworkInvitationParser.urlPrefix + code())!)
+    XCTAssertFalse(router.pendingIsBrowse)
+    XCTAssertFalse(router.consume().isEmpty)
+    router.open(URL(string: "hub://pair/abc")!)
+    XCTAssertTrue(router.pendingInput.isEmpty)
   }
 }

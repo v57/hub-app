@@ -58,6 +58,32 @@ enum NativeJoinPresentation {
   }
 }
 
+/// An invitation as a link: `hub://join/<code>` puts a device on the hub's network, `hub://browse/<code>` does that and
+/// switches it to the inviting device's internet (Add a Device's Use This Mac's Internet, H-035). The code is the same
+/// signed invitation; the mode is outside it, so the node and older parsers see the usual code.
+enum NetworkInvitationLink {
+  static let browsePrefix = "hub://browse/"
+
+  /// The invitation's own link or code, and whether it's for browsing
+  static func parse(_ text: String) -> (link: String, browse: Bool) {
+    let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard value.hasPrefix(browsePrefix) else { return (value, false) }
+    return (NetworkInvitationParser.urlPrefix + value.dropFirst(browsePrefix.count), true)
+  }
+
+  /// `link` (hub://join/… or a bare code) as a browse link
+  static func browse(_ link: String) -> String {
+    let value = link.trimmingCharacters(in: .whitespacesAndNewlines)
+    let code = value.hasPrefix(NetworkInvitationParser.urlPrefix) ? String(value.dropFirst(NetworkInvitationParser.urlPrefix.count)) : value
+    return browsePrefix + code
+  }
+
+  /// Decodes either kind
+  static func decode(_ text: String) throws -> DecodedNetworkInvitation {
+    try NetworkInvitationParser.decode(parse(text).link)
+  }
+}
+
 @MainActor
 @Observable
 final class NetworkInvitationRouter {
@@ -66,11 +92,15 @@ final class NetworkInvitationRouter {
   private(set) var pendingInput = ""
 
   func open(_ url: URL) {
-    guard url.absoluteString.hasPrefix(NetworkInvitationParser.urlPrefix) else {
+    let link = url.absoluteString
+    guard link.hasPrefix(NetworkInvitationParser.urlPrefix) || link.hasPrefix(NetworkInvitationLink.browsePrefix) else {
       return
     }
-    pendingInput = url.absoluteString
+    pendingInput = link
   }
+
+  /// The pending link is for browsing through the inviting device's internet
+  var pendingIsBrowse: Bool { NetworkInvitationLink.parse(pendingInput).browse }
 
   func consume() -> String {
     defer { pendingInput = "" }

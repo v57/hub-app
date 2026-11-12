@@ -89,7 +89,10 @@ struct RootView: View {
     }
     .modifier(RouteFollower(compactColumn: $compactColumn))
     .onChange(of: NetworkInvitationRouter.main.pendingInput) { _, input in
-      if !input.isEmpty { shell.sheet = .connect }
+      // A browse link goes to Browse Through My Own Internet, which joins and switches to that device's internet.
+      // Connect or Browse already up takes the link itself.
+      guard !input.isEmpty, shell.sheet != .connect, shell.sheet != .browseOwnInternet else { return }
+      shell.sheet = NetworkInvitationRouter.main.pendingIsBrowse ? .browseOwnInternet : .connect
     }
     .onAppear {
       // iPhone: until a hub is set up, the welcome is the first screen

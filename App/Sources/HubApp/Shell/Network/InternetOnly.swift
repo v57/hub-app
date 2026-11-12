@@ -19,16 +19,24 @@ struct BrowseOwnInternetSheet: View {
   @Environment(\.kitDismiss) private var dismiss
   // Optional: a kit overlay may not carry the window's model
   @Environment(ShellModel.self) private var shell: ShellModel?
-  @State private var link: String?
+  /// A browse link opened from outside (the Mac's Copy Link in Use This Mac's Internet) goes straight to joining
+  @State private var link: String? = NetworkInvitationRouter.main.pendingInput.isEmpty ? nil
+    : NetworkInvitationLink.parse(NetworkInvitationRouter.main.consume()).link
   @State private var scanning = false
   @State private var input = ""
   @State private var error: String?
 
   var body: some View {
-    if let link {
-      JoinNetworkSheet(link: link, useInternet: true).id(link)
-    } else {
-      explainer
+    Group {
+      if let link {
+        JoinNetworkSheet(link: link, useInternet: true).id(link)
+      } else {
+        explainer
+      }
+    }
+    // A link opened while the sheet is up
+    .onChange(of: NetworkInvitationRouter.main.pendingInput) { _, pending in
+      if !pending.isEmpty, link == nil { link = NetworkInvitationLink.parse(NetworkInvitationRouter.main.consume()).link }
     }
   }
 
@@ -49,7 +57,7 @@ struct BrowseOwnInternetSheet: View {
 #else
       FormCard {
         FormRow("Invitation", help: "The link the other device shows under Can’t scan?", systemImage: "link", hue: .indigo, error: error.map { "\($0)" },
-                field: TextField("hub://join/…", text: $input).kitFont(.mono).kitTextContent(.url).onSubmit { accept(input) })
+                field: TextField("hub://browse/…", text: $input).kitFont(.mono).kitTextContent(.url).onSubmit { accept(input) })
       }
 #endif
       if let error, scanning {
@@ -108,9 +116,9 @@ struct BrowseOwnInternetSheet: View {
   private func accept(_ text: String) {
     let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
     do {
-      _ = try NetworkInvitationParser.decode(text)
+      _ = try NetworkInvitationLink.decode(text)
       scanning = false
-      link = text
+      link = NetworkInvitationLink.parse(text).link
     } catch let invitation as NetworkInvitationError {
       error = invitation.message
     } catch {

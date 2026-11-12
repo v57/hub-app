@@ -41,6 +41,13 @@ struct AddDeviceSheet: View {
 #endif
   }
 
+  /// What the code and Copy Link carry: in Use This Mac's Internet, a browse link, so the phone opens it in Browse
+  /// Through My Own Internet and switches to this Mac's internet (H-035)
+  private var shown: String? {
+    guard let link else { return nil }
+    return purpose == .internet ? NetworkInvitationLink.browse(link) : link
+  }
+
   /// Whether this device is an owner of the hub: its invitations admit without approval
   private var isOwner: Bool { hub.require(permissions: "hub/device/approve") }
 
@@ -103,17 +110,17 @@ struct AddDeviceSheet: View {
           steps
         }
       }
-      if link != nil {
+      if let shown {
         HStack(spacing: 4) {
           Text("Can’t scan?")
 #if !os(tvOS)
-          if let link, let url = URL(string: link) {
+          if let url = URL(string: shown) {
             ShareLink(item: url) { Text("Send a link instead") }.buttonStyle(.plain).foregroundStyle(.kitLink)
             Text("·")
           }
 #endif
           Button(copied ? "Copied" : "Copy Link") {
-            if let link { KitPasteboard.copy(link) }
+            KitPasteboard.copy(shown)
             copied = true
           }
           .buttonStyle(.plain).foregroundStyle(.kitLink)
@@ -129,13 +136,14 @@ struct AddDeviceSheet: View {
       Button("Done") { dismiss() }.buttonStyle(.kitPrimary).keyboardShortcut(.defaultAction)
     }
     .task(id: attempt) { await create() }
+    .onChange(of: purpose) { copied = false }
   }
 
   @ViewBuilder
   private var code: some View {
     Group {
-      if let link {
-        KitQRCode(link, size: 168)
+      if let shown {
+        KitQRCode(shown, size: 168)
       } else if let error {
         VStack(spacing: 8) {
           Text(error).kitFont(.caption).foregroundStyle(Hue.red.text).multilineTextAlignment(.center)
@@ -154,7 +162,8 @@ struct AddDeviceSheet: View {
   private var steps: some View {
     VStack(alignment: .leading, spacing: 14) {
       if purpose == .internet {
-        // The invitation doesn't say what it's for yet, so the phone is told where to scan it
+        // The code and the link say what they're for (hub://browse/…): opened on the phone, the link goes to Browse
+        // Through My Own Internet too
         NumberedStep(1, String(localized: "Install Hub on your phone"))
         NumberedStep(2, String(localized: "Open it and choose Browse Through My Own Internet"), String(localized: "Then Scan Its Code, and point it here."))
         NumberedStep(3, String(localized: "It browses through \(facts.thisName)"), String(localized: "Joining and the switch to this Mac’s internet happen together."))

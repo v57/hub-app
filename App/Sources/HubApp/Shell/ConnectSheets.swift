@@ -34,11 +34,13 @@ struct ConnectSheet: View {
     let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !text.isEmpty else { return .empty }
     do {
-      _ = try NetworkInvitationParser.decode(text)
+      _ = try NetworkInvitationLink.decode(text)
       return .invitation
     } catch let error as NetworkInvitationError {
-      // A hub://join link, or a code that decoded far enough to be one (an address never has its key and signature)
-      if text.hasPrefix(NetworkInvitationParser.urlPrefix) || [.expired, .invalidTime, .invalidSignature].contains(error.code) {
+      // A hub://join or hub://browse link, or a code that decoded far enough to be one (an address never has its key
+      // and signature)
+      if text.hasPrefix(NetworkInvitationParser.urlPrefix) || text.hasPrefix(NetworkInvitationLink.browsePrefix)
+        || [.expired, .invalidTime, .invalidSignature].contains(error.code) {
         return .badInvitation(error.message)
       }
     } catch {}
@@ -56,7 +58,9 @@ struct ConnectSheet: View {
 
   var body: some View {
     if let joinLink {
-      JoinNetworkSheet(link: joinLink).id(joinLink)
+      // A browse link (Use This Mac's Internet) joins and switches to that device's internet
+      let invitation = NetworkInvitationLink.parse(joinLink)
+      JoinNetworkSheet(link: invitation.link, useInternet: invitation.browse).id(joinLink)
     } else {
       form
     }
@@ -160,14 +164,14 @@ struct ConnectSheet: View {
       code = PairingCode.format(link.code)
       return true
     }
-    guard (try? NetworkInvitationParser.decode(text)) != nil else { return false }
+    guard (try? NetworkInvitationLink.decode(text)) != nil else { return false }
     if input != text { input = text }
     return true
   }
 
   /// A scanned code: an invitation goes straight to what joining means
   private func scanned(_ text: String) -> Bool {
-    if (try? NetworkInvitationParser.decode(text)) != nil {
+    if (try? NetworkInvitationLink.decode(text)) != nil {
       joinLink = text
       return true
     }
