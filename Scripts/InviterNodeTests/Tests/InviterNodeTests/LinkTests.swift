@@ -445,6 +445,107 @@ final class LinkTests: XCTestCase {
     XCTAssertTrue(lines.value.contains { $0.contains("link link-1 to \(machine.serviceKey.suffix(8)) dropped: no answer") })
   }
 
+  /// H-031: an iPhone's tunnel restarts on the Mac's LAN. Its profile already points WireGuard at the Mac's LAN
+  /// address, so the handshake is done before the link is ready, and WireGuard won't make another for two minutes.
+  /// The link comes up where that session runs, without trying the Mac's public mapping (no hairpin on a home router,
+  /// and iOS doesn't follow the Mac's packets back), which used to flap the path for a minute and then keep the mapping.
+  func testARestartedMemberKeepsTheLANPathItReachedBeforeTheLink() async throws {
+    let hub = Curve25519.Signing.PrivateKey()
+    let member = LinkDevice(port: port, trusting: hub, name: "member")
+    let machine = LinkDevice(port: port, trusting: hub, name: "machine")
+    let wire = FakeWire(endpoint: "192.168.1.6:51820", handshake: Date().addingTimeInterval(-2), follows: false)
+    let manager = wire.manager(ownKey: member.serviceKey, hub: hub, candidate: "192.168.1.5:60000") { _ in
+      .init(linkId: "link-1", probeToken: "token", peerKey: machine.serviceKey)
+    }
+    await manager.presenceChanged(true)
+    await manager.update(grants: [signedGrant(hub: hub, member: member, machine: machine)], devicePorts: everyPort)
+    await manager.handle(ready("link-1", endpoints: ["192.168.1.6:51820"], observed: "185.117.120.25:12230"))
+    try await wire.waitLog("up with \(machine.serviceKey.suffix(8)) at 192.168.1.6:51820, reached before the link")
+    XCTAssertEqual(wire.endpointsApplied(for: machine.wireGuardKey), ["192.168.1.6:51820"], "the public mapping is never tried")
+    XCTAssertFalse(wire.logged("found no path"))
+    let ups = await manager.linkUps
+    XCTAssertEqual(ups, 1)
+    // The live link isn't opened again
+    await manager.tick()
+    XCTAssertEqual(wire.count("opened to"), 1)
+  }
+
+  /// The Mac's side of H-031: the restarted iPhone's handshake reached the Mac before its link did, and WireGuard (on a
+  /// Mac it follows the packets) already sends to the iPhone's LAN address, the candidate the iPhone offers
+  func testTheMachineKeepsTheAddressARestartedMemberCameFrom() async throws {
+    let hub = Curve25519.Signing.PrivateKey()
+    let member = LinkDevice(port: port, trusting: hub, name: "member")
+    let machine = LinkDevice(port: port, trusting: hub, name: "machine")
+    let wire = FakeWire(endpoint: "192.168.1.5:60000", handshake: Date().addingTimeInterval(-3), follows: true)
+    let manager = wire.manager(ownKey: machine.serviceKey, hub: hub, candidate: "192.168.1.6:51820") { _ in
+      throw CoordinatorError.timeout
+    }
+    await manager.presenceChanged(true)
+    var incoming = CoordinatorClient.Envelope(majorVersion: 1, minorVersion: 0, type: "link.incoming")
+    incoming.linkId = "link-1"
+    incoming.grant = signedGrant(hub: hub, member: member, machine: machine)
+    incoming.probeToken = "token"
+    incoming.peerKey = member.serviceKey
+    await manager.handle(incoming)
+    await manager.handle(ready("link-1", endpoints: ["192.168.1.5:60000"], observed: "185.117.120.25:4500"))
+    try await wire.waitLog("up with \(member.serviceKey.suffix(8)) at 192.168.1.5:60000, reached before the link")
+    XCTAssertEqual(wire.endpointsApplied(for: member.wireGuardKey), ["192.168.1.5:60000"])
+  }
+
+  /// The iPad's profile names a port the Mac no longer listens on, so nothing reached the Mac before the link: the link
+  /// tries the Mac's endpoints and comes up at the first that answers
+  func testAMemberWhoseProfileEndpointIsStalePunches() async throws {
+    let hub = Curve25519.Signing.PrivateKey()
+    let member = LinkDevice(port: port, trusting: hub, name: "member")
+    let machine = LinkDevice(port: port, trusting: hub, name: "machine")
+    // An old session at the stale port still looks live: it isn't an endpoint the Mac offers now
+    let wire = FakeWire(endpoint: "192.168.1.6:54055", handshake: Date().addingTimeInterval(-100), follows: false)
+    wire.answers = "192.168.1.6:51820"
+    let manager = wire.manager(ownKey: member.serviceKey, hub: hub, candidate: "192.168.1.5:60000") { _ in
+      .init(linkId: "link-1", probeToken: "token", peerKey: machine.serviceKey)
+    }
+    await manager.presenceChanged(true)
+    await manager.update(grants: [signedGrant(hub: hub, member: member, machine: machine)], devicePorts: everyPort)
+    await manager.handle(ready("link-1", endpoints: ["192.168.1.6:51820"], observed: "185.117.120.25:12230"))
+    try await wire.waitLog("link link-1 up with \(machine.serviceKey.suffix(8)) at 192.168.1.6:51820")
+    XCTAssertFalse(wire.logged("reached before the link"))
+  }
+
+  /// Another link to the same device (the iPhone's share link to the iPad, opened by both at once) reached it while this
+  /// one waited for `punchAt`: that handshake counts, rather than a minute of trials that flip the endpoint to the
+  /// iPad's public mapping and back
+  func testAHandshakeWhileWaitingToPunchCounts() async throws {
+    let hub = Curve25519.Signing.PrivateKey()
+    let member = LinkDevice(port: port, trusting: hub, name: "member")
+    let machine = LinkDevice(port: port, trusting: hub, name: "machine")
+    let wire = FakeWire(endpoint: "", handshake: nil, follows: false)
+    let manager = wire.manager(ownKey: member.serviceKey, hub: hub, candidate: "192.168.1.5:60000") { _ in
+      .init(linkId: "link-1", probeToken: "token", peerKey: machine.serviceKey)
+    }
+    await manager.presenceChanged(true)
+    await manager.update(grants: [signedGrant(hub: hub, member: member, machine: machine)], devicePorts: everyPort)
+    var envelope = ready("link-1", endpoints: ["192.168.1.6:51820"], observed: "185.117.120.25:12230")
+    envelope.punchAt = ISO8601DateFormatter().string(from: Date().addingTimeInterval(2))
+    await manager.handle(envelope)
+    try await Task.sleep(nanoseconds: 300_000_000)
+    wire.reach("192.168.1.6:51820")
+    try await wire.waitLog("up with \(machine.serviceKey.suffix(8)) at 192.168.1.6:51820, reached before the link")
+    XCTAssertEqual(wire.endpointsApplied(for: machine.wireGuardKey), ["192.168.1.6:51820"])
+  }
+
+  private func ready(_ linkId: String, endpoints: [String], observed: String) -> CoordinatorClient.Envelope {
+    func endpoint(_ value: String) -> LinkEndpoint {
+      let parts = value.split(separator: ":")
+      return LinkEndpoint(address: String(parts[0]), port: UInt16(parts[1])!)
+    }
+    var envelope = CoordinatorClient.Envelope(majorVersion: 1, minorVersion: 0, type: "link.ready")
+    envelope.linkId = linkId
+    envelope.endpoints = endpoints.map(endpoint)
+    let mapping = endpoint(observed)
+    envelope.observedEndpoint = .init(version: 1, key: "", transport: "udp", address: mapping.address, port: mapping.port)
+    return envelope
+  }
+
   private func signedGrant(
     hub: Curve25519.Signing.PrivateKey, purpose: String = "hub", member: LinkDevice, machine: LinkDevice,
     ports: [PeerLinkGrant.Port] = [.init(protocol: "tcp", port: 1997)]
@@ -599,6 +700,87 @@ final class LinkDevice: @unchecked Sendable {
         return peer
       }
       guard Date() < deadline else { throw CoordinatorError.timeout }
+      try await Task.sleep(nanoseconds: 50_000_000)
+    }
+  }
+}
+
+/// WireGuard as one device's link manager sees it, without a node: the session it already has with the other side
+/// (`endpoint`, `handshake`), whether it follows the other side's packets (a Mac) or keeps the endpoint it's given (iOS),
+/// and where a handshake completes once WireGuard is pointed there (`answers`)
+final class FakeWire: @unchecked Sendable {
+  private let lock = NSLock()
+  private var current: String
+  private var last: Date?
+  private let follows: Bool
+  private var applied: [String: [String]] = [:]
+  private var lines: [String] = []
+  private var answer: String?
+
+  init(endpoint: String, handshake: Date?, follows: Bool) {
+    current = endpoint
+    last = handshake
+    self.follows = follows
+  }
+
+  var answers: String? {
+    get { lock.withLock { answer } }
+    set { lock.withLock { answer = newValue } }
+  }
+
+  func manager(
+    ownKey: String, hub: Curve25519.Signing.PrivateKey, candidate: String,
+    open: @escaping @Sendable (PeerLinkGrant) async throws -> CoordinatorClient.OpenedLink
+  ) -> LinkManager {
+    let parts = candidate.split(separator: ":")
+    let own = LinkEndpoint(address: String(parts[0]), port: UInt16(parts[1])!)
+    return LinkManager(ownKey: ownKey, trustedHubKey: spki(hub.publicKey), devicePorts: everyPort, dependencies: .init(
+      open: open,
+      send: { _, _, _ in }, probe: { _ in },
+      apply: { [weak self] peers in self?.apply(peers) },
+      lastHandshake: { [weak self] _ in self?.lock.withLock { self?.last } },
+      liveEndpoint: { [weak self] _ in self?.lock.withLock { self?.current } },
+      candidates: { [own] },
+      log: { [weak self] line in self?.lock.withLock { self?.lines.append(line) } }
+    ))
+  }
+
+  private func apply(_ peers: [LinkManager.Peer]) {
+    lock.withLock {
+      for peer in peers {
+        guard let endpoint = peer.endpoint else { continue }
+        if applied[peer.wireGuardKey]?.last != endpoint { applied[peer.wireGuardKey, default: []].append(endpoint) }
+        if !follows { current = endpoint }
+        if endpoint == answer {
+          current = endpoint
+          last = Date()
+        }
+      }
+    }
+  }
+
+  /// A handshake at `endpoint` just now, as another link to the same device would make
+  func reach(_ endpoint: String) {
+    lock.withLock {
+      current = endpoint
+      last = Date()
+    }
+  }
+
+  /// Each endpoint the manager pointed WireGuard at for this key, in order
+  func endpointsApplied(for wireGuardKey: String) -> [String] { lock.withLock { applied[wireGuardKey] ?? [] } }
+
+  func logged(_ text: String) -> Bool { lock.withLock { lines.contains { $0.contains(text) } } }
+
+  func count(_ text: String) -> Int { lock.withLock { lines.filter { $0.contains(text) }.count } }
+
+  func waitLog(_ text: String, timeout: TimeInterval = 10) async throws {
+    let deadline = Date().addingTimeInterval(timeout)
+    while !logged(text) {
+      guard Date() < deadline else {
+        XCTFail("no \"\(text)\" in \(lock.withLock { lines })")
+        throw CoordinatorError.timeout
+      }
       try await Task.sleep(nanoseconds: 50_000_000)
     }
   }

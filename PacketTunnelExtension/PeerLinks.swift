@@ -239,6 +239,8 @@ actor LinkManager {
   /// The grants whose link came up: a new grant (other ports) opens the link again even while the path is live, since
   /// the other side learns ports only from the grant a link brings
   private var delivered: Set<String> = []
+  /// Punches in their trials, by the other device's key
+  private var trying: [String: Int] = [:]
   private var present = false
   private(set) var linkUps = 0
 
@@ -433,21 +435,45 @@ actor LinkManager {
     let endpoints = Self.reachableFirst(offered, own: await dependencies.candidates())
     guard let attempt = attempts[linkId], !endpoints.isEmpty else { return }
     let link = attempt.link
-    // A link opened again for a new grant over a path that still works keeps its endpoint. The other side must
-    // still be there: after a network change its old mapping can look live for a while, and punching is needed
-    if let current = peers[link.other.key]?.endpoint, endpoints.contains(where: { $0.endpoint == current }),
+    let wait = punchAt.timeIntervalSince(dependencies.now())
+    if wait > 0 { try? await Task.sleep(nanoseconds: UInt64(min(wait, 5) * 1_000_000_000)) }
+    guard !Task.isCancelled else { return }
+    // A path that already works keeps its endpoint: a link opened again for a new grant, or a tunnel that just started
+    // and reached the other side before the link was ready (at the profile's endpoint for the hub's machine, or where
+    // the other side's handshake came from). WireGuard renews a session only every two minutes, so no trial would see a
+    // handshake newer than the punch, and trying the other endpoints would only take the path away: the punch would
+    // find nothing, and the next link would keep whichever endpoint the trials left (H-031). WireGuard's own endpoint
+    // counts first, since it follows the other side's packets. The other side must still be there: after a network
+    // change its old mapping can look live for a while, but it isn't among the endpoints offered now, and punching is
+    // needed. Checked once the wait is over, so a handshake another link to the same device made meanwhile counts too:
+    // anything older than the punch's start is seen here, anything newer by the trials. Not while another link's trials
+    // to the same device are under way: the endpoint is then just the one being tried
+    let recorded = peers[link.other.key]?.endpoint
+    let live = await dependencies.liveEndpoint(link.other.wireGuardKey)
+    if trying[link.other.key, default: 0] == 0,
+      let current = [live, recorded].compactMap({ $0 }).first(where: { path in endpoints.contains { $0.endpoint == path } }),
       await isLive(link)
     {
       delivered.insert(link.grant.grantId)
+      if recorded != current, var peer = peers[link.other.key] {
+        peer.endpoint = current
+        peers[link.other.key] = peer
+        await apply()
+      }
       let reached = await pinLiveEndpoint(of: link, tried: current)
-      dependencies.log("link \(linkId.prefix(8)) renewed with \(link.other.key.suffix(8)) at \(reached)")
+      if recorded == nil {
+        linkUps += 1
+        dependencies.log("link \(linkId.prefix(8)) up with \(link.other.key.suffix(8)) at \(reached), reached before the link")
+      } else {
+        dependencies.log("link \(linkId.prefix(8)) renewed with \(link.other.key.suffix(8)) at \(reached)")
+      }
       finish(linkId)
       return
     }
-    let wait = punchAt.timeIntervalSince(dependencies.now())
-    if wait > 0 { try? await Task.sleep(nanoseconds: UInt64(min(wait, 5) * 1_000_000_000)) }
     let started = dependencies.now()
     let deadline = started.addingTimeInterval(punchWindow)
+    trying[link.other.key, default: 0] += 1
+    defer { trying[link.other.key, default: 1] -= 1 }
     var index = 0
     while dependencies.now() < deadline, !Task.isCancelled {
       let endpoint = endpoints[index % endpoints.count]
@@ -471,6 +497,9 @@ actor LinkManager {
         try? await Task.sleep(nanoseconds: 250_000_000)
       }
     }
+    // A later `link.ready` for the same link (the node can send more endpoints) cancelled this punch and started
+    // another: that one owns the attempt now
+    guard !Task.isCancelled else { return }
     dependencies.log("link \(linkId.prefix(8)) to \(link.other.key.suffix(8)) found no path through \(endpoints.map(\.endpoint))")
     finish(linkId)
   }
