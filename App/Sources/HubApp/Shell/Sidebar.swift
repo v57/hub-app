@@ -54,17 +54,17 @@ struct HubSidebar: View {
       ViewThatFits(in: .horizontal) {
         HStack(spacing: 6) {
           StatusDot(hue: online > 0 ? .green : .gray)
-          Text("\(online) of \(total) online")
+          Text("\(online.formatted()) of \(total) online")
         }
         HStack(spacing: 6) {
           StatusDot(hue: online > 0 ? .green : .gray)
-          Text("\(online)/\(total) online")
+          Text("\(online.formatted())/\(total) online")
         }
         HStack(spacing: 4) {
           StatusDot(hue: online > 0 ? .green : .gray)
           Text("\(online)/\(total)")
         }
-        .accessibilityLabel(Text("\(online) of \(total) online"))
+        .accessibilityLabel(Text("\(online.formatted()) of \(total) online"))
       }
     }
     .navigationTitle("Hub")

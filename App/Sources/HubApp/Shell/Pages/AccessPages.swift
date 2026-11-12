@@ -430,7 +430,7 @@ struct LockdownPage: View {
       guard isOn != whitelist.enabled else { return }
       Task { try? await hub.lockdown(SetLockdown(enabled: isOn)) }
     }
-    .pageToolbar(String(localized: "Lockdown"), meta: PageMeta.parts(hub, [whitelist.enabled ? String(localized: "On") : String(localized: "Off"), String(localized: "\(trusted.count) of \(keyed.count) trusted")]), systemImage: HubPage.lockdown.systemImage, hue: .blue) {
+    .pageToolbar(String(localized: "Lockdown"), meta: PageMeta.parts(hub, [whitelist.enabled ? String(localized: "On") : String(localized: "Off"), String(localized: "\(trusted.count.formatted()) of \(keyed.count) trusted")]), systemImage: HubPage.lockdown.systemImage, hue: .blue) {
       if idiom != .phone {
         KitSearchField(text: $search, prompt: "Name or key").frame(width: 180)
       }

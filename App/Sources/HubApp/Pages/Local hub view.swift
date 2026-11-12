@@ -215,7 +215,7 @@ struct LocalHubCard: View {
   var subtitle: String {
     if hub.isRunning {
       let count = hub.status.connections
-      return String(localized: "Hub on port \(hub.status.port ?? hub.port) · \(count) connected")
+      return String(localized: "Hub on port \(hub.status.port ?? hub.port)") + " · " + String(localized: "\(count) connected")
     }
     if hub.isStarting { return String(localized: "Starting the hub…") }
     if hub.isEnabled, hub.error != nil { return String(localized: "The hub couldn't start") }

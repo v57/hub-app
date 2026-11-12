@@ -334,7 +334,7 @@ private struct CamerasCard: View {
 
   var body: some View {
     let on = setups.filter(\.isOn).count
-    KitSection("Cameras", meta: [String(localized: "\(on) of \(setups.count) on"), String(localized: "each is its own camera")], systemImage: "camera", hue: .indigo) {
+    KitSection("Cameras", meta: [String(localized: "\(on.formatted()) of \(setups.count) on"), String(localized: "each is its own camera")], systemImage: "camera", hue: .indigo) {
       ForEach(setups) { setup in
         let device = camera.devices.first { $0.id == setup.device }
         let reason = device.flatMap { camera.reasonCantTurnOn($0) }
@@ -399,7 +399,7 @@ private struct VideoCard: View {
             .kitField().frame(maxWidth: 200)
             .onSubmit { rename() }
         }
-        FormRow(String(localized: "Resolution"), help: top.map { together > 1 ? String(localized: "Up to \($0.height)p with \(together) cameras on") : String(localized: "Up to \($0.height)p on this camera") }, systemImage: "rectangle.expand.vertical") {
+        FormRow(String(localized: "Resolution"), help: top.map { together > 1 ? String(localized: "Up to \(String($0.height))p with \(together) cameras on") : String(localized: "Up to \($0.height)p on this camera") }, systemImage: "rectangle.expand.vertical") {
           KitPicker("Resolution", selection: binding(\.video.height), segments: CameraVideo.heights.map { height in
             let reason = sizeReason(height, caps: caps, alone: alone)
             return KitSegment(reason.map { "\(height)p — \($0)" } ?? "\(height)p", value: height, isEnabled: reason == nil)
@@ -793,7 +793,9 @@ private struct ClipsCard: View {
     let base = storage.target == .hub
       ? String(localized: "Each clip goes to the hub’s storage when it ends; this \(KitDevice.nameInSentence) keeps a thumbnail.")
       : String(localized: "Clips stay on this \(KitDevice.nameInSentence).")
-    return String(localized: "\(base) A clip starts \(Int(storage.preRoll)) seconds before the motion and ends \(Int(storage.postRoll)) seconds after it.")
+    let before = String(localized: "\(Int(storage.preRoll)) seconds")
+    let after = String(localized: "\(Int(storage.postRoll)) seconds")
+    return String(localized: "\(base) A clip starts \(before) before the motion and ends \(after) after it.")
   }
 }
 

@@ -76,14 +76,14 @@ struct OverviewPage: View {
     return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: KitMetrics.gutter), count: width < 640 ? 2 : 4), spacing: KitMetrics.gutter) {
       KitStatCard(
         "APIs", value: "\(status.services.count)", systemImage: "hexagon", hue: .blue,
-        detail: waiting > 0 ? "\(online) online · \(waiting) waiting" : "\(online) online"
+        detail: waiting > 0 ? "\(online) online · \(String(localized: "\(waiting) waiting"))" : "\(online) online"
       ) { Navigator.main.open(hub, .services) }
       if hub.canOpen(.devices) {
         KitStatCard(
           "Devices", value: "\(devices.count)", systemImage: "laptopcomputer", hue: .gray,
           detail: facts.pendingDevices.isEmpty
             ? "\(devices.filter(\.online).count) online"
-            : "\(devices.filter(\.online).count) online · \(facts.pendingDevices.count) waiting"
+            : "\(devices.filter(\.online).count) online · \(String(localized: "\(facts.pendingDevices.count) waiting"))"
         ) { Navigator.main.open(hub, .devices) }
       }
       KitStatCard(
