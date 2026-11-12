@@ -95,7 +95,10 @@ final class ShareNetworkAppAgentCoordinator {
   }
 
   init(hub: Hub) {
-    agentServices = hub.service.group(enabled: false).hubNetworkAgentService(identity: hub.identity)
+    agentServices = hub.service.group(enabled: false).hubNetworkAgentService(identity: hub.identity, hold: { [weak hub] hold in
+      guard let hub else { throw CancellationError() }
+      let _: EmptyCodable = try await hub.client.send("hub/net/invitations/hold", hold)
+    })
     runtime = Runtime(
       isConnected: { [weak hub] in hub?.isConnected == true },
       supports: { [weak hub] in hub?.api.contains($0) == true },

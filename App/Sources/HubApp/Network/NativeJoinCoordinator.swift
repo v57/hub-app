@@ -44,6 +44,10 @@ enum NativeJoinError: LocalizedError, Equatable {
   case staged(NativeJoinFailureStage, String)
   /// The hub refused the joiner's connection
   case refused(HubClient.Refusal)
+  /// A member invited this device and an owner denied it (H-033)
+  case denied
+  /// A member invited this device and no owner approved it while the invitation's bootstrap lasted
+  case approvalTimedOut
 
   var errorDescription: String? {
     switch self {
@@ -51,6 +55,10 @@ enum NativeJoinError: LocalizedError, Equatable {
       "This device was revoked by the hub, so it can't join it. (Or this device's clock is wrong.)"
     case .refused(let refusal):
       refusal.description
+    case .denied:
+      "An owner of this hub denied this device. It can ask again once an owner allows it under Devices."
+    case .approvalTimedOut:
+      "No owner approved this device in time. Ask an owner to approve it under Devices, then join with a new invitation."
     case .transactionConflict:
       "Another Hub Network join is already in progress."
     case .activeVPNConflict:
@@ -205,7 +213,9 @@ struct NativeJoinCoordinator {
         try await failIfRefused(client)
         let binding = try await classified(.bind, invitation: invitation, record: record) {
           do {
-            return try await performBind(client: client, record: record, admission: status.admission)
+            return try await bindOnceApproved(
+              client: client, record: record, admission: status.admission, transactionId: transactionId, report: report
+            )
           } catch let error as ChannelError where error.code == .refused {
             throw await refusal(of: client) ?? error
           }
@@ -406,6 +416,65 @@ struct NativeJoinCoordinator {
       registration.hubNetworkId,
       [ipv4, ipv6]
     )
+  }
+
+  /// Binds, and when the hub holds this device for an owner (a member's invitation: `approval_required`) shows the code
+  /// the owner compares, waits for the approval and binds again, for as long as the invitation's admission lasts
+  private static func bindOnceApproved(
+    client: HubClient,
+    record: NativeJoinRecord,
+    admission: DirectBootstrapResponse?,
+    transactionId: String,
+    report: @escaping Progress
+  ) async throws -> (hubKey: String, hubNetworkId: String, overlayAddresses: [String]) {
+    let expires = admission.flatMap { ISO8601DateFormatter.js.date(from: $0.expiresAt) }
+    let deadline = ContinuousClock.now + .seconds(max(30, (expires?.timeIntervalSinceNow ?? 600) - 15))
+    while true {
+      do {
+        return try await performBind(client: client, record: record, admission: admission)
+      } catch where networkErrorCode(error) == "denied" {
+        throw NativeJoinError.denied
+      } catch where networkErrorCode(error) == "approval_required" {
+        try await waitForApproval(client: client, transactionId: transactionId, until: deadline, report: report)
+        report(.init(transactionId: transactionId, state: .binding))
+      }
+    }
+  }
+
+  /// The code of a Hub Network error: hub-server and HubServer send it as the channel error's code
+  private static func networkErrorCode(_ error: Error) -> String? {
+    guard let error = error as? ChannelError else { return nil }
+    if case .string(let code) = error.code { return code }
+    if error.text.contains("an owner must approve") { return "approval_required" }
+    if error.text.contains("an owner denied") { return "denied" }
+    return nil
+  }
+
+  /// Asks `hub/device/request` on the joining connection every few seconds until an owner approved (or denied) the
+  /// device, showing the code to compare meanwhile
+  private static func waitForApproval(
+    client: HubClient,
+    transactionId: String,
+    until deadline: ContinuousClock.Instant,
+    report: @escaping Progress
+  ) async throws {
+    let deviceKey = client.device?.key.publicKey
+    while ContinuousClock.now < deadline {
+      // A channel call waits on through a connection that went away, so each read is bounded
+      let request = try? await bounded(.seconds(10), timedOut: { NativeJoinError.approvalTimedOut }) {
+        try await client.oneValue("hub/device/request", as: DeviceRequest.self)
+      }
+      switch request?.status {
+      case .approved: return
+      case .denied: throw NativeJoinError.denied
+      case .pending, .waiting:
+        let code = client.hubKey.flatMap { hubKey in deviceKey.flatMap { request?.safetyCode(hubKey: hubKey, deviceKey: $0) } }
+        report(.init(transactionId: transactionId, state: .awaitingApproval, approvalCode: code))
+      case nil: break
+      }
+      try await Task.sleep(for: .seconds(2))
+    }
+    throw NativeJoinError.approvalTimedOut
   }
 
   private static func classified<T>(

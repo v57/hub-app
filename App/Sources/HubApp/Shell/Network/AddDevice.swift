@@ -41,6 +41,9 @@ struct AddDeviceSheet: View {
 #endif
   }
 
+  /// Whether this device is an owner of the hub: its invitations admit without approval
+  private var isOwner: Bool { hub.require(permissions: "hub/device/approve") }
+
   /// The device that joined while the code was shown
   private var joined: NetDevice? {
     guard let known else { return nil }
@@ -171,8 +174,13 @@ struct AddDeviceSheet: View {
       } else {
         NumberedStep(1, String(localized: "Open Hub on the other device"), String(localized: "A Mac, iPhone or iPad. Install Hub first if it isn’t there."))
         NumberedStep(2, String(localized: "Choose Connect to a Hub, then Scan"), String(localized: "Point it at this code. On a Mac, paste the link into Address."))
-        // An invited device still waits for an owner (Hub decision 4, security audit M3).
-        NumberedStep(3, String(localized: "An owner approves it"), String(localized: "It waits under Devices with a code. Approve it once that code matches the one the device shows."))
+        // A device an owner invites joins at once; one a member invites waits for an owner (Hub decision 4, security
+        // audit M3, H-034), also when the hub's machine makes the invitation for the member
+        if isOwner {
+          NumberedStep(3, String(localized: "It joins right away"), String(localized: "Your invitation needs no approval. The device appears under Devices once it joins."))
+        } else {
+          NumberedStep(3, String(localized: "An owner approves it"), String(localized: "It waits under Devices with a code. An owner approves it once that code matches the one the device shows."))
+        }
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)

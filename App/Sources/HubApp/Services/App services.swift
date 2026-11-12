@@ -49,16 +49,46 @@ extension HubService.Group {
   enum HubNetworkInviteError: LocalizedError {
     case inviterOffline
     case nodeNotSet
+    case notHeld(String)
     var errorDescription: String? {
       switch self {
       case .inviterOffline: "This device is not registered with the Hub Network node yet."
       case .nodeNotSet: "This Hub has no Hub Network node. An owner has to set one before invitations work."
+      case .notHeld(let reason): "The hub couldn’t keep this invitation waiting for an owner’s approval, so it wasn’t made (\(reason)). The hub may need an update."
       }
     }
   }
 
+  /// `hub/net/invitations/hold`: whoever joins with the invitation of `replayId` waits for an owner
+  struct HubNetworkInvitationHold: Encodable, Sendable {
+    struct By: Encodable, Sendable {
+      let key: String?
+      let device: String?
+      let name: String?
+    }
+    let replayId: String
+    let expiresAt: String
+    let by: By
+  }
+
+  /// What `net/invite` holds for an invitation it made for `caller`: nothing for an owner, the invitation's replay id,
+  /// expiry and who asked for anyone else. An older hub sends no caller: that's held too, it's who the hub can't vouch for.
+  nonisolated static func invitationHold(code: String, caller: Caller?) throws -> HubNetworkInvitationHold? {
+    guard caller?.owner != true else { return nil }
+    let invitation = try NetworkInvitationParser.decode(code)
+    return HubNetworkInvitationHold(
+      replayId: invitation.replayId,
+      expiresAt: ISO8601DateFormatter.js.string(from: invitation.expiresAt),
+      by: .init(key: caller?.key, device: caller?.device?.id, name: caller?.device?.name)
+    )
+  }
+
+  /// `net/invite` on the hub's machine: an invitation signed with this machine's key, an owner's. One asked for by
+  /// someone who isn't an owner (a member's Add a Device) is held first (`hold`), so the device that joins with it still
+  /// waits for an owner's approval (security decisions 1.0, Hub 4; Hub app H-034). Without the hold it isn't handed out.
   func hubNetworkAgentService(
     identity: KeyChain = .main,
+    hold: @escaping @Sendable (HubNetworkInvitationHold) async throws -> Void,
     nodeEndpoint: @escaping @Sendable () -> String
       = { HubNetworkNodeEndpointStore.shared.current() },
     inviterOnline: @escaping @Sendable () async -> Bool = {
@@ -94,7 +124,15 @@ extension HubService.Group {
       ) ?? endpoint
       payload += "?e=" + escaped
       let signature = try identity.signature(for: Data(payload.utf8)).base64URLEncodedString()
-      return "\(payload)/\(signature)"
+      let code = "\(payload)/\(signature)"
+      if let invitationHold = try Self.invitationHold(code: code, caller: HubRequest.caller) {
+        do {
+          try await hold(invitationHold)
+        } catch {
+          throw HubNetworkInviteError.notHeld(error.localizedDescription)
+        }
+      }
+      return code
     }
   }
 #if canImport(AVFoundation)
