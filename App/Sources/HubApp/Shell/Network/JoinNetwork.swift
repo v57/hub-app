@@ -397,6 +397,14 @@ struct JoinFailure: Equatable {
       (title, detail, canRetry) = (String(localized: "This invitation expired"), String(localized: "Invitations last seven days. Ask someone in \(name) for a new one."), false)
     case NativeJoinError.activeVPNConflict:
       let other = Hubs.main.list.first(where: \.net.isJoined)?.settings.name
+      if let other, other == hub {
+        // The hub this invitation is for (H-036): not "another hub". A rejoin comes back as a new device for now
+        (title, detail, canRetry) = (
+          String(localized: "This \(device) is already on \(other)’s network"),
+          String(localized: "It needs no new invitation. To join again anyway, turn off \(other)’s network on this \(device) first: it comes back as a new device, and an owner gives it Access again."), true
+        )
+        break
+      }
       (title, detail, canRetry) = (
         other.map { String(localized: "This \(device) is on \($0)’s network") } ?? String(localized: "This \(device) is on another hub’s network"),
         String(localized: "A device can be on one hub’s network at a time. Turn off \(other.map { String(localized: "\($0)’s") } ?? String(localized: "that one")) first."), true
