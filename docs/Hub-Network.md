@@ -18,12 +18,15 @@ of the sidebar. The card’s title and its **Devices & Apps** row open the hub�
   iPad it’s listed in the system’s VPN settings as Hub.
 - Turn it off to leave. The VPN disconnects, and your other devices see this one as **Asleep**.
 
-The card’s status reads **Off**, **Connecting…**, **On · N devices**, or **On · internet via …** when you use another
-device’s internet. **Waiting for …** means the hub’s network isn’t running: when the Hub app on a Mac runs the hub, it’s
-on whenever Hub is open there, so open Hub on that Mac or wake it. Otherwise ask the hub’s owner to set up Hub Network
-on it.
+The card’s status reads **Off**, **Connecting…**, **On · N devices**, **On · internet via …** when you use another
+device’s internet, or **Reconnecting…** (see below). **Waiting for …** means the hub’s network isn’t running: when the
+Hub app runs the hub, it’s on while Hub is open on that device, so open Hub there, or wake that Mac. An iPhone or iPad
+pauses its hub soon after Hub leaves the screen. Otherwise ask the hub’s owner to set up Hub Network on it.
 
-Hub Network comes back on its own after this device or the hub’s machine restarts.
+Hub Network comes back on its own after this device or the hub’s machine restarts. If its VPN stops without you turning
+it off, for example after an update, Hub starts it again. While Hub restarts it, or when the network stops carrying
+anything to the hub, the card reads **Reconnecting…**. If it keeps stopping, the card says why and goes **Off**; turn it
+on again to try again.
 
 On iPhone, the network page’s bar has the same switch. On iPad and the Mac, the bar has **Add a Device** instead, and
 the page has **Turn On** and **Turn Off** buttons.
@@ -57,16 +60,24 @@ the address and UDP port it answers on, from its own Hub Network page or its rou
 1. On the network page, choose **Add a Device**. Hub shows a QR code and three steps.
 2. On the other device (a Mac, iPhone or iPad with Hub installed), choose **Connect to a Hub**. On iPhone and iPad,
    choose **Scan** and point it at the code. On a Mac, paste the link (see below) into **Address**.
-3. An owner approves the new device. It waits under **Devices** with a code; approve it once that code matches the one
-   the device shows. See [Approve a device](Devices-and-Access.md#approve-a-device).
+3. If you’re an owner, the step reads **It joins right away**: your invitation needs no approval, and the device
+   appears under **Devices** once it joins. If you’re a member, it reads **An owner approves it**: the device waits
+   under **Devices** with a code, and an owner approves it once that code matches the one the device shows. See
+   [Approve a device](Devices-and-Access.md#approve-a-device).
 
 Can’t scan? Choose **Send a link instead** or **Copy Link**, and open the link on the other device.
 
-The invitation works once, within seven days. Members of a hub can invite too, but an owner still approves each new
-device. When the device joins, the sheet says so, with **Add Another** and **Done**.
+The invitation works once, within seven days. Members of a hub can invite too, but an owner approves each device a
+member invites, also when the invitation comes from the hub’s machine. When the device joins, the sheet says so, with
+**Add Another** and **Done**.
+
+You can add a device from any device on the network. Away from the hub’s machine, Hub asks that machine for the
+invitation, so it has to be on.
 
 On the Mac, **Add a Device** also has **Use This Mac’s Internet**: the phone that scans the code joins and browses
-through this Mac right away. If this Mac doesn’t share its internet yet, choose **Share It**.
+through this Mac right away. Its code and link are a `hub://browse/…` link, so opened on the phone they go straight to
+[Browse Through My Own Internet](#browse-through-your-own-internet). If this Mac doesn’t share its internet yet, choose
+**Share It**.
 
 ## Join with an invitation
 
@@ -77,13 +88,21 @@ When you open an invitation, scan its code, or paste it into **Connect to a Hub*
 2. **One More Step**: your device asks to add a VPN. Choose **Continue**, then **Allow** when the system asks.
 3. Hub checks the invitation, sets up a secure connection and connects. **Joined …** shows **Show Devices**.
 
+If a member invited you, the device waits for an owner after it connects: Hub shows **An owner approves this device in
+Hub: code …**. Read that code out to an owner, who approves the device under **Devices** once the codes match. Hub keeps
+waiting until the invitation’s time to join runs out.
+
 If joining fails, Hub says why:
 
 - **This invitation was already used** or **This invitation expired**: ask someone in the hub for a new one.
 - **Couldn’t reach …**: the Mac that runs the hub may be asleep or offline. Try again once it’s on.
 - **You didn’t allow the VPN**: choose **Try Again** and **Allow**.
 - **This iPhone is on another hub’s network**: turn that one off first.
+- **This iPhone is already on …’s network**: it needs no new invitation. To join again anyway, turn off that hub’s
+  network on this device first. It comes back as a new device, and an owner gives it access again.
 - **… doesn’t accept this iPhone**: an owner removed it. If that’s a mistake, check this device’s date and time.
+- **Couldn’t join …**: **Details** says why, for example that an owner denied this device, or that no owner approved
+  it in time. A denied device can ask again once an owner allows it under **Devices**.
 
 ## Use another device’s internet
 
@@ -96,6 +115,12 @@ To use it:
   goes back to this device’s own internet.
 - Or on the network page, under **Internet**, choose **Choose…** next to **Use another device’s internet**. The
   **Use Internet Through** sheet lists this device’s own internet and every device that shares its internet.
+
+While Hub switches over, the device’s row reads **Connecting…** with **Cancel**, which goes back to this device’s own
+internet. If the hub doesn’t answer within 20 seconds, Hub gives up and says so.
+
+The device you used last stays on the card: **Last used · available**, **Last used · not sharing now** when it’s online
+but stopped sharing its internet, or **Last used · offline** when it’s asleep.
 
 **If … stops answering** decides what happens when that device goes away: **Use My Own** or **Wait**.
 
@@ -116,6 +141,9 @@ On iPhone and iPad, the welcome’s **Browse Through My Own Internet** sets this
 3. Choose **Join and Use**, then allow the VPN.
 4. **Using …’s Internet** shows **Stop** and **Done**.
 
+Or open the Mac’s link (under **Can’t scan?**) on the phone: Hub asks **Use …’s Internet?** and says which device
+invited it. Choose **Join and Use**. Pasted into **Connect to a Hub**, the link does the same.
+
 ### Use This Mac’s Internet Anywhere (Mac)
 
 On the Mac, the welcome’s **Use This Mac’s Internet Anywhere…** walks through four steps, about a minute in all:
@@ -135,12 +163,15 @@ Share an app that runs on this device, and your devices open it from anywhere.
 4. Under **Who can use it**, choose **Change** to pick who may use it.
 5. Choose **Share**.
 
-On another device, open this device on the network page and choose **Open** next to the app.
+On another device, open this device on the network page and choose **Open** next to the app. The app’s name goes with
+it, so your other devices list it by that name. Hub’s own shares show by what they are, for example **Storage** for
+this device’s [Storage](This-Device.md#storage).
 
 Each shared app has a menu (**…**, **Who Can Use …**):
 
 - **Everyone in …**, a group, or **Only Me**.
-- **Choose People…**: pick people one by one, then **Save**.
+- **Choose People…**: pick the other devices on the network, and the hub’s people where you may see them, one by one,
+  then **Save**. Someone the app already allows who isn’t on the network now is listed as **Not on the network now**.
 - **Disconnect Everyone Now**: devices that are still allowed can connect again.
 - **Stop Sharing**: takes the app off the network.
 
@@ -161,7 +192,9 @@ Ports](This-Device.md#open-ports).
 ## On Linux
 
 On Linux, Hub Network runs through the hub-net service. Turning the network on for a hub asks the hub’s machine for
-an invitation, and turning it off pauses the membership. The **Advanced** section shows the service’s state. Using
+an invitation, and turning it off pauses the membership. If you’re not an owner, the join waits for an owner to approve
+this computer, and Hub shows its safety code to compare. If you may approve devices on that hub, Hub approves it for
+you. The **Advanced** section shows the service’s state. Using
 another device’s internet isn’t available on Linux yet; a Linux computer can share its own.
 
 ## Cameras need Hub Network

@@ -33,14 +33,25 @@ When a device connects without a pairing code, it waits for an owner. The Device
 2. On your device, choose **Approve…**. Hub asks **Does … Show …?** with the code.
 3. If the codes match, choose **Codes Match, Approve**. If they don’t, choose **Cancel** and deny the device.
 
-On iPad and the Mac, **Deny** removes the request. On iPhone, leave the request or revoke the device later.
+On iPad and the Mac, **Deny** turns the request down: the device moves to **Denied** and can’t ask again until you
+allow it (an older hub only removes the request, so a device that stays connected asks again). On iPhone, leave the
+request or revoke the device later.
 
 If the banner is red and says **no safety code checks, so this may not be your device**, the hub gives no code that
 checks against its key. This happens with older hubs. Anyone who reaches the hub can ask to join under any name.
 Approve it only if you just asked from your own device and no one else could have: choose **Approve…**, then **Approve
 Without a Code**.
 
-A device that joined through a Hub Network invitation also waits here until an owner approves it.
+A device that a member invited to Hub Network also waits here until an owner approves it. A device an owner invited
+joins at once.
+
+### Denied devices
+
+**Denied** lists the devices whose request was turned down: they **can’t ask to join until you allow it**, and the
+device’s own page says an owner denied it.
+
+- **Allow to Ask Again**: the device asks again, with a new safety code to compare, and **Approve…** admits it.
+- **Revoke…**, then **Revoke**: it can never ask to join this hub again, and it leaves the list.
 
 ### Attach a device
 
@@ -86,7 +97,11 @@ Select a connection to see:
 
 - **Key**, with **Copy Key**.
 - **Group**: tap a group to put the connection in it, or **No group**. **Remove from …** takes it out.
-- **Lockdown**: **Can connect in Lockdown**.
+- **Lockdown**: **Can connect in Lockdown**. This app and the hub’s owners are always trusted, as on the Lockdown page:
+  their connections say **Always trusted**.
+
+A device’s own connection carries the name **Devices** gives it, for example **iPhone-2** when the hub made a second
+**iPhone** unique.
 
 A connection without a key can only call the APIs anyone may call.
 
@@ -95,7 +110,9 @@ A connection without a key can only call the APIs anyone may call.
 **Permissions** is a table of permissions (rows) and groups (columns). A group gives its connections the permissions
 you tick. Owners always have every permission.
 
-1. Tick or untick boxes. A section’s box shows when only some of its permissions are on.
+1. Tick or untick boxes. A section’s box shows when only some of its permissions are on. A permission’s row lists the
+   APIs it stands for, and ticking it gives all of them; for example **Manage Proxy Hubs** is `hub/proxy/add` and
+   `hub/proxy/remove`. Search finds a permission by its name or by an API’s path.
 2. Edited groups say **edited**, and the page counts unsaved changes.
 3. Open the group (select its header; on iPhone, tap it) and choose **Save**, or **Revert** to drop the changes.
 

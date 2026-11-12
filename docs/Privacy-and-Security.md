@@ -16,6 +16,8 @@ connect to a hub, run one, or turn on Hub Network.
   which devices are online, not what they send: devices then connect directly, encrypted.
 - **Another device’s internet.** When you choose **Use** for another device, all of this device’s traffic goes out
   through that device of yours. Sites see that device’s address.
+- **Storage.** With **Share Storage** on, this device keeps the hub’s files in a folder of Hub’s own and answers only
+  over Hub Network, for requests the hub signed. See [Storage](This-Device.md#storage).
 - **Shared Services.** When you turn on **Share with …**, the hub sends this device the work its callers ask for
   (images, videos, text), and this device sends back the results. The work is done on this device.
 - **The store’s list.** **Get More** loads the list of apps from GitHub (`raw.githubusercontent.com`), only after you
@@ -63,7 +65,9 @@ on its machine.
   approval question before you choose **Codes Match, Approve**.
 - When a hub gives no safety code to check, the request is red. Anyone who reaches the hub can ask to join under any
   name. Choose **Approve Without a Code** only if you just asked from your own device.
-- A device invited to Hub Network waits for an owner’s approval too.
+- A device a member invites to Hub Network waits for an owner’s approval too, also when the invitation comes from the
+  hub’s machine. A device an owner invites joins at once.
+- **Deny** keeps a device out: it can’t ask again until an owner allows it under **Devices**.
 
 ## What other devices may do
 

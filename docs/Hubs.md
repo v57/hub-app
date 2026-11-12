@@ -51,7 +51,8 @@ keeps your key until an owner removes it. Your other devices keep the hub.
 
 A hub’s pages tell you why it isn’t available:
 
-- **Connecting to …** shows the address while Hub connects.
+- **Connecting to …** shows the address while Hub connects, with **Remove…**. These pages keep their title bar, so
+  **Back** on iPhone stays.
 - **… Isn’t Reachable**: Hub keeps trying the address, and the pages show what they last loaded. Use **Copy Address**
   to check it, or **Remove…**.
 - **… Needs an Update**: the hub runs an old version that can’t prove who it is, so this device sends it nothing.

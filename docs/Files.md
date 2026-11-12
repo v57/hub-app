@@ -41,7 +41,7 @@ copies a link to the file from the hub’s storage.
 
 ## Upload files
 
-- Choose **Upload** in the bar and pick one or more files.
+- Choose **Upload** in the bar and pick one or more files. On the Mac you can pick folders too.
 - On iPad, you can also drag files from the Files app onto the list.
 
 An empty folder says **Empty Folder** and **Drop files here to upload them**.

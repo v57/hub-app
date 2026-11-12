@@ -51,7 +51,8 @@ Owners, and anyone with permission to change it, can pick how an API’s request
 - **Queued**: in order.
 - **Distributed**: the first free provider.
 
-The hub saves the choice. Without that permission the choice is shown but can’t be changed.
+The hub saves the choice. Without that permission the choice is shown but can’t be changed. A hub can keep its own
+choice, and the page then says so: Random can’t be used while the API’s providers limit how many calls each takes.
 
 ## Apps
 

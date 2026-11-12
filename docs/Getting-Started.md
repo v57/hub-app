@@ -62,7 +62,8 @@ If the hub doesn’t know this device yet, it waits for an owner to approve it. 
 
 An invitation puts this device on a hub’s private network, Hub Network. Paste the `hub://join/…` link or code into
 **Address**. The field turns into **Invitation**, and the button reads **Join**. Invitations work once, for seven
-days. See [Hub Network](Hub-Network.md#join-with-an-invitation).
+days. A `hub://browse/…` link from a Mac’s **Use This Mac’s Internet** joins and switches to that Mac’s internet. See
+[Hub Network](Hub-Network.md#join-with-an-invitation).
 
 ## Permissions the system asks for
 
