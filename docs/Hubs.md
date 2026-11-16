@@ -6,7 +6,7 @@ what Hub shows when a hub can’t be used.
 ## The sidebar
 
 - The **Hubs** card lists **All Hubs** and each hub, with a status dot or a count of requests waiting for you. Its
-  line says how many hubs are online.
+  line says how many hubs it shows and how they’re sorted. The sidebar’s bottom bar says how many are online.
 - **Search Hubs** filters the hubs by name. Offline hubs that are hidden show while you search.
 - **Sort Hubs** (⇅) orders them by **Recent** or **Name**, and **Show Offline Hubs** / **Hide Offline Hubs** shows or
   hides the ones you can’t reach. A **Show N More** row reveals hidden hubs. Hub keeps the order after a relaunch.
@@ -31,11 +31,13 @@ On iPhone, tap a hub to see its pages as cards: the hub’s own pages, **Access*
 - tiles for the pages you use most and for its apps, with **+N More** for the rest;
 - a **N requests** chip when a device or a service is waiting. Tap it to open **Devices** or **Requests**.
 
-On iPad and the Mac, the bar has a search field for hubs, apps and devices. **Connect** adds a hub.
+On iPad and the Mac, the bar has a search field that finds hubs by name and their pages and apps. **Connect** adds a
+hub.
 
 ## A hub’s menu
 
-Touch and hold a hub in the sidebar or on **All Hubs**, or use its **…** button. The menu has:
+Right-click a hub in the sidebar or on **All Hubs** (on iPhone and iPad, touch and hold it), or use its **…** button.
+The menu has:
 
 - **Open**
 - **Copy Address**

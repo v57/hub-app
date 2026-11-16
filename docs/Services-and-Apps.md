@@ -8,7 +8,8 @@ them. Services can also publish apps: pages, widgets and web apps that Hub draws
 
 Open a hub to see its **Overview**:
 
-- **APIs**, **Devices**, **Requests / s** (with a small chart) and **Connections**. Tap a card to open its page.
+- **APIs**, **Devices**, **Requests / s** (with a small chart) and **Connections**. Tap **APIs**, **Devices** or
+  **Connections** to open its page. **Devices** and **Connections** show only when you can open those pages.
 - A banner when something needs you: a device waiting to join, a service asking to post APIs, or a launcher update.
   - On iPhone, **Review** opens what waits first.
   - On iPad and the Mac, **Update** (on the Mac, **Update** and the app’s name) or **Update All** installs updates,
@@ -20,7 +21,7 @@ The bar has **Invite**, which opens the hub’s Hub Network page, and **More** (
 ## Services
 
 **Services** lists the hub’s APIs, grouped by the first part of their path. Filter them with **All**, **Online**,
-**Needs approval** or **Offline**.
+**Needs approval** or **Offline** (the last two show when there are any).
 
 - On iPad and the Mac, the list is a table you can sort and expand, with a search field for a path or a provider.
   The bottom bar says which address you’re connected to and the end of your key.

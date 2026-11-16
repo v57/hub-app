@@ -12,37 +12,38 @@ If a hub runs the launcher but has no storage yet, **Files** opens **Connect Sto
   3. Choose **Test**, then **Open Files**.
 - **Cloud**: steps for a cloud storage provider (Wasabi): create an account, a bucket and an access key on its
   website, then type the **Bucket Name**, **Server Region**, **Access Key** and **Secret Key**. Use **Start**,
-  **Continue** and **Back** to move through the steps, then **Create**, **Allow** and **Test** as for Local.
+  **Continue** and **Back** to move through the steps, then **Create**, **Allow Access** and **Test** as for Connect.
 - **Connect**: your own S3-compatible storage. Fill in **Endpoint**, **Region (optional)**, **Bucket name**,
   **Access Key** and **Secret Key**, then **Create**, **Allow Access** and **Test**. Later, **Update** changes them.
 
 ### Storage on your devices
 
 An iPhone, iPad or Mac running Hub can share part of its own storage with the hub: on that device, open **This
-Device** → **Storage** and turn on **Share Storage** (see [This Device](This-Device.md#storage)). It shows up here as a
-place named after the device, while Hub is open there and the device is on Hub Network. The first time, the hub’s owner
-allows the storage under **Requests** (it asks to post the `s3` APIs).
+iPhone** (or iPad, Mac) ▸ **Storage** and turn on **Share Storage** (see [This Device](This-Device.md#storage)). It
+shows up here as a place named after the device, while Hub is open there and the device is on Hub Network. The first
+time, the hub’s owner allows the storage under **Requests** (it asks to post the `s3` APIs).
 
 Installing storage needs permission to install apps on the hub. Without it, Hub says **You don't have permissions to
 install services**. If you can install but not allow, ask the hub’s owner to give access to the storage service.
 
-The keys you type for your own S3 storage go to the hub’s launcher, which keeps them as the service’s secrets.
+The keys you type for S3 storage go to the hub’s launcher. It keeps the secret key as the service’s secret, and the
+other values as its environment values.
 
 ## Browse files
 
 - When a hub has several storage places, pick one from the cards at the top.
 - Use the path at the top or **Back** to move up. Double-tap a folder to open it; on iPhone, tap it.
-- The table shows **Name**, **Kind**, **Size** and **Modified** (on iPhone, **Name** and **Size**). On iPad and the Mac
+- The table shows **Name**, **Size**, **Kind** and **Modified** (on iPhone, **Name** and **Size**). On iPad and the Mac
   you can search.
 
 Select a file to see its **Folder**, **Modified** and **Size**. On iPhone, tap the file and its details open on a page
-of their own. On an iPad in portrait with the sidebar shown, they float over the right side of the list. **Copy Link**
-copies a link to the file from the hub’s storage.
+of their own. When the page is narrow, for example on an iPad in portrait with the sidebar shown, they float over the
+right side of the list. **Copy Link** copies a temporary link to the file from the hub’s storage.
 
 ## Upload files
 
 - Choose **Upload** in the bar and pick one or more files. On the Mac you can pick folders too.
-- On iPad, you can also drag files from the Files app onto the list.
+- You can also drag files onto the list: from the Finder on the Mac, or from the Files app on iPad.
 
 An empty folder says **Empty Folder** and **Drop files here to upload them**.
 

@@ -12,9 +12,9 @@ Until you add a hub, Hub opens on **No Hub Yet**. It offers:
 - On iPhone and iPad, **Browse Through My Own Internet**: use your home Mac’s internet when you’re away. See
   [Hub Network](Hub-Network.md#browse-through-your-own-internet).
 - On the Mac, **Use This Mac’s Internet Anywhere…**: set this Mac up so your phone can browse through it. See
-  [Hub Network](Hub-Network.md#use-this-macs-internet-anywhere-mac).
+  [Hub Network](Hub-Network.md#use-this-macs-internet-anywhere).
 
-Nothing is contacted until you connect. Once you have hubs, the welcome lists them under **Your Hubs**.
+Nothing is contacted until you connect. Once you add a hub, **All Hubs** takes the welcome’s place.
 
 ## Get a hub
 
@@ -37,7 +37,7 @@ A new hub has no owner yet. The first device that enters its pairing code become
 4. Type the code in **Pairing code**. The button changes from **Connect** to **Pair**.
 5. Choose **Pair**. When pairing finishes, this device is an owner and the hub opens.
 
-A wrong or malformed code shows an error under the sheet, and the hub isn’t added.
+A wrong or malformed code shows an error under the fields, and the hub isn’t added.
 
 Faster ways to pair:
 
@@ -67,8 +67,8 @@ days. A `hub://browse/…` link from a Mac’s **Use This Mac’s Internet** joi
 
 ## Permissions the system asks for
 
-- **Local Network** (iPhone and iPad): the first time you connect to a hub on your network or run one, iOS asks.
-  Choose **Allow**, or Hub can’t reach hubs on your network.
+- **Local Network**: the first time you connect to a hub on your network or run one, the system asks. Choose
+  **Allow**, or Hub can’t reach hubs on your network.
 - **Camera**: the first time you scan a code or use this device as a security camera.
 - **VPN**: the first time you turn on Hub Network. See [Hub Network](Hub-Network.md).
 - **Notifications**: the first time you turn on a camera’s **Motion Alerts**.
@@ -82,7 +82,5 @@ days. A `hub://browse/…` link from a Mac’s **Use This Mac’s Internet** joi
 
 The pages are covered in [Hubs](Hubs.md) and the pages that follow it.
 
-## Keyboard
-
-Hub has no menu commands of its own. In a sheet, Return confirms and Escape cancels; this works on iPad with a
-keyboard too. On a camera’s page, ⌘[ goes back to Cameras.
+Hub’s few keyboard shortcuts are on [Keyboard Shortcuts](Keyboard-Shortcuts.md), and what you can change is on
+[Settings](Settings.md).

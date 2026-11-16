@@ -10,8 +10,8 @@ hub gives your device the permission for it; owners see them all.
 Filter with **All**, **Phones**, **Computers**, **Other** or **Offline**.
 
 - On iPad and the Mac, switch between a grid and a list, search by name or kind, and select a device to see its
-  details beside the list.
-- On iPhone, tap a device to open its details.
+  details beside the list. The filters show in the list.
+- On iPhone, a device’s card shows its battery and how many services it runs. Tap a device to open its details.
 
 **Invite** (or **Invite…** on an empty hub) opens the hub’s Hub Network page to add a device. See
 [Add a Device](Hub-Network.md#add-a-device).
@@ -34,8 +34,8 @@ When a device connects without a pairing code, it waits for an owner. The Device
 3. If the codes match, choose **Codes Match, Approve**. If they don’t, choose **Cancel** and deny the device.
 
 On iPad and the Mac, **Deny** turns the request down: the device moves to **Denied** and can’t ask again until you
-allow it (an older hub only removes the request, so a device that stays connected asks again). On iPhone, leave the
-request or revoke the device later.
+allow it (an older hub only removes the request, so a device that stays connected asks again). iPhone has no
+**Deny**: leave the request waiting, or deny it from iPad or the Mac.
 
 If the banner is red and says **no safety code checks, so this may not be your device**, the hub gives no code that
 checks against its key. This happens with older hubs. Anyone who reaches the hub can ask to join under any name.
@@ -67,8 +67,8 @@ this iPhone** (or iPad, Mac), with its safety code. An attached device starts wi
 
 An owner can give a device access to API paths directly, and link what attached devices get:
 
-- **Access**: choose **Grant** (+), type a path such as `s3/read` or `s3/*`, then **Grant**. Turn on **Passes down**
-  to pass it on to attached devices. **Remove** takes it back.
+- **Access**: choose **Grant** (+), type a path such as `s3/read` or `s3/*`, then **Grant**. When the device has
+  attached devices, turn on **Passes down** to pass it on to them. **Remove** takes it back.
 - **Link to parent**: **Gets linked grants** lets an attached device get what its parent passes down.
 - **Attached**: the devices attached below this one, each with a **Linked** switch.
 - **Detach from Parent**, then **Detach**: what the device got through the link goes. It stays approved with what you
@@ -89,9 +89,9 @@ With nothing waiting, the page says **Nothing Waiting**. A waiting request also 
 
 ## Connections
 
-**Connections** lists everything connected to the hub: a device or service by name, or **Unauthorized** for a
-connection without a key, with its group. On iPad and the Mac, switch between a grid and a list and search by name
-or key. **Lockdown** in the bar opens the Lockdown page.
+**Connections** lists everything connected to the hub under its group (or **No group**): a device or service by name
+(**Unauthorized** when it gives none), with the end of its key, or **no key**. On iPad and the Mac, switch between a
+grid and a list and search by name or key. **Lockdown** in the bar opens the Lockdown page.
 
 Select a connection to see:
 
@@ -112,9 +112,10 @@ you tick. Owners always have every permission.
 
 1. Tick or untick boxes. A section’s box shows when only some of its permissions are on. A permission’s row lists the
    APIs it stands for, and ticking it gives all of them; for example **Manage Proxy Hubs** is `hub/proxy/add` and
-   `hub/proxy/remove`. Search finds a permission by its name or by an API’s path.
+   `hub/proxy/remove`. On iPad and the Mac, search finds a permission by its name or by an API’s path.
 2. Edited groups say **edited**, and the page counts unsaved changes.
-3. Open the group (select its header; on iPhone, tap it) and choose **Save**, or **Revert** to drop the changes.
+3. Open the group (select its header; on iPhone, tap it, or choose **Review** on the unsaved-changes banner) and
+   choose **Save**, or **Revert** to drop the changes.
 
 Members get the new permissions when you save. To add a group, choose **New Group**, type a name, then **Create**.
 To delete one, open it, choose **Delete …**, then **Delete**; its members lose its permissions.
@@ -129,11 +130,11 @@ and the rest are refused until you trust them.
 - Turn **Lockdown** on or off at the top.
 - **Trusted** lists the devices that connect during Lockdown; **Not trusted** lists the rest. Use each device’s
   **Trusted** switch.
-- When turning Lockdown on would refuse connections, a banner says so with **Trust** or **Trust All**.
+- When turning Lockdown on would refuse connections, a banner says so with **Trust**, or **Trust All …** for several.
 - This device and the hub’s owners are always trusted: their rows say **You · always trusted** and **Owner · always
   trusted**.
 
 ## What owners control
 
-Services installed on a hub allow only its owners by default. Give a group the permissions for a service, or grant
-them to a device, before another device can use it.
+On a new hub, a service’s APIs allow only its owners, unless the service marks an API as open to anyone. Give a group
+the permissions for a service, or grant them to a device, before another device can use it.

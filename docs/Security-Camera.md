@@ -24,18 +24,19 @@ On the device that will be the camera:
 1. Open the hub, then **Cameras**.
 2. Choose **Camera** (iPhone) or **Add Camera ▸ Set Up…** (iPad and the Mac). The page **This iPhone as a Camera**
    opens.
-3. Turn on **Use as a Security Camera**. The first time, the system asks for the camera.
+3. Turn on **Use as a Security Camera**. The first time, the system asks for the camera. On iPhone and iPad, the
+   camera screen opens (see below).
 
 Only the hub’s devices on Hub Network that know the camera’s password can watch. A device can be a camera for one hub
 at a time: turning it on for another hub moves it.
 
 The page’s bar has **Turn On** and **Turn Off**.
 
-On iPhone and iPad, Hub has to stay open for the camera to work. **Camera Screen** in the bar turns the screen black to save
-power and heat. Touch it to see the status (network, battery, microphone off, temperature and where clips go), and
-choose **Preview**, **Back to Hub** or **Stop Camera**. The screen turns black again after 30 seconds.
+On iPhone and iPad, Hub has to stay open for the camera to work. **Camera Screen** in the bar turns the screen black
+to save power and heat. Touch it to see the status (network, battery, microphone off, temperature and where clips go),
+and choose **Preview**, **Back to Hub** or **Stop Camera**. The screen turns black again after 30 seconds.
 
-On the Mac, the camera stays on while the Mac is awake.
+On the Mac, the camera stays on while the Mac is awake, and keeps the Mac from going to sleep on its own.
 
 When Hub opens again on the camera’s device, the camera comes back on where it was.
 
@@ -52,15 +53,16 @@ them on means more heat and more data.
   plays everywhere, **HEVC** uses about 40% less data) and **Bitrate**. **Microphone** isn’t available yet: live view
   and clips are silent.
 - **Picture and Power**: a profile, **Best Picture**, **Balanced** or **Low Power**, or your own mix of
-  **Stabilization**, **Focus**, **Exposure** and **White Balance** (**Auto**, **Slow** or **Locked**). **Lock Now**
+  **Stabilization**, **Focus** (**Auto** or **Locked**), **Exposure** and **White Balance** (**Auto**, **Slow** or
+  **Locked**). **Lock Now**
   locks focus, exposure and colour where they are. The **Budget** shows the cost in heat and CPU.
 - **Expected Usage**: an estimate of the data for live view, clip uploads and clips kept, for this camera or **All
   Cameras**.
-- **Clips**: **Keep Clips On** this device or the hub’s storage, **Delete After** (1 to 90 days) and **Size Limit**
-  (the oldest clips go first). With the hub’s storage, each clip goes there when it ends, and the device keeps a
-  thumbnail. If the hub’s storage can’t be reached, a banner says **Clips stay on this iPhone**.
-- **Access**: the camera’s **Password**, with **Show**, **Copy** and **Change…**. Devices that watch it sign in again
-  with a new password. **Shared** shows how many devices are watching.
+- **Clips**: **Keep Clips On** this device or the hub’s storage (when the hub has storage), **Delete After** (1 to 90
+  days, or **Never**) and **Size Limit** (1 to 50 GB, or **None**; the oldest clips go first). With the hub’s
+  storage, each clip goes there when it ends, and the device keeps a thumbnail. If the hub’s storage can’t be reached, a banner says **Clips stay on this iPhone**.
+- **Access**: the camera’s **Password**, with **Show**, **Copy** and **Change…** (at least 6 characters). Devices that
+  watch it sign in again with a new password. **Shared** shows how many devices are watching.
 - **Apple Home** comes in a later version.
 
 On iPhone, **Picture and Power** and **Expected Usage** open as their own pages under **More**.
@@ -84,7 +86,9 @@ A camera’s page shows the live picture, the day’s motion events and a timeli
 - **Previous Event** and **Next Event**
 - **Save…** and **Share**
 - **Delete Clip**: deletes it from the camera and wherever its clips are kept, for everyone who watches it.
-- **Live** goes back to the live picture. **Settings** opens the camera’s settings on its own device.
+- **Live** goes back to the live picture.
+
+On the camera’s own device, the page has **Settings** instead, which opens its settings.
 
 **Motion Events** on the Cameras page lists **Today** or the **Week**. Tap one to see its clip.
 
@@ -92,11 +96,12 @@ On iPad with a keyboard and on the Mac, ⌘[ goes back to Cameras.
 
 ## Motion alerts
 
-On a camera’s page, choose **Motion Alerts**. The first time, the system asks to allow notifications. When the camera
-sees motion, this device shows **Motion at …** with a picture; tap it to open the camera’s page. Choose **Motion
-Alerts On** to stop.
+On the page of a camera on another device, choose **Motion Alerts**. The first time, the system asks to allow
+notifications. When the camera sees motion, this device shows **Motion at …** with a picture; tap it to open the
+camera’s page. Choose **Motion Alerts On** to stop.
 
 Alerts come straight from the camera over Hub Network, with no push service. On iPhone and iPad with iOS 18 or
-later, they also arrive while Hub is in the background, as long as Hub Network is on.
+later, they also arrive while Hub is in the background, as long as Hub Network is on. On the Mac, and before iOS 18,
+they arrive while Hub is open.
 
 If notifications are off for Hub, it says **Notifications are off for Hub. Turn them on in Settings, then try again.**

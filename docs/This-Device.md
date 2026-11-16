@@ -55,10 +55,10 @@ and chat with an on-device model. **Shared Services** shows a card per service:
   a device with Apple Intelligence.
 
 Each card has a **Share with …** switch for every hub you’re connected to. Turn it on, and the hub lists the service’s
-APIs with this device as a provider. Turn it off to stop. With no hubs, the card says **Connect to a hub to share
-it.**
+APIs with this device as a provider. Turn it off to stop. With no hub connected, the card says **Connect to a hub to
+share it.** On Linux, none of these can be shared yet.
 
-All of these run on this device; none needs the internet.
+All of these run on this device; none needs the internet, except that Translate downloads a language the first time.
 
 ### Try a service
 
@@ -116,40 +116,19 @@ iPhone or iPad on a charger. On the Mac, it runs while Hub is open.
 
 Farm keeps this device awake so it keeps serving your hubs.
 
-- Set the minimum battery level with the slider. Farm runs while charging or while the battery is above that level.
-  At 0 it runs until you turn it off. Below the level, Hub asks you to charge the device or change the level.
-- **Lower brightness**: lowers the screen to its minimum until Farm stops.
-- **Black overlay**: a black screen, which saves battery on OLED and XDR displays.
+- Set the minimum battery level with the slider (80% at first). Farm runs while charging or while the battery is above
+  that level. At 0 it runs until you turn it off; at 100%, only while charging. Below the level, Hub asks you to
+  charge the device or change the level.
+- **Lower brightness** (iPhone and iPad): lowers the screen to its minimum until Farm stops.
+- **Black overlay** (iPhone and iPad): a black screen, which saves battery on OLED and XDR displays.
 - **Show Activity**: shows requests as they happen.
 
-Choose **Start Farming**. Tap or click the black screen to stop.
+Choose **Start Farming**. Tap or click the screen to stop. On iPhone and iPad, Farm also stops when Hub leaves the
+screen.
 
 On a computer without a battery, the battery level doesn’t show.
 
 ## Settings
 
-**Settings** under this device holds:
-
-- **Use iCloud** (iPhone, iPad and the Mac): on or off for every v57 app on this device. Turning it off asks **Turn Off
-  iCloud?**: every v57 app on this device stops syncing through iCloud and iCloud Keychain. What’s already there stays,
-  and your other devices keep it.
-- A card for each hub with **Your Key**, **Device Key** and **Safety Code**. While an owner hasn’t approved this
-  device yet, the card says so: an owner compares this code and approves this device.
-- **Open Ports** (see below).
-- **Shared Keys**: **Your Key** and **Device Key** for older hubs and the hub this device runs.
-- **Reset Data** (see below).
-
-### Open Ports
-
-Over Hub Network, a hub can only open a port on this device that you share from it or list here, whatever the hub
-signs.
-
-- Type a port such as `tcp/8080` and choose **Allow**. Remove one with ✕.
-- On the Mac, **SSH (port 22)** lets your devices reach this Mac’s Remote Login over Hub Network. It’s off until you
-  turn it on.
-
-### Reset Data
-
-**Reset Data** removes your hubs, settings and caches, Hub Network membership and its VPN profile, and the hub this
-device runs with its data. Hub starts over at the welcome. Your keys stay, so hubs that know this device still know
-it. This can’t be undone.
+**Settings** under this device holds iCloud, this device’s keys, Open Ports and Reset Data. See
+[Settings](Settings.md).

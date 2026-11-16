@@ -7,7 +7,9 @@ connect to a hub, run one, or turn on Hub Network.
 
 - **Hubs you add.** Hub connects to the address you typed, signs in with this device’s key, and stays connected while
   the hub is in your list (it keeps trying when the hub is away). It tells each hub this device’s name, model, system,
-  CPU, memory, storage, battery and network type, which show on the hub’s **Devices** page. It sends the hub the
+  CPU, memory, storage, battery, temperature state and network type, which show on the hub’s **Devices** page. On the
+  Mac and Linux, while an SSH server runs (Remote Login on the Mac), it also tells the hub its SSH host keys and your
+  user name, so your devices can reach it over SSH. It sends the hub the
   calls you make: pages, files you upload, settings you change.
 - **A hub this device runs.** With **Run a Hub** on, this device accepts connections from your other devices on the
   local network, on its port (1997 by default).
@@ -43,7 +45,7 @@ Hub sends nothing else. It has no analytics.
 ## Keys
 
 - **Device key.** Each device has one key. The Hub app shares it with the other v57 apps on this device, so they are one
-  device on a hub. It’s kept in the system keychain. Hub keeps no passwords.
+  device on a hub. It’s kept in the system keychain. The only passwords Hub keeps are cameras’, also in the keychain.
 - **Your Key** for each hub, and **Shared Keys** for older hubs and the hub this device runs. **Settings** under this
   device shows them. **Copy My Key** copies the open hub’s key.
 - **On Linux**, the device key is a file in your home folder, and Hub’s other keys are in the system’s secret store.

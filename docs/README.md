@@ -7,13 +7,14 @@ internet, and turn an old iPhone, iPad or Mac into a security camera.
 
 ## Platforms
 
-- **Mac** (macOS 14 or later): every feature, plus the Mac-only parts of Hub Network: **Use This Mac’s Internet
-  Anywhere…** and **Keep this Mac awake while sharing**.
-- **iPhone and iPad** (iOS 17 or later): every feature, plus **Browse Through My Own Internet** and the camera
-  screen. A hub that an iPhone or iPad runs pauses when Hub leaves the screen.
+- **Mac** (macOS 14 or later): every feature but **Detect sensitive content**, plus the Mac-only parts of Hub
+  Network (**Use This Mac’s Internet Anywhere…** and **Keep this Mac awake while sharing**), a camera’s **When to
+  Record**, and SSH under **Open Ports**.
+- **iPhone and iPad** (iOS 17 or later): every feature, plus **Browse Through My Own Internet**, **Detect sensitive
+  content** and the camera screen. A hub that an iPhone or iPad runs pauses when Hub leaves the screen.
 - **Linux** (an early build): the app runs on a Linux desktop. Hub Network works through the hub-net service there.
-  Using another device’s internet, the security camera, the iCloud switch and the Apple Intelligence services aren’t
-  available on Linux.
+  Using another device’s internet, the security camera, This Device’s **Storage**, sharing **Shared Services**, the
+  iCloud switch and the Apple Intelligence services aren’t available on Linux.
 
 Hub doesn’t run on Windows or Android yet.
 
@@ -28,10 +29,10 @@ Hub doesn’t run on Windows or Android yet.
 - [Hub Network](Hub-Network.md): a private network between your devices, invitations, sharing apps and internet.
 - [Security Camera](Security-Camera.md): use a device as a camera, watch it live, motion clips and alerts.
 - [This Device](This-Device.md): Run a Hub, Shared Services, Storage, Farm and Settings.
+- [Settings](Settings.md): the Settings page, Open Ports, Reset Data, and the settings that sit next to what they
+  change.
+- [Keyboard Shortcuts](Keyboard-Shortcuts.md): Return, Escape and ⌘[.
 - [Privacy and Security](Privacy-and-Security.md): what Hub sends over the network, keys, approval codes and Reset Data.
-
-Hub has no menu commands of its own. In a sheet, Return confirms and Escape cancels. On a camera’s page, ⌘[ goes back
-to Cameras.
 
 ## Works with other v57 apps
 

@@ -8,8 +8,8 @@ Changes on this page (installing, uninstalling, updating, settings and instances
 
 ## See what runs
 
-**Launcher** lists each app with its status: CPU, memory and uptime, **Stopped**, **Not running** or **Updating**. An
-app with an update shows **Update**.
+**Launcher** lists each app with its status: uptime (and on iPad and the Mac, CPU and memory), **Stopped**, **Not
+running** or **Updating**. An app with an update shows **Update**.
 
 - On iPad and the Mac, switch between a grid and a list. Select an app to see its details beside the list.
 - On iPhone, tap an app to open its details.
@@ -18,14 +18,14 @@ A hub with no apps says **No Apps Yet**, with **Get More…** and **New App…**
 
 ## Start, stop and restart
 
-- Use ▶ or ⏸ on an app’s card to start or stop it.
-- In an app’s details, **Restart** restarts it.
+- Use ▶ or ⏸ on an app’s card to start or stop it. hub-server itself has no button.
+- In an app’s details, **Restart** restarts it while it runs.
 
 ## Change an app’s settings
 
 In an app’s details:
 
-- **Instances**: how many copies run.
+- **Instances**: how many copies run, from 1 to 64 (not for hub-server).
 - **Restart on crash**: shown as **On** or **Off**.
 - **Environment values**: names and values the app reads. Choose **Add Value** for another one.
 - **Secret keys**: values such as API keys. Choose **Add Secret**. hub-launcher keeps them and never shows them again.
@@ -50,10 +50,8 @@ When updates are available:
 Choose **New App** and pick **Shell** or **Bun**:
 
 - **Name**
-- **Repository**: cloned into `~/Hub/Launcher/apps` on the hub’s machine.
-- **Directory**
-- **Install**: one command a line.
-- **Start command**
+- For Bun, **Repository**: cloned into `~/Hub/Launcher/apps` on the hub’s machine.
+- For Shell, **Directory**, **Install** (one command a line) and **Start command**.
 - **Restart on crash**
 
 Choose **Create**. The app appears in the list and starts.
